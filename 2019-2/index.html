@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+      <meta name="description" content="CMSC 125: Operating Systems, Institute of Computer Science, University of the Philippines Los Banos">
+      <meta name="author" content="Joseph Anthony C. Hermocilla">
+
+      <title>CMSC 125: Operating Systems (Second Sem 2019-2020)</title>
+
+      <!-- Bootstrap core CSS -->
+      <link href="../../lib/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+      <!-- Custom styles for this template -->
+      <link href="../../lib/css/scrolling-nav.css" rel="stylesheet">
+
+      <style>
+         .cmscwide {
+            width:100%;
+            height:100%;
+            background-image:url('./ics-os.jpg');
+            background-size:cover;
+         }
+      </style>
+
+   </head>
+
+   <body id="page-top">
+
+      <!-- Navigation -->
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top" id="mainNav">
+         <div class="container">
+            <a class="navbar-brand js-scroll-trigger" href="#page-top">CMSC 125</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+               <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarResponsive">
+               <ul class="navbar-nav ml-auto">
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#about">About</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#staff">Staff</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#lecture">Lecture</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#laboratory">Laboratory</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#homework">Homework</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#resources">Resources</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="https://github.com/srg-ics-uplb/ics-os">ICS-OS</a>
+                  </li>
+               </ul>
+            </div>
+         </div>
+      </nav>
+
+      <header class="bg-primary text-white cmscwide">
+         <div class="container text-center">
+            <h1>Operating Systems</h1>
+            <p class="lead">Second Semester AY 2019-2020</p>
+         </div>
+      </header>
+ 
+      <section id="about">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>About</h2>
+                  <h5>Catalog Description</h5>
+                  <div class="container">
+                  <table class="table table-condensed table-sm">
+                     <tbody>
+                        <tr>
+                           <td>Course Number</td>
+                           <td>CMSC 125</td>
+                        </tr>
+                        <tr>
+                           <td>Course Title</td>
+                           <td>Operating Systems</td>
+                        </tr>
+                        <tr>
+                           <td>Description</td>
+                           <td>Processor management, memory management, file and disk management, resource management, concurrent processes, networks and distributed systems.</td>
+                        </tr>
+                        <tr>
+                           <td>Prerequisites</td>
+                           <td>CMSC 123 or COI</td>
+                        </tr>
+                        <tr>
+                           <td>Credit</td>
+                           <td>3 units</td>
+                        </tr>
+                     </tbody>
+                  </table>
+                  </div>
+                  <h5>Aim</h5>
+                  <p>The aim of this course is to introduce students to operating systems concepts.</p>
+                  <h5>Objectives</h5>
+                  At the end of this course the student should be able to: 
+                  <ol>
+                     <li>describe the purpose and functions of an operating system;</li>
+                     <li>design and implement programs to perform simple operating system tasks; and</li>
+                     <li>evaluate the performance of different operating system algorithms.</li>
+                  </ol>
+                  <h5>Topics (based on ACM's 2013 Curriculum Guidelines)</h5>
+                  <ol>
+                     <li>OS/Overview of Operating Systems</li>
+                     <li>OS/Operating System Principles</li>
+                     <li>OS/Concurrency</li>
+                     <li>OS/Scheduling and Dispatch</li>
+                     <li>OS/Memory Management</li>
+                     <li>OS/Security and Protection</li>
+                     <li>OS/Virtual Machines</li>
+                     <li>OS/Device Management</li>
+                     <li>OS/File Systems</li>
+                     <li>OS/Real Time and Embedded Systems</li>
+                     <li>OS/Fault Tolerance</li>
+                     <li>OS/System Performance and Evaluation</li>
+                     <li>SF/Cross-Layer Communications</li>
+                     <li>SF/Resource Allocation and Scheduling</li>
+                     <li>SF/Virtualization and Isolation</li>
+                  </ol>
+                  <h5>Evaluation/Grading(Tentative)</h5>
+                     <table class="table table-sm">
+                        <tr>
+                           <td>(A) 3 Long Exams</td>
+                           <td>45%</td>
+                        </tr>
+                        <tr>
+                           <td>(B) Quizzes/Homeworks</td>
+                           <td>10%</td>
+                        </tr>
+                        <tr>
+                           <td>(C) Project</td>
+                           <td>10%</td>
+                        </tr>
+                        <tr>
+                           <td>(D) Laboratory</td>
+                           <td>35%</td>
+                        </tr>
+                        <tr>
+                           <td>(E) Prefinal</td>
+                           <td>A+B+C+D</td>
+                        </tr>
+                        <tr>
+                           <td>(F) Final Exam</td>
+                           <td>100%</td>
+                        </tr>
+                        <tr>
+                           <td>(G) Final Grade</td>
+                           <td>20%xF+80%xE</td>
+                        </tr>
+                     </table>
+                     Passing grade is 55%. No grade of 4.0 will be given. Grading scale is shown below. 
+                     <table class="table table-sm table-striped">
+                        <tr>
+                           <td>0.00</td>
+                           <td>54.99</td>
+                           <td>5.0</td>
+                        </tr>
+                        <tr>
+                           <td>55.00</td>
+                           <td>59.99</td>
+                           <td>3.0</td>
+                        </tr>
+                        <tr>
+                           <td>60.00</td>
+                           <td>64.99</td>
+                           <td>2.75</td>
+                        </tr>
+                        <tr>
+                           <td>65.00</td>
+                           <td>69.99</td>
+                           <td>2.5</td>
+                        </tr>
+                        <tr>
+                           <td>70.00</td>
+                           <td>74.99</td>
+                           <td>2.25</td>
+                        </tr>
+                        <tr>
+                           <td>75.00</td>
+                           <td>79.99</td>
+                           <td>2.0</td>
+                        </tr>
+                        <tr>
+                           <td>80.00</td>
+                           <td>84.99</td>
+                           <td>1.75</td>
+                        </tr>
+                        <tr>
+                           <td>85.00</td>
+                           <td>89.99</td>
+                           <td>1.5</td>
+                        </tr>
+                        <tr>
+                           <td>90.00</td>
+                           <td>94.99</td>
+                           <td>1.25</td>
+                        </tr>
+                        <tr>
+                           <td>95.00</td>
+                           <td>100</td>
+                           <td>1.0</td>
+                        </tr>
+                     </table>
+                  <h5>Attendance Policy</h5>
+                  <p>Attendance will be checked every meeting. Students with seven(7) or more absences in the lecture or four(4) or more absences in the lab will be automatically dropped from the course.</p>
+                  <h5>Collaboration Policy</h5>
+                  <p></p>
+                  <h5>Honor Code</h5>
+                     <ul>
+                        <li>Properly acknowledge help received.</li>
+                        <li>No looking at solutions/programs from previous years.</li>
+                        <li>No sharing of code with other students.</li>
+                        <li>Be ready to explain your code.</li>
+                     </ul> 
+                  <h5>Google Classroom: <u>TBA</u></h5>
+               </div>
+            </div>
+         </div>
+      </section>
+      
+      <section id="staff" class="bg-light">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Staff</h2>
+                  <table class="table table-striped table-sm">
+                     <thead>
+                     <tr>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Email</th>
+                     </tr>
+                     </thead>
+                     <tbody>
+                        <tr>
+                           <td>Joseph Anthony C. Hermocilla</td>
+                           <td>Lecturer/Lab (Section T)</td>
+                           <td>jchermocilla@up.edu.ph</td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      <section id="lecture">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Lecture</h2>
+                  <table class="table table-sm table-striped table-bordered">
+                     <thead class="thead-inverse">
+                        <tr>
+                           <th style="width:10%">Meeting</th>
+                           <th>Date</th>
+                           <th>Topic</th>
+                           <th>Reading/Slides/Videos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                           <th scope="row">1</th>
+                           <td>1/14/2020 T</td>
+                           <td>(no meeting)</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">2</th>
+                           <td>1/16/2020 Th</td>
+                           <td>(no meeting)</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">3</th>
+                           <td>1/21/2020 T</td>
+                           <td>Introduction</td>
+                           <td><a href="http://pages.cs.wisc.edu/~remzi/OSTEP/intro.pdf">[Readings]</a>&nbsp;<a href="https://drive.google.com/file/d/152xsMGLQG0eokvHyHe6SfdJLGBJOHp4t/view?usp=sharing">[PDF]</a>&nbsp;<a href="https://www.youtube.com/watch?v=F-AOs0007fg">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">4</th>
+                           <td>1/23/2020 Th</td>
+                           <td>Persistence</td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="https://drive.google.com/file/d/152xsMGLQG0eokvHyHe6SfdJLGBJOHp4t/view?usp=sharing">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">5</th>
+                           <td>1/28/2020 T</td>
+                           <td>Process Abstraction</td>
+                           <td><a href="http://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf">[Readings]</a>&nbsp;<a href="https://drive.google.com/file/d/1oYpQEgBkEpntwvJ3_4-mcWKtAkqU_PM6/view?usp=sharing">[PDF]</a>&nbsp;<a href="https://www.youtube.com/watch?v=98wYrIEhxv0">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">6</th>
+                           <td>1/30/2020 Th</td>
+                           <td>Process API</td>
+                           <td><a href="http://pages.cs.wisc.edu/~remzi/OSTEP/cpu-api.pdf">[Readings]</a>&nbsp;<a href="https://drive.google.com/file/d/1Gsjk9o2FxHv2WWQdHwE6ta4W94cwdRGs/view?usp=sharing">[PDF]</a>&nbsp;<a href="https://youtu.be/lrRfU4pKx0g?list=PLJxblOKA4CEqBa4BJh6gw6vOwbQtXIaZt">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">7</th>
+                           <td>2/4/2020 T</td>
+                           <td>Virtualizing the CPU with control</td>
+                           <td><a href="http://pages.cs.wisc.edu/~remzi/OSTEP/cpu-mechanisms.pdf">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="https://youtu.be/d2qphHpucdo?list=PLJxblOKA4CEqBa4BJh6gw6vOwbQtXIaZt">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">8</th>
+                           <td>2/6/2020 Th</td>
+                           <td>Timer</td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="https://youtu.be/zDsov84bJws?list=PLJxblOKA4CEqBa4BJh6gw6vOwbQtXIaZt">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">9</th>
+                           <td>2/11/2020 T</td>
+                           <td>Scheduling with I/O</td>
+                           <td><a href="http://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched.pdf">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="https://youtu.be/cMF5nmsUOSk?list=PLJxblOKA4CEqBa4BJh6gw6vOwbQtXIaZt">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">10</th>
+                           <td>2/13/2020 Th</td>
+                           <td>Multiprocessor Scheduling</td>
+                           <td><a href="http://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-multi.pdf">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="https://youtu.be/LX-FXKEAZAY?list=PLJxblOKA4CEqBa4BJh6gw6vOwbQtXIaZt">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">11</th>
+                           <td>2/18/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">12</th>
+                           <td>2/20/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">13</th>
+                           <td>2/25/2020 T</td>
+                           <td><b>EXAM 1</b></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">14</th>
+                           <td>2/27/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">15</th>
+                           <td>3/3/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">16</th>
+                           <td>3/5/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">17</th>
+                           <td>3/10/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">18</th>
+                           <td>3/12/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">19</th>
+                           <td>3/17/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">20</th>
+                           <td>3/19/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">21</th>
+                           <td>3/24/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">22</th>
+                           <td>3/26/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">23</th>
+                           <td>3/31/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">24</th>
+                           <td>4/2/2020 Th</td>
+                           <td><b>EXAM 2</b></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">25</th>
+                           <td>4/7/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">26</th>
+                           <td>4/9/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">27</th>
+                           <td>4/14/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">28</th>
+                           <td>4/16/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">29</th>
+                           <td>4/21/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">30</th>
+                           <td>4/23/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">31</th>
+                           <td>4/28/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">32</th>
+                           <td>4/30/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">33</th>
+                           <td>5/5/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">34</th>
+                           <td>5/7/2020 Th</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">35</th>
+                           <td>5/12/2020 T</td>
+                           <td></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">36</th>
+                           <td>5/14/2020 Th</td>
+                           <td><b>EXAM 3</b></td>
+                           <td><a href="">[Readings]</a>&nbsp;<a href="">[PDF]</a>&nbsp;<a href="">[Video]</a></td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      <section id="laboratory" class="bg-light">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Laboratory</h2>
+                  <table class="table table-sm table-striped table-bordered">
+                     <thead class="thead-inverse">
+                        <tr>
+                           <th style="width:10%">Meeting</th>
+                           <th>Date</th>
+                           <th>Topic</th>
+                           <th>Readings</th>
+                           <th>Homework</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                           <th scope="row">1</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">2</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">3</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">4</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">5</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">6</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">7</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">8</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">9</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">10</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">11</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">12</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">13</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">14</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">15</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">16</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         </div>
+      </section>
+      
+      <section id="homework">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Homework</h2>
+                  <ul>
+<!--
+                     <li><a href="">Homework 7: I/O Subsystem</a></li>
+                     <li><a href="">Homework 6: Files and Filesystems</a></li>
+                     <li><a href="">Homework 5: Memory Management</a></li>
+                     <li><a href="">Homework 4: CPU Scheduling</a></li>
+                     <li><a href="">Homework 3: Environment Variables, Processes, and Threads</a></li>
+                     <li><a href="./hw2.pdf">Homework 2: Command Line Interface, System Calls, and System Utilities</a></li>
+                     <li><a href="./hw1.pdf">Homework 1: Building ICS-OS</a></li>
+-->
+                  </ul>
+               </div>
+            </div>
+         </div>
+      </section>
+      
+      <section id="resources" class="bg-light">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Resources</h2>
+                  <h5>Textbook</h5>
+                  <p>
+                     [OSTEP]Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau. 2018. <a href="http://pages.cs.wisc.edu/~remzi/OSTEP/">Operating Systems: Three Easy Pieces</a>. CreateSpace Independent Publishing Platform, North Charleston, SC, USA.
+                  </p>
+                  <h5>Supplementary Textbooks</h5>
+                  <ul>
+                     <li>[OSBOOK]<a href="http://codex.cs.yale.edu/avi/os-book/OS9/index.html">Operating System Concepts, 9th Edition</a> by Abraham Silberschatz, Peter B. Galvin, Greg Gagne</li>
+                  </ul>
+                  <h5>Similar OS Courses</h5>
+                  <ul>
+                     <li><a href="http://www.cs.cmu.edu/~410/">CMU</a></li>
+                     <li><a href="https://cs162.eecs.berkeley.edu/">UCB</a></li>
+                     <li><a href="https://www.cs.princeton.edu/courses/archive/fall17/cos318/">Princeton</a></li>
+                     <li><a href="http://www.scs.stanford.edu/17wi-cs140/">Stanford</a></li>
+                     <li><a href="http://web.cs.ucla.edu/classes/winter17/cs111/">UCLA</a></li>
+                     <li><a href="https://read.seas.harvard.edu/cs161-19/">Harvard</a></li>
+                     <li><a href="https://pdos.csail.mit.edu/6.828/2017/index.html">MIT</a></li>
+                  </ul>
+                  <h5>Software</h5>
+                  <ul>
+                     <li><a href="https://github.com/srg-ics-uplb/ics-os">ICS-OS</a></li>
+                  </ul>
+                  <h5>Others</h5>
+                  <ul>
+                     <li><a href="http://wiki.osdev.org/Expanded_Main_Page">OSDev Wiki</a></li>
+                     <li><a href="http://www.brokenthorn.com/Resources/">Broken Thorn OSDev Series</a></li>
+                     <li><a href="https://software.intel.com/en-us/articles/intel-sdm">Intel 64 and IA-32 manuals</a></li>
+                     <li><a href="http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0419c/index.html">ARM manuals</a></li>
+                     <li><a href="http://www.logix.cz/michal/doc/i386/">i386 Manual</a></li>
+                  </ul>
+                  </div>
+            </div>
+         </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="py-5 bg-dark">
+         <div class="container">
+            <p class="m-0 text-center text-white">Copyright &copy; JACH 2020</p>
+         </div>
+         <!-- /.container -->
+      </footer>
+
+      <!-- Bootstrap core JavaScript -->
+      <script src="../../lib/vendor/jquery/jquery.min.js"></script>
+      <script src="../../lib/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+      <!-- Plugin JavaScript -->
+      <script src="../../lib/vendor/jquery-easing/jquery.easing.min.js"></script>
+
+      <!-- Custom JavaScript for this theme -->
+      <script src="../../lib/js/scrolling-nav.js"></script>
+
+   </body>
+
+</html>

@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+      <meta name="description" content="CMSC 125: Operating Systems, Institute of Computer Science, University of the Philippines Los Banos">
+      <meta name="author" content="Joseph Anthony C. Hermocilla">
+
+      <title>CMSC 125: Operating Systems (Second Sem 2017-2018)</title>
+
+      <!-- Bootstrap core CSS -->
+      <link href="../../lib/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+      <!-- Custom styles for this template -->
+      <link href="../../lib/css/scrolling-nav.css" rel="stylesheet">
+
+      <style>
+         .cmscwide {
+            width:100%;
+            height:100%;
+            background-image:url('ics-os.jpg');
+            background-size:cover;
+         }
+      </style>
+
+   </head>
+
+   <body id="page-top">
+
+      <!-- Navigation -->
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top" id="mainNav">
+         <div class="container">
+            <a class="navbar-brand js-scroll-trigger" href="#page-top">CMSC 125</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+               <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarResponsive">
+               <ul class="navbar-nav ml-auto">
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#about">About</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#staff">Staff</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#lecture">Lecture</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#laboratory">Laboratory</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#homework">Homework</a>
+                  </li>
+                  <li class="nav-item">
+                     <a class="nav-link js-scroll-trigger" href="#resources">Resources</a>
+                  </li>
+               </ul>
+            </div>
+         </div>
+      </nav>
+
+      <header class="bg-primary text-white cmscwide">
+         <div class="container text-center">
+            <h1>Operating Systems</h1>
+            <p class="lead">Second Semester AY 2017-2018</p>
+         </div>
+      </header>
+
+      <section id="about">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>About</h2>
+                  <h5>Catalog Description</h5>
+                  <div class="container">
+                  <table class="table table-condensed table-sm">
+                     <tbody>
+                        <tr>
+                           <td>Course Number</td>
+                           <td>CMSC 125</td>
+                        </tr>
+                        <tr>
+                           <td>Course Title</td>
+                           <td>Operating Systems</td>
+                        </tr>
+                        <tr>
+                           <td>Description</td>
+                           <td>Processor management, memory management, file and disk management, resource management, concurrent processes, networks and distributed systems.</td>
+                        </tr>
+                        <tr>
+                           <td>Prerequisites</td>
+                           <td>CMSC 123 or COI</td>
+                        </tr>
+                        <tr>
+                           <td>Credit</td>
+                           <td>3 units</td>
+                        </tr>
+                     </tbody>
+                  </table>
+                  </div>
+                  <h5>Aim</h5>
+                  <p>The aim of this course is to introduce students to operating systems concepts.</p>
+                  <h5>Objectives</h5>
+                  At the end of this course the student should be able to: 
+                  <ol>
+                     <li>describe the purpose and functions of an operating system;</li>
+                     <li>design and implement programs to perform simple operating system tasks; and</li>
+                     <li>evaluate the performance of different operating system algorithms.</li>
+                  </ol>
+                  <h5>Topics (based on ACM's 2013 Curriculum Guidelines)</h5>
+                  <ol>
+                     <li>OS/Overview of Operating Systems</li>
+                     <li>OS/Operating System Principles</li>
+                     <li>OS/Concurrency</li>
+                     <li>OS/Scheduling and Dispatch</li>
+                     <li>OS/Memory Management</li>
+                     <li>OS/Security and Protection</li>
+                     <li>OS/Virtual Machines</li>
+                     <li>OS/Device Management</li>
+                     <li>OS/File Systems</li>
+                     <li>OS/Real Time and Embedded Systems</li>
+                     <li>OS/Fault Tolerance</li>
+                     <li>OS/System Performance and Evaluation</li>
+                     <li>SF/Cross-Layer Communications</li>
+                     <li>SF/Resource Allocation and Scheduling</li>
+                     <li>SF/Virtualization and Isolation</li>
+                  </ol>
+                  <h5>Evaluation/Grading(Tentative)</h5>
+                     <table class="table table-sm">
+                        <tr>
+                           <td>(A) 3 Long Exams</td>
+                           <td>45%</td>
+                        </tr>
+                        <tr>
+                           <td>(B) Quizzes/Homeworks</td>
+                           <td>10%</td>
+                        </tr>
+                        <tr>
+                           <td>(C) Project</td>
+                           <td>10%</td>
+                        </tr>
+                        <tr>
+                           <td>(D) Laboratory</td>
+                           <td>35%</td>
+                        </tr>
+                        <tr>
+                           <td>(E) Prefinal</td>
+                           <td>A+B+C+D</td>
+                        </tr>
+                        <tr>
+                           <td>(F) Final Exam</td>
+                           <td>100%</td>
+                        </tr>
+                        <tr>
+                           <td>(G) Final Grade</td>
+                           <td>20%xF+80%xE</td>
+                        </tr>
+                     </table>
+                     Passing grade is 55%. No grade of 4.0 will be given. Grading scale is shown below. 
+                     <table class="table table-sm table-striped">
+                        <tr>
+                           <td>0.00</td>
+                           <td>54.99</td>
+                           <td>5.0</td>
+                        </tr>
+                        <tr>
+                           <td>55.00</td>
+                           <td>59.99</td>
+                           <td>3.0</td>
+                        </tr>
+                        <tr>
+                           <td>60.00</td>
+                           <td>64.99</td>
+                           <td>2.75</td>
+                        </tr>
+                        <tr>
+                           <td>65.00</td>
+                           <td>69.99</td>
+                           <td>2.5</td>
+                        </tr>
+                        <tr>
+                           <td>70.00</td>
+                           <td>74.99</td>
+                           <td>2.25</td>
+                        </tr>
+                        <tr>
+                           <td>75.00</td>
+                           <td>79.99</td>
+                           <td>2.0</td>
+                        </tr>
+                        <tr>
+                           <td>80.00</td>
+                           <td>84.99</td>
+                           <td>1.75</td>
+                        </tr>
+                        <tr>
+                           <td>85.00</td>
+                           <td>89.99</td>
+                           <td>1.5</td>
+                        </tr>
+                        <tr>
+                           <td>90.00</td>
+                           <td>94.99</td>
+                           <td>1.25</td>
+                        </tr>
+                        <tr>
+                           <td>95.00</td>
+                           <td>100</td>
+                           <td>1.0</td>
+                        </tr>
+                     </table>
+                  <h5>Attendance Policy</h5>
+                  <p>Attendance will be checked every meeting. Students with seven(7) or more absences in the lecture or four(4) or more absences in the lab will be automatically dropped from the course.</p>
+                  <h5>Collaboration Policy</h5>
+                  <p></p>
+                  <h5>Honor Code</h5>
+                     <ul>
+                        <li>Properly acknowledge help received.</li>
+                        <li>No looking at solutions/programs from previous years.</li>
+                        <li>No sharing of code with other students.</li>
+                        <li>Be ready to explain your code.</li>
+                     </ul> 
+                  <h5>Google Classroom: <u>8u1fuhw</u></h5>
+                  <h5>Take the quiz: <u><a href="https://goo.gl/forms/qaiItsjX2n1iJz062">here</a></u></h5>
+               </div>
+            </div>
+         </div>
+      </section>
+      
+      <section id="staff" class="bg-light">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Staff</h2>
+                  <table class="table table-striped table-sm">
+                     <thead>
+                     <tr>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Email</th>
+                     </tr>
+                     </thead>
+                     <tbody>
+                        <tr>
+                           <td>Joseph Anthony C. Hermocilla</td>
+                           <td>Lecturer (Section T)</td>
+                           <td>jchermocilla@up.edu.ph</td>
+                        </tr>
+                        <tr>
+                           <td>Dyanara Dela Rosa</td>
+                           <td>Lab Instructor</td>
+                           <td>dmdelarosa@up.edu.ph</td>
+                        </tr>
+                        <tr>
+                           <td>Zenith Arnejo</td>
+                           <td>Lab Instructor</td>
+                           <td>zoarnejo@up.edu.ph</td>
+                        </tr>
+                        <tr>
+                           <td>Marie Betel de Robles</td>
+                           <td>Lab Instructor</td>
+                           <td>mbderobles2@up.edu.ph</td>
+                        </tr>
+                        <tr>
+                           <td>Kristine Bernadette Pelaez</td>
+                           <td>Lab Instructor</td>
+                           <td>kppelaez@up.edu.ph</td>
+                        </tr>
+                        <tr>
+                           <td>Joman Encinas</td>
+                           <td>Lab Instructor</td>
+                           <td>jiencinas@up.edu.ph</td>
+                        </tr>
+                        <tr>
+                           <td>Perico Dionisio</td>
+                           <td>Lab Instructor</td>
+                           <td>pbdionisio@up.edu.ph</td>
+                        </tr>
+                        <tr>
+                           <td>Samuel Bautista</td>
+                           <td>Student Assistant</td>
+                           <td>slbautista@up.edu.ph</td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      <section id="lecture">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Lecture</h2>
+                  <table class="table table-sm table-striped table-bordered">
+                     <thead class="thead-inverse">
+                        <tr>
+                           <th style="width:10%">Meeting</th>
+                           <th>Date</th>
+                           <th>Topic</th>
+                           <th>Readings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                           <th scope="row">1</th>
+                           <td>1/16/2018 T</td>
+                           <td>Introduction</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">2</th>
+                           <td>1/18/2018 Th</td>
+                           <td>Interrupt Timeline</td>
+                           <td>[OSBOOK]Ch. 1</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">3</th>
+                           <td>1/23/2018 T</td>
+                           <td>Multitasking</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">4</th>
+                           <td>1/25/2018 Th</td>
+                           <td>I/O Systems</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">5</th>
+                           <td>1/30/2018 T</td>
+                           <td>Open Source Operating Systems</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">6</th>
+                           <td>2/1/2018 Th</td>
+                           <td>Example of Standard API</td>
+                           <td>[OSBOOK]Ch. 2</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">7</th>
+                           <td>2/6/2018 T</td>
+                           <td>System Calls, FreeDOS, FreeBSD</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">8</th>
+                           <td>2/8/2018 Th</td>
+                           <td>System Boot</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">9</th>
+                           <td>2/13/2018 T</td>
+                           <td>Ready Queue and Device Queue</td>
+                           <td>[OSBOOK]Ch. 3</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">10</th>
+                           <td>2/15/2018 Th</td>
+                           <td>Context Switch</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">11</th>
+                           <td>2/20/2018 T</td>
+                           <td>Shared-Memory and Message-Passing</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">12</th>
+                           <td>2/22/2018 Th</td>
+                           <td><b>Exam 1</b></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">13</th>
+                           <td>2/27/2018 T</td>
+                           <td>Pipes</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">14</th>
+                           <td>3/1/2018 Th</td>
+                           <td>Thread Libraries</td>
+                           <td>[OSBOOK]Ch. 4</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">15</th>
+                           <td>3/6/2018 T</td>
+                           <td>Mutexes</td>
+                           <td>[OSBOOK]Ch. 5</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">16</th>
+                           <td>3/8/2018 Th</td>
+                           <td>Dining Philosphers Problem</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">17</th>
+                           <td>3/13/2018 T</td>
+                           <td>Priority Scheduling</td>
+                           <td>[OSBOOK]Ch. 6</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">18</th>
+                           <td>3/15/2018 Th</td>
+                           <td>Multiprocessor scheduling</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">19</th>
+                           <td>3/20/2018 T</td>
+                           <td>Evaluating Scheduling Algorithms</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">20</th>
+                           <td>3/22/2018 Th</td>
+                           <td>Deadlock Prevention</td>
+                           <td>[OSBOOK]Ch. 7</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">21</th>
+                           <td>3/27/2018 T</td>
+                           <td>(no meeting)</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">22</th>
+                           <td>3/29/2018 Th</td>
+                           <td>(no meeting)</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">23</th>
+                           <td>4/3/2018 T</td>
+                           <td>Recovery from Deadlock</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">24</th>
+                           <td>4/5/2018 Th</td>
+                           <td>"Lifecycle" of a C program</td>
+                           <td>[OSBOOK]Ch. 8</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">25</th>
+                           <td>4/10/2018 T</td>
+                           <td><b>Exam 2</b></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">26</th>
+                           <td>4/12/2018 Th</td>
+                           <td>Swapping on Mobile Systems</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">27</th>
+                           <td>4/17/2018 T</td>
+                           <td>Segmentation Hardware</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">28</th>
+                           <td>4/19/2018 Th</td>
+                           <td>(no meeting: power outage)</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">29</th>
+                           <td>4/24/2018 T</td>
+                           <td>Paging in example systems </td>
+                           <td>[OSBOOK]Ch. 9</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">30</th>
+                           <td>4/26/2018 Th</td>
+                           <td>Performance of Demand Paging</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">31</th>
+                           <td>5/1/2018 T</td>
+                           <td>(No meeting: Labor Day)</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">32</th>
+                           <td>5/3/2018 Th</td>
+                           <td>LRU Page Replacement Implementations</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">33</th>
+                           <td>5/8/2018 T</td>
+                           <td>Non-uniform memory access</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">34</th>
+                           <td>5/10/2018 Th</td>
+                           <td>Effects of Program Structure to Page Fault Rate</td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">35</th>
+                           <td>5/15/2018 T</td>
+                           <td>Disk Management</td>
+                           <td>[OSBOOK]Ch. 10</td>
+                        </tr>
+                        <tr>
+                           <th scope="row">36</th>
+                           <td>5/17/2018 Th</td>
+                           <td><b>Exam 3</b></td>
+                           <td></td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         </div>
+      </section>
+
+      <section id="laboratory" class="bg-light">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Laboratory</h2>
+                  <table class="table table-sm table-striped table-bordered">
+                     <thead class="thead-inverse">
+                        <tr>
+                           <th style="width:10%">Meeting</th>
+                           <th>Date</th>
+                           <th>Topic</th>
+                           <th>Readings</th>
+                           <th>Homework</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                           <th scope="row">1</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">2</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">3</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">4</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">5</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">6</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">7</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">8</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">9</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">10</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">11</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">12</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">13</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">14</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">15</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                        <tr>
+                           <th scope="row">16</th>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                           <td></td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         </div>
+      </section>
+      
+      <section id="homework">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Homework</h2>
+                  <ul>
+                     <li><a href="">Homework 7: I/O Subsystem</a></li>
+                     <li><a href="">Homework 6: Files and Filesystems</a></li>
+                     <li><a href="">Homework 5: Memory Management</a></li>
+                     <li><a href="">Homework 4: CPU Scheduling</a></li>
+                     <li><a href="hw3.pdf">Homework 3: Environment Variables, Processes, and Threads</a></li>
+                     <li><a href="hw2.pdf">Homework 2: Command Line Interface, System Calls, and System Utilities</a></li>
+                     <li><a href="hw1.pdf">Homework 1: Building ICS-OS</a></li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+      </section>
+      
+      <section id="resources" class="bg-light">
+         <div class="container">
+            <div class="row">
+               <div class="col-lg-8 mx-auto">
+                  <h2>Resources</h2>
+                  <h5>Textbook</h5>
+                  <p>
+                     [OSBOOK]<a href="http://codex.cs.yale.edu/avi/os-book/OS9/index.html">Operating System Concepts, 9th Edition</a> by Abraham Silberschatz, Peter B. Galvin, Greg Gagne
+                  </p>
+                  <h5>Supplementary Textbooks</h5>
+                  <ul>
+                     <li><a href="http://pages.cs.wisc.edu/~remzi/OSTEP/">OS: Three Easy Pieces</a></li>
+                  </ul>
+                  <h5>Similar OS Courses</h5>
+                  <ul>
+                     <li><a href="http://www.cs.cmu.edu/~410/">CMU</a></li>
+                     <li><a href="https://cs162.eecs.berkeley.edu/">UCB</a></li>
+                     <li><a href="https://www.cs.princeton.edu/courses/archive/fall17/cos318/">Princeton</a></li>
+                     <li><a href="http://www.scs.stanford.edu/17wi-cs140/">Stanford</a></li>
+                     <li><a href="http://web.cs.ucla.edu/classes/winter17/cs111/">UCLA</a></li>
+                     <li><a href="http://www.eecs.harvard.edu/~cs161/">Harvard</a></li>
+                     <li><a href="https://pdos.csail.mit.edu/6.828/2017/index.html">MIT</a></li>
+                  </ul>
+                  <h5>Software</h5>
+                  <ul>
+                     <li><a href="https://github.com/srg-ics-uplb/ics-os">ICS-OS</a></li>
+                  </ul>
+                  <h5>Others</h5>
+                  <ul>
+                     <li><a href="http://wiki.osdev.org/Expanded_Main_Page">OSDev Wiki</a></li>
+                     <li><a href="http://www.brokenthorn.com/Resources/">Broken Thorn OSDev Series</a></li>
+                     <li><a href="https://software.intel.com/en-us/articles/intel-sdm">Intel 64 and IA-32 manuals</a></li>
+                     <li><a href="http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0419c/index.html">ARM manuals</a></li>
+                  </ul>
+                  </div>
+            </div>
+         </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="py-5 bg-dark">
+         <div class="container">
+            <p class="m-0 text-center text-white">Copyright &copy; JACH 2018</p>
+         </div>
+         <!-- /.container -->
+      </footer>
+
+      <!-- Bootstrap core JavaScript -->
+      <script src="../../lib/vendor/jquery/jquery.min.js"></script>
+      <script src="../../lib/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+      <!-- Plugin JavaScript -->
+      <script src="../../lib/vendor/jquery-easing/jquery.easing.min.js"></script>
+
+      <!-- Custom JavaScript for this theme -->
+      <script src="../../lib/js/scrolling-nav.js"></script>
+
+   </body>
+
+</html>
