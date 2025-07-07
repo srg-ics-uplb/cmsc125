@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS 3013 - Operating Systems | University Catalog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background-color: #fff;
+        }
+        
+        .header {
+            background-color: #003366;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo {
+            width: 50px;
+            height: 50px;
+            background-color: #0066cc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+        }
+        
+        .container {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .main-content {
+            flex: 1;
+        }
+        
+        .sidebar {
+            width: 250px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-left: 1px solid #ddd;
+        }
+        
+        .course-header {
+            border-bottom: 2px solid #003366;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .course-number {
+            font-size: 18px;
+            color: #666;
+            font-weight: bold;
+        }
+        
+        .course-title {
+            font-size: 28px;
+            color: #003366;
+            margin: 5px 0;
+        }
+        
+        .credits {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+        }
+        
+        .section h2 {
+            font-size: 20px;
+            color: #003366;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 3px;
+        }
+        
+        .section p, .section li {
+            margin-bottom: 8px;
+        }
+        
+        .section ul {
+            margin-left: 20px;
+        }
+        
+        .prereq {
+            font-weight: bold;
+            color: #d9534f;
+        }
+        
+        .sidebar h3 {
+            font-size: 16px;
+            color: #003366;
+            margin-bottom: 10px;
+        }
+        
+        .sidebar ul {
+            list-style: none;
+        }
+        
+        .sidebar li {
+            margin-bottom: 5px;
+        }
+        
+        .sidebar a {
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .sidebar a:hover {
+            text-decoration: underline;
+        }
+        
+        .current {
+            font-weight: bold;
+            color: #d9534f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">TU</div>
+        <h1>Tech University - Course Catalog</h1>
+    </div>
+    
+    <div class="container">
+        <div class="main-content">
+            <div class="course-header">
+                <div class="course-number">CS 3013</div>
+                <h1 class="course-title">Operating Systems</h1>
+                <div class="credits">3 Credit Hours</div>
+            </div>
+            
+            <div class="section">
+                <h2>Course Description</h2>
+                <p>This course provides a comprehensive introduction to operating systems principles and design. Students will learn about process management, memory management, file systems, and system security. The course emphasizes both theoretical concepts and practical implementation through programming assignments and system analysis.</p>
+                <p><span class="prereq">Prerequisites:</span> CS 2011 (Data Structures), CS 2012 (Computer Organization), and MATH 2001 (Discrete Mathematics)</p>
+            </div>
+            
+            <div class="section">
+                <h2>Course Objectives</h2>
+                <p>Upon completion of this course, students will be able to:</p>
+                <ul>
+                    <li>Understand the fundamental concepts and principles of operating systems design and implementation</li>
+                    <li>Analyze and evaluate different process scheduling algorithms and their performance characteristics</li>
+                    <li>Design and implement memory management strategies including virtual memory systems</li>
+                    <li>Understand file system organization, implementation, and security mechanisms</li>
+                    <li>Analyze deadlock prevention, avoidance, and detection algorithms</li>
+                    <li>Implement system calls and understand kernel-level programming concepts</li>
+                    <li>Evaluate operating system performance and optimization techniques</li>
+                    <li>Understand security threats and protection mechanisms in modern operating systems</li>
+                </ul>
+            </div>
+            
+            <div class="section">
+                <h2>Course Topics</h2>
+                <p>The following topics are covered based on ACM Computing Curricula recommendations:</p>
+                <ul>
+                    <li><strong>Overview of Operating Systems:</strong> History, types, and basic concepts</li>
+                    <li><strong>System Structures:</strong> System calls, system programs, and operating system design</li>
+                    <li><strong>Process Management:</strong> Process concept, process scheduling, and inter-process communication</li>
+                    <li><strong>Threads:</strong> Multithreading models, thread libraries, and threading issues</li>
+                    <li><strong>Process Synchronization:</strong> Critical section problem, semaphores, and monitors</li>
+                    <li><strong>CPU Scheduling:</strong> Scheduling algorithms, algorithm evaluation, and multiprocessor scheduling</li>
+                    <li><strong>Deadlocks:</strong> System model, deadlock prevention, avoidance, and detection</li>
+                    <li><strong>Memory Management:</strong> Memory allocation, paging, segmentation, and virtual memory</li>
+                    <li><strong>Virtual Memory:</strong> Demand paging, page replacement algorithms, and memory-mapped files</li>
+                    <li><strong>File Systems:</strong> File concept, directory structure, file system implementation, and recovery</li>
+                    <li><strong>I/O Systems:</strong> I/O hardware, application interface, and kernel I/O subsystem</li>
+                    <li><strong>Mass Storage:</strong> Disk scheduling, RAID structure, and storage management</li>
+                    <li><strong>Protection and Security:</strong> Access control, authentication, and security threats</li>
+                    <li><strong>Distributed Systems:</strong> Network structures, distributed coordination, and distributed file systems</li>
+                    <li><strong>System Performance:</strong> Performance measurement, system tuning, and optimization techniques</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <h3>Course Offerings</h3>
+            <ul>
+                <li><a href="#" class="current">Spring 2025 (Current)</a></li>
+                <li><a href="#">Fall 2024</a></li>
+                <li><a href="#">Spring 2024</a></li>
+                <li><a href="#">Fall 2023</a></li>
+                <li><a href="#">Spring 2023</a></li>
+            </ul>
+            
+            <h3>Related Courses</h3>
+            <ul>
+                <li><a href="#">CS 3014 - Systems Programming</a></li>
+                <li><a href="#">CS 4013 - Distributed Systems</a></li>
+                <li><a href="#">CS 4015 - Computer Security</a></li>
+                <li><a href="#">CS 4017 - Network Programming</a></li>
+            </ul>
+            
+            <h3>Resources</h3>
+            <ul>
+                <li><a href="#">Syllabus Template</a></li>
+                <li><a href="#">Course Schedule</a></li>
+                <li><a href="#">Prerequisites Guide</a></li>
+                <li><a href="#">Faculty Information</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

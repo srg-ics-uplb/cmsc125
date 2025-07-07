@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMSC 125 - Operating Systems | Course Catalog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Optima', 'Palatino', 'Avenir', 'Helvetica', sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #8B1538 0%, #2E5233 100%);
+            color: white;
+            padding: 15px 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #8B1538;
+            font-size: 1.2rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .main-container {
+            margin-top: 80px;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+        }
+
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 120px;
+            right: 20px;
+            width: 280px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-height: calc(100vh - 140px);
+            overflow-y: auto;
+        }
+
+        .course-header {
+            border-bottom: 3px solid #8B1538;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .course-number {
+            color: #8B1538;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .course-title {
+            color: #2E5233;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .course-meta {
+            color: #666;
+            font-size: 0.95rem;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section h2 {
+            color: #8B1538;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            border-left: 4px solid #F5D800;
+            padding-left: 15px;
+        }
+
+        .section h3 {
+            color: #2E5233;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            margin-top: 15px;
+        }
+
+        .description {
+            text-align: justify;
+            margin-bottom: 15px;
+        }
+
+        .prerequisites {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #8B1538;
+        }
+
+        .objectives ul, .topics ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .objectives li, .topics li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .objectives li:before {
+            content: "▸";
+            color: #8B1538;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .topics li:before {
+            content: "•";
+            color: #2E5233;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .topics ul ul {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+
+        .topics ul ul li:before {
+            content: "◦";
+            color: #666;
+        }
+
+        .sidebar h3 {
+            color: #8B1538;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #F5D800;
+            padding-bottom: 8px;
+        }
+
+        .course-links {
+            list-style: none;
+            padding: 0;
+        }
+
+        .course-links li {
+            margin-bottom: 10px;
+        }
+
+        .course-links a {
+            color: #2E5233;
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            display: block;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .course-links a:hover {
+            background: #f8f9ff;
+            border-left-color: #8B1538;
+            color: #8B1538;
+        }
+
+        .current {
+            background: #8B1538;
+            color: white !important;
+            font-weight: 600;
+        }
+
+        .current:hover {
+            background: #2E5233;
+            border-left-color: #F5D800;
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                margin-top: 100px;
+            }
+            
+            .sidebar {
+                position: static;
+                width: 100%;
+                max-height: none;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                padding: 0 15px;
+            }
+            
+            .main-container {
+                padding: 15px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .course-meta {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <img src="./ics-logo.jpg" class="logo" />
+            <h1>Institute of Computer Science | University of the Philippines Los Banos </h1>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <main class="content">
+            <div class="course-header">
+                <div class="course-number">CMSC 125</div>
+                <div class="course-title">Operating Systems</div>
+                <div class="course-meta">
+                    <span><strong>Credits:</strong> 3 units (2 hours lecture, 3 hours laboratory)</span>
+                </div>
+            </div>
+
+            <section class="section">
+                <h2>Course Description</h2>
+                <div class="description">
+                    Processor management, memory management, file and disk management, resource management, concurrent processes, networks and distributed systems. 
+                </div>
+                <div class="prerequisites">
+                    <strong>Prerequisites:</strong> CMSC 123 (Data Structures) or COI
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Course Objectives</h2>
+                <div class="objectives">
+                    <ul>
+                        <li>describe the purpose and functions of an operating system;</li>
+                        <li>design and implement programs to perform simple operating system tasks; and</li>
+                        <li>evaluate the performance of different operating system algorithms.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Course Topics</h2>
+                <div class="topics">
+                  These topics are based on <a href="acm2013-os-sf.pdf">ACM's 2013 Curriculum Guidelines</a>.
+                  <ul class="topics">
+                     <li>OS/Overview of Operating Systems</li>
+                     <li>OS/Operating System Principles</li>
+                     <li>OS/Concurrency</li>
+                     <li>OS/Scheduling and Dispatch</li>
+                     <li>OS/Memory Management</li>
+                     <li>OS/Security and Protection</li>
+                     <li>OS/Virtual Machines</li>
+                     <li>OS/Device Management</li>
+                     <li>OS/File Systems</li>
+                     <li>OS/Real Time and Embedded Systems</li>
+                     <li>OS/Fault Tolerance</li>
+                     <li>OS/System Performance and Evaluation</li>
+                     <li>SF/Cross-Layer Communications</li>
+                     <li>SF/Resource Allocation and Scheduling</li>
+                     <li>SF/Virtualization and Isolation</li> 
+                  </ul>
+                </div>
+            </section>
+        </main>
+
+        <aside class="sidebar">
+            <h3>Course Offerings</h3>
+            <ul class="course-links">
+                <li><a href="#" class="current">First Semester - Current (2025)</a></li>
+                <li><a href="./2023-1/index.html">First Semester - 2023</a></li>
+                <li><a href="./2021-1/index.html">First Semester - 2021</a></li>
+                <li><a href="./2019-2/index.html">Second Semester - 2019</a></li>
+                <li><a href="./2018-2/index.html">Second Semester - 2018</a></li>
+                <li><a href="./2017-2/index.html">Second Semester - 2017</a></li>
+            </ul>
+
+        </aside>
+    </div>
+</body>
+</html>
