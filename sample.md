@@ -83,11 +83,6 @@ This course will require that you have taken CMSC 123, Data Structures.
 | 0.00 | 54.99 | **5.00** |
 
 
-  
-
-
-
-
 **VIII. On Course Requirements**
 
 **Attendance**
