@@ -1,0 +1,326 @@
+/* CMSC 125 Course Guide - Professional Academic Stylesheet */
+
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    line-height: 1.6;
+    color: #2c3e50;
+    background-color: #ffffff;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    font-size: 16px;
+}
+
+/* Typography Hierarchy */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #1a252f;
+}
+
+h1 {
+    font-size: 2.5rem;
+    text-align: center;
+    color: #2c5aa0;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid #2c5aa0;
+}
+
+h2 {
+    font-size: 1.8rem;
+    color: #2c5aa0;
+    margin-top: 2.5rem;
+    margin-bottom: 1.5rem;
+    padding-left: 0.5rem;
+    border-left: 4px solid #2c5aa0;
+}
+
+h3 {
+    font-size: 1.4rem;
+    color: #34495e;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+h4 {
+    font-size: 1.2rem;
+    color: #34495e;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Paragraph and Text Styles */
+p {
+    margin-bottom: 1.2rem;
+    text-align: justify;
+    text-justify: inter-word;
+}
+
+strong {
+    color: #2c5aa0;
+    font-weight: 600;
+}
+
+em {
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+/* Lists */
+ul, ol {
+    margin-left: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+li {
+    margin-bottom: 0.5rem;
+    line-height: 1.7;
+}
+
+/* Table Styles */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+thead {
+    background: linear-gradient(135deg, #2c5aa0 0%, #3498db 100%);
+    color: white;
+}
+
+th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid #ecf0f1;
+    vertical-align: top;
+}
+
+/* Alternating row colors */
+tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+tbody tr:hover {
+    background-color: #e3f2fd;
+    transition: background-color 0.3s ease;
+}
+
+/* Special table cells */
+td[style*="text-align: center"] {
+    text-align: center;
+    font-weight: 600;
+    color: #2c5aa0;
+}
+
+/* Course Information Table */
+table:first-of-type {
+    max-width: 600px;
+    margin: 2rem auto;
+}
+
+table:first-of-type td {
+    padding: 1rem 1.5rem;
+    font-size: 1.1rem;
+}
+
+table:first-of-type td:first-child {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #2c5aa0;
+    width: 40%;
+}
+
+/* Schedule Table Specific Styles */
+table:not(:first-of-type):not(:last-of-type) {
+    font-size: 0.9rem;
+}
+
+table:not(:first-of-type):not(:last-of-type) th {
+    font-size: 0.85rem;
+    padding: 0.75rem 0.5rem;
+}
+
+table:not(:first-of-type):not(:last-of-type) td {
+    padding: 0.6rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+/* Grading Scale Table */
+table:last-of-type {
+    max-width: 400px;
+    margin: 2rem auto;
+}
+
+table:last-of-type td {
+    text-align: center;
+    padding: 0.75rem;
+    font-weight: 600;
+}
+
+table:last-of-type td:last-child {
+    background-color: #2c5aa0;
+    color: white;
+}
+
+/* Links */
+a {
+    color: #2c5aa0;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.3s ease;
+}
+
+a:hover {
+    border-bottom-color: #2c5aa0;
+}
+
+/* Course Objectives List */
+ul li {
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+ul li::before {
+    content: "▶";
+    position: absolute;
+    left: 0;
+    color: #2c5aa0;
+    font-size: 0.8rem;
+}
+
+/* Academic Integrity Section */
+body > p:last-of-type {
+    background-color: #ffeaa7;
+    border: 2px solid #fdcb6e;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+}
+
+/* Teaching Staff Section */
+ul:last-of-type {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+ul:last-of-type li {
+    background-color: white;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+ul:last-of-type li::before {
+    content: "👨‍🏫";
+    font-size: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    body {
+        padding: 1rem;
+        font-size: 14px;
+    }
+    
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    table {
+        font-size: 0.8rem;
+    }
+    
+    th, td {
+        padding: 0.5rem;
+    }
+    
+    ul, ol {
+        margin-left: 1rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    body {
+        max-width: none;
+        margin: 0;
+        padding: 1rem;
+        font-size: 12pt;
+        color: black;
+    }
+    
+    h1, h2, strong {
+        color: black;
+    }
+    
+    table {
+        box-shadow: none;
+        border: 1px solid #000;
+    }
+    
+    thead {
+        background: #ddd !important;
+        color: black !important;
+    }
+    
+    tbody tr:nth-child(even) {
+        background-color: #f5f5f5 !important;
+    }
+    
+    a {
+        color: black;
+        text-decoration: underline;
+    }
+}
+
+/* Additional Academic Styling */
+.course-number {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    color: #2c5aa0;
+}
+
+.exam-notice {
+    background-color: #ffe6e6;
+    border-left: 4px solid #e74c3c;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.reading-break {
+    background-color: #e8f5e8;
+    border-left: 4px solid #27ae60;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+}

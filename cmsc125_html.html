@@ -1,0 +1,512 @@
+---
+title: "CMSC 125 Course Guide"
+subtitle: "Operating Systems"
+author: "University of the Philippines"
+date: "1st Semester AY 2024-2025"
+toc: true
+toc-depth: 3
+number-sections: true
+css: |
+  <style>
+  /* Custom CSS for professional HTML output */
+  :root {
+    --up-maroon: #800000;
+    --up-gold: #FFD700;
+    --light-gray: #f5f5f5;
+    --border-color: #ddd;
+    --text-color: #333;
+    --link-color: #0066cc;
+  }
+  
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+  }
+  
+  /* Header styling */
+  .header {
+    background: linear-gradient(135deg, var(--up-maroon), #a00000);
+    color: white;
+    padding: 30px;
+    text-align: center;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+  
+  .header h1 {
+    font-size: 2.5em;
+    margin: 0;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  }
+  
+  .header .subtitle {
+    font-size: 1.5em;
+    margin: 10px 0;
+    font-style: italic;
+  }
+  
+  .header .meta {
+    font-size: 1.1em;
+    margin-top: 15px;
+    opacity: 0.9;
+  }
+  
+  /* Table of Contents */
+  #TOC {
+    background-color: var(--light-gray);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+  }
+  
+  #TOC::before {
+    content: "📋 Table of Contents";
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--up-maroon);
+    display: block;
+    margin-bottom: 15px;
+  }
+  
+  #TOC ul {
+    list-style-type: none;
+    padding-left: 0;
+  }
+  
+  #TOC > ul > li {
+    margin: 8px 0;
+  }
+  
+  #TOC a {
+    color: var(--link-color);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+  
+  #TOC a:hover {
+    background-color: var(--up-maroon);
+    color: white;
+  }
+  
+  /* Section headers */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--up-maroon);
+    margin-top: 30px;
+    margin-bottom: 15px;
+    font-weight: bold;
+  }
+  
+  h1 {
+    font-size: 2.2em;
+    border-bottom: 3px solid var(--up-maroon);
+    padding-bottom: 10px;
+  }
+  
+  h2 {
+    font-size: 1.8em;
+    border-bottom: 2px solid var(--up-maroon);
+    padding-bottom: 5px;
+  }
+  
+  h3 {
+    font-size: 1.5em;
+    color: #a00000;
+  }
+  
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 0.9em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  th, td {
+    padding: 12px;
+    text-align: left;
+    border: 1px solid var(--border-color);
+    vertical-align: top;
+  }
+  
+  th {
+    background-color: var(--up-maroon);
+    color: white;
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  tr:nth-child(even) {
+    background-color: var(--light-gray);
+  }
+  
+  tr:hover {
+    background-color: #e8e8e8;
+  }
+  
+  /* Course schedule table special styling */
+  .schedule-table {
+    font-size: 0.8em;
+    overflow-x: auto;
+  }
+  
+  .schedule-table th {
+    background-color: var(--up-maroon);
+    color: white;
+    font-size: 0.9em;
+    padding: 10px 8px;
+  }
+  
+  .schedule-table td {
+    padding: 10px 8px;
+    line-height: 1.4;
+  }
+  
+  .exam-row {
+    background-color: #ffebee !important;
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  .exam-row td {
+    background-color: var(--up-maroon) !important;
+    color: white !important;
+    padding: 15px;
+  }
+  
+  .break-row {
+    background-color: #f0f8ff !important;
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  /* Grading table */
+  .grading-table th {
+    background-color: var(--up-maroon);
+    color: white;
+  }
+  
+  .grading-table td:nth-child(2) {
+    text-align: center;
+    font-weight: bold;
+  }
+  
+  /* Course info cards */
+  .info-card {
+    background-color: var(--light-gray);
+    border-left: 4px solid var(--up-maroon);
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  
+  .info-card h3 {
+    margin-top: 0;
+    color: var(--up-maroon);
+  }
+  
+  /* Lists */
+  ul, ol {
+    padding-left: 25px;
+  }
+  
+  li {
+    margin: 8px 0;
+  }
+  
+  /* Links */
+  a {
+    color: var(--link-color);
+    text-decoration: none;
+  }
+  
+  a:hover {
+    text-decoration: underline;
+    color: var(--up-maroon);
+  }
+  
+  /* Code and emphasis */
+  code {
+    background-color: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+  }
+  
+  strong {
+    color: var(--up-maroon);
+  }
+  
+  em {
+    color: #666;
+  }
+  
+  /* Faculty list */
+  .faculty-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+  }
+  
+  .faculty-member {
+    background-color: var(--light-gray);
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid var(--up-maroon);
+  }
+  
+  .faculty-member strong {
+    display: block;
+    margin-bottom: 5px;
+  }
+  
+  /* Footer */
+  .footer {
+    background-color: var(--up-maroon);
+    color: white;
+    text-align: center;
+    padding: 20px;
+    margin-top: 50px;
+    border-radius: 8px;
+  }
+  
+  .footer strong {
+    color: var(--up-gold);
+  }
+  
+  /* Responsive design */
+  @media (max-width: 768px) {
+    body {
+      padding: 10px;
+    }
+    
+    .header h1 {
+      font-size: 2em;
+    }
+    
+    .header .subtitle {
+      font-size: 1.2em;
+    }
+    
+    table {
+      font-size: 0.8em;
+    }
+    
+    .schedule-table {
+      font-size: 0.7em;
+    }
+    
+    .faculty-list {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  /* Print styles */
+  @media print {
+    body {
+      font-size: 12pt;
+      line-height: 1.4;
+    }
+    
+    .header {
+      background: none !important;
+      color: black !important;
+      border: 2px solid black;
+    }
+    
+    #TOC {
+      page-break-after: always;
+    }
+    
+    h1 {
+      page-break-before: always;
+    }
+    
+    table {
+      page-break-inside: avoid;
+    }
+  }
+  </style>
+header-includes: |
+  <div class="header">
+    <h1>CMSC 125 Course Guide</h1>
+    <div class="subtitle">Operating Systems</div>
+    <div class="meta">
+      <strong>University of the Philippines</strong><br>
+      1st Semester AY 2024-2025
+    </div>
+  </div>
+---
+
+# Course Description
+
+<div class="info-card">
+
+| **Course Number** | CMSC 125 |
+|:------------------|:----------|
+| **Course Title**  | **Operating Systems** |
+| **Description**   | Processor management, memory management, file and disk management, resource management, concurrent processes, networks and distributed systems. |
+| **Prerequisite**  | CMSC 123 or COI |
+
+</div>
+
+# Course Introduction
+
+**Welcome to CMSC 125!** The aim of this course is to introduce students to operating systems concepts.
+
+# Course Objectives
+
+<div class="info-card">
+<h3>🎯 Learning Goals</h3>
+
+At the end of the course, you should be able to:
+
+* describe the purpose and functions of an operating system;
+* design and implement programs to perform simple operating system tasks; and
+* evaluate the performance of different operating system algorithms.
+
+</div>
+
+# Course Prerequisite
+
+This course will require that you have taken **CMSC 123, Data Structures**.
+
+# Course Materials and Schedule
+
+* You will be provided with **video lectures** and a PDF version of the set of **presentation slides** used in the videos as well as a set of **labs** for you to do, mostly coding. These will be made available through the course website or Google Classroom. No coursepack will be provided.
+* Below is the timetable summarizing the topics that we will cover for the semester. We advise that during each week you spend one to two hours viewing the videos of the lectures. Don't forget to read the textbook!
+
+<div class="schedule-table">
+
+| **Wk** | **Scheduled Dates** | **Actual Dates** | **Topics** | **Expected Learning Outcomes** | **Learning Resources** | **Labs** | **F2F/Async Activities** |
+|:------:|:------------------:|:----------------:|:-----------|:------------------------------|:---------------------|:---------|:------------------------|
+| **1** | **Aug 19-23** | | Introduction to the Course | | | Tutorial01: Installing Ubuntu Desktop 20.04 on VirtualBox | *F2F*: Discussion/Quizzes/Lab<br>*Async*: Readings/Videos/Consultation via Slack |
+| **2** | **Aug 26-30** | *Aug 26-30* | • Introduction to OS<br>• The Process Abstraction<br>• Process API Example | • Describe the main services provided by an operating system in the context of virtualization, concurrency, and persistence<br>• Differentiate a program from a process<br>• Describe the different states a process can be in<br>• Differentiate CPU-bound process and I/O-bound processes<br>• Explain how a process transitions from one state to another<br>• Explain how the fork(), wait(), and exec() system calls work<br>• Describe other process control functions | [OSTEP Ch. 2](https://pages.cs.wisc.edu/~remzi/OSTEP/intro.pdf)<br>[OSTEP Ch. 4](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf)<br>[OSTEP Ch. 5](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-api.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab01: Advanced Linux Commands | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **3** | **Sep 2-6** | *Sep 2-6*<br>*Sep 9-13* | • Limited Direct Execution<br>• Scheduling<br>• Multi-Level Feedback Queue<br>• Fair-Share Scheduling<br>• Multiprocessor Scheduling | • Illustrate the Limited Direct Execution Protocol<br>• Describe how the trap and return-from-trap instructions work<br>• Differentiate user mode from kernel mode<br>• Describe the approaches on how the kernel takes back control when switching processes<br>• Explain how the timer interrupt is used for the kernel to regain control<br>• Evaluate various CPU scheduling policies based on certain metrics given some assumptions on the input processes<br>• Describe how MLFQ works<br>• Describe the different approaches to proportional share scheduling<br>• Describe the challenges, and solutions, in multiprocessor scheduling | [OSTEP Ch. 6](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-mechanisms.pdf)<br>[OSTEP Ch. 7](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched.pdf)<br>[OSTEP Ch. 8](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-mlfq.pdf)<br>[OSTEP Ch. 9](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-lottery.pdf)<br>[OSTEP Ch. 10](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-multi.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab02: BASH Shell Scripting | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **4** | **Sep 9-13** | *Sep 16-20* | • Address Spaces<br>• Memory API<br>• Address Translation | • Explain what the address space of a process is<br>• Illustrate the address space of a process<br>• Explain the function and behaviour of each section of a process' address space: code, data, stack, heap<br>• Describe the goals for virtualizing memory<br>• Explain how the malloc(), free(), sbrk(), and other functions are used in C programs<br>• Explain the importance and mechanisms of address translation: virtual address to physical address<br>• Illustrate Limited Direct Execution with Dynamic Relocation at boot time and at run time<br>• Illustrate internal fragmentation | [OSTEP Ch. 13](https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-multi.pdf)<br>[OSTEP Ch. 14](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-api.pdf)<br>[OSTEP Ch. 15](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-mechanism.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab03: Process API in Linux | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **5** | **Sep 16-20** | *Sep 23-27*<br>*Sep 30-Oct 4*<br>*Oct 7-11* | • Segmentation<br>• Free Space Management<br>• Paging<br>• TLB<br>• Swapping Mechanisms<br>• Advanced Page Tables | • Illustrate how segmentation works<br>• Explain how the hardware determines the segment and offset within a segment given a memory address<br>• Illustrate external fragmentation<br>• Describe a basic algorithm for implementing malloc()<br>• Illustrate how paging works<br>• Illustrate how the TLB helps in improving paging performance<br>• Illustrate how paged-segmentation works<br>• Illustrate how multi-level paging works | [OSTEP Ch. 16](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-segmentation.pdf)<br>[OSTEP Ch. 17](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-freespace.pdf)<br>[OSTEP Ch. 18](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-paging.pdf)<br>[OSTEP Ch. 19](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-tlbs.pdf)<br>[OSTEP Ch. 20](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-smalltables.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab04: CPU Scheduling Simulations | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **6** | **Sep 23-27** | | Policies and Mechanisms for Memory (reading assignment) | • Explain the role and implementation of swap space<br>• Illustrate what happens during a page fault<br>• Explain what thrashing is | [OSTEP Ch. 21](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys.pdf)<br>[OSTEP Ch. 22](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys-policy.pdf)<br>[OSTEP Ch. 23](https://pages.cs.wisc.edu/~remzi/OSTEP/vm-complete.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab05: Understanding the PC Boot Process | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **7** | **Sep 30-Oct 4** | | (Review and Exam Week) | | | Lab06: Virtual Memory Simulation | |
+
+</div>
+
+<div class="exam-row">
+<table>
+<tr class="exam-row">
+<td colspan="7"><strong>🎓 EXAM 1 (Oct 3, Thu, 7PM-9PM)</strong></td>
+</tr>
+</table>
+</div>
+
+<div class="schedule-table">
+
+| **Wk** | **Scheduled Dates** | **Actual Dates** | **Topics** | **Expected Learning Outcomes** | **Learning Resources** | **Labs** | **F2F/Async Activities** |
+|:------:|:------------------:|:----------------:|:-----------|:------------------------------|:---------------------|:---------|:------------------------|
+| **8** | **Oct 7-11** | *Nov 4-8* | • Concurrency<br>• Thread API<br>• Locks | • Explain what a thread is and its advantages<br>• Differentiate a process from a thread<br>• Explain terms related to concurrency: race condition, critical section, mutual exclusion, atomicity<br>• Write multithreaded programs using the PThreads API<br>• Describe the lock abstraction<br>• Describe and evaluate different lock implementations<br>• Describe how basic data structures are implemented to support concurrent access | [OSTEP Ch. 26](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf)<br>[OSTEP Ch. 27](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-api.pdf)<br>[OSTEP Ch. 28](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf)<br>[OSTEP Ch. 29](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab07: Unix System V Shared Memory API | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+
+</div>
+
+<div class="break-row">
+<table>
+<tr class="break-row">
+<td colspan="7"><strong>📚 Oct 14-19: READING BREAK</strong></td>
+</tr>
+</table>
+</div>
+
+<div class="schedule-table">
+
+| **Wk** | **Scheduled Dates** | **Actual Dates** | **Topics** | **Expected Learning Outcomes** | **Learning Resources** | **Labs** | **F2F/Async Activities** |
+|:------:|:------------------:|:----------------:|:-----------|:------------------------------|:---------------------|:---------|:------------------------|
+| **9** | **Oct 21-24** | *Nov 11-15* | • Lock-based concurrent data structures<br>• Condition Variables<br>• Semaphores | • Articulate when and how to use condition variables in concurrent programs<br>• Articulate when and how to use semaphores in concurrent programs<br>• Describe and evaluate solutions to the Bounded-Buffer Problem<br>• Articulate when and how to use reader-writer locks in concurrent programs<br>• Describe and evaluate solutions to the Dining Philosophers Problem<br>• Implement semaphores using locks and condition variables<br>• Describe some non-deadlock concurrency bugs<br>• Explain why deadlocks occur<br>• Describe the approaches on how to prevent and avoid deadlocks as well as detect and recover from it<br>• Describe how event-based concurrency works<br>• Explain how select() works<br>• Explain what asynchronous I/O is | [OSTEP Ch. 30](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-cv.pdf)<br>[OSTEP Ch. 31](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf)<br>[OSTEP Ch. 32](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf)<br>[OSTEP Ch. 33](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-events.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab08: Programming with PThreads | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **10** | **Oct 28-Nov 1** | *Nov 18-22* | • Common Concurrency Problems<br>• Event-based Concurrency<br>• I/O Devices<br>• HDD | • Describe modern computer system architecture<br>• Describe a basic I/O device and its interface<br>• Differentiate programmed I/O from interrupt-driven I/O<br>• Explain how Direct Memory Access (DMA) works<br>• Describe approaches on how the CPU interacts with the hardware: I/O instructions and memory-mapped I/O<br>• Describe what a device driver is and how it interacts with the kernel<br>• Explain how a simple IDE Disk driver works<br>• Explain the interface and geometry of hard disk drives<br>• Explain the factors that contribute to disk performance<br>• Calculate the I/O time and rate of I/O of a disk given a disk specification and different workloads<br>• Describe various disk scheduling algorithms and their properties | [OSTEP Ch. 36](https://pages.cs.wisc.edu/~remzi/OSTEP/file-devices.pdf)<br>[OSTEP Ch. 37](https://pages.cs.wisc.edu/~remzi/OSTEP/file-disks.pdf)<br>[OSTEP Ch. 38](https://pages.cs.wisc.edu/~remzi/OSTEP/file-raid.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab09: Thread Synchronization in PThreads | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **11** | **Nov 4-8** | *Nov 25-30*<br>*Dec 2-6* | • Files and Directories<br>• File System Implementation | • Explain the file and directory abstractions as well as associated terminologies<br>• Describe and use the File System API: creating, reading and writing, renaming, mounting, etc.<br>• Describe a simple File System Implementation<br>• Explain the importance of caching and buffering in File Systems<br>• Describe how the Fast File System works | [OSTEP Ch. 39](https://pages.cs.wisc.edu/~remzi/OSTEP/file-intro.pdf)<br>[OSTEP Ch. 40](https://pages.cs.wisc.edu/~remzi/OSTEP/file-implementation.pdf)<br>[OSTEP Ch. 41](https://pages.cs.wisc.edu/~remzi/OSTEP/file-ffs.pdf)<br>[OSTEP Ch. 42](https://pages.cs.wisc.edu/~remzi/OSTEP/file-journaling.pdf)<br>[YouTube Videos](https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw) | Lab10a: [ICS-OS] Building and Booting ICS-OS<br>Lab10b: [ICS-OS] Command Line Interface, System Calls, and System Utilities | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **12** | **Nov 11-15** | | (buffer week) | | | Lab11: [ICS-OS] Environment Variables, Processes, and Threads | *F2F:* Discussion/Quizzes/Lab<br>*Async:* Readings/Videos/Consultation via Slack |
+| **13** | **Nov 18-22** | | (buffer week) | | | Lab12: [ICS-OS] Implementing Lottery Scheduling in ICS-OS | |
+| **14** | **Nov 25-30** | | (Review and Exam Week) | | | | |
+
+</div>
+
+<div class="exam-row">
+<table>
+<tr class="exam-row">
+<td colspan="7"><strong>🎓 EXAM 2</strong></td>
+</tr>
+</table>
+</div>
+
+<div class="schedule-table">
+
+| **Wk** | **Scheduled Dates** | **Actual Dates** | **Topics** | **Expected Learning Outcomes** | **Learning Resources** | **Labs** | **F2F/Async Activities** |
+|:------:|:------------------:|:----------------:|:-----------|:------------------------------|:---------------------|:---------|:------------------------|
+| **15** | **Dec 2-6** | | | | | | |
+| **16** | **Dec 9-12** | | | | | | |
+
+</div>
+
+# References
+
+<div class="info-card">
+<h3>📚 Required Textbooks and Resources</h3>
+
+* **[OSTEP]** Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau. 2018. Operating Systems: Three Easy Pieces. CreateSpace Independent Publishing Platform, North Charleston, SC, USA. ([Online Version](http://pages.cs.wisc.edu/~remzi/OSTEP/))
+
+* **[OSBOOK10]** Operating System Concepts, 10th Edition by Abraham Silberschatz, Peter B. Galvin, Greg Gagne ([Website](https://www.os-book.com/OS10/))
+
+* **[ICS-OS]** J. A. C. Hermocilla. Ics-os: A kernel programming approach to teaching operating system concepts. Philippine Information Technology Journal, 2(2):25--30, 2009. ([GitHub Repository](https://github.com/srg-ics-uplb/ics-os))
+
+</div>
+
+# Grading
+
+<div class="info-card">
+<h3>📊 Grade Breakdown</h3>
+
+Your **final standing** will be based on the following requirements. **No Final Exam**.
+
+<div class="grading-table">
+
+| **Component** | **Weight** |
+|:--------------|:----------:|
+| Two Lecture Exams | 40% |
+| Lecture Quizzes/Homework/Problem Set | 10% |
+| ICS-OS Project | 10% |
+| Laboratory | 40% |
+| **Total** | **100%** |
+
+</div>
+
+</div>
+
+<div class="info-card">
+<h3>🎯 Grading Scale</h3>
+
+We shall be using the following **grading scale** to transmute your final standing to a numerical grade:
+
+<div class="grading-table">
+
+| **Range (Lower)** | **Range (Upper)** | **Grade** |
+|:-----------------:|:-----------------:|:---------:|
+| 95.00 | 100.00 | 1.00 |
+| 90.00 | 94.99 | **1.25** |
+| 85.00 | 89.99 | **1.50** |
+| 80.00 | 84.99 | **1.75** |
+| 75.00 | 79.99 | **2.00** |
+| 70.00 | 74.99 | **2.25** |
+| 65.00 | 69.99 | **2.50** |
+| 60.00 | 64.99 | **2.75** |
+| 55.00 | 59.

@@ -1,0 +1,382 @@
+<p><strong>CMSC 125 COURSE GUIDE 1st Semester AY 2024-2025</strong></p>
+<p><strong>I. Course Description</strong></p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"><em>Course Number</em></th>
+<th style="text-align: left;">CMSC 125</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><em>Course Title</em></td>
+<td style="text-align: left;"><strong>Operating Systems</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><em>Description</em></td>
+<td style="text-align: left;">Processor management, memory management, file and disk management, resource management, concurrent processes, networks and distributed systems.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><em>Prerequisite</em></td>
+<td style="text-align: left;">CMSC 123 or COI</td>
+</tr>
+</tbody>
+</table>
+<p><strong>II. Course Introduction</strong></p>
+<p><strong>Welcome to CMSC 125</strong>! The aim of this course is to introduce students to operating systems concepts.</p>
+<p><strong>III. Course Objectives</strong><br />
+At the end of the course, you should be able to</p>
+<ul>
+<li>describe the purpose and functions of an operating system;<br />
+</li>
+<li>design and implement programs to perform simple operating system tasks; and<br />
+</li>
+<li>evaluate the performance of different operating system algorithms.</li>
+</ul>
+<p><strong>IV. Course Prerequisite</strong></p>
+<p>This course will require that you have taken CMSC 123, Data Structures.</p>
+<p><strong>V. Course Materials and Schedule</strong></p>
+<ul>
+<li>You will be provided with <strong>video lectures</strong> and a PDF version of the set of <strong>presentation slides</strong> used in the videos as well as a set of <strong>labs</strong> for you to do, mostly coding. These will be made available through the course website or Google Classroom. No coursepack will be provided.<br />
+</li>
+<li>Below is the timetable summarizing the topics that we will cover for the semester. We advise that during each week you spend one to two hours viewing the videos of the lectures. Don’t forget to read the textbook!</li>
+</ul>
+<table>
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">Wk</th>
+<th>Scheduled Dates</th>
+<th>Actual Dates</th>
+<th>Topics</th>
+<th>Expected Learning Outcomes</th>
+<th>Learning Resources</th>
+<th>Labs</th>
+<th>F2F/Async Activities</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>1</strong></td>
+<td><strong>Aug 19-23</strong></td>
+<td></td>
+<td>Introduction to the Course</td>
+<td></td>
+<td></td>
+<td>Tutorial01: Installing Ubuntu Desktop 20.04 on VirtualBox,</td>
+<td><em>F2F</em>: Discussion/Quizzes/Lab <em>Async</em>: Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>2</strong></td>
+<td><strong>Aug 26-30</strong></td>
+<td><em>Aug 26-30</em></td>
+<td>-Introduction to OS<br/> -The Process Abstraction<br/> -Process API Example</td>
+<td>-Describe the main services provided by an operating system in the context of virtualization, concurrency, and persistence<br/> -Differentiate a program from a process<br/> -Describe the different states a process can be in<br/> -Differentiate CPU-bound process and I/O-bound processes<br/> -Explain how a process transitions from one state to another<br/> -Explain how the fork(), wait(), and exec() system calls work<br/> -Describe other process control functions</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/intro.pdf">OSTEP Ch. 2</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf">OSTEP Ch. 4</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-api.pdf">OSTEP Ch. 5</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab01: Advanced Linux Commands</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>3</strong></td>
+<td><strong>Sep 2-6</strong></td>
+<td><em>Sep 2- 6</em> <em>Sep 9-13</em></td>
+<td>Limited Direct Execution Scheduling Multi-Level Feedback Queue Fair-Share Scheduling Multiprocessor Scheduling</td>
+<td>Illustrate the Limited Direct Execution Protocol Describe how the trap and return-from-trap instructions work Differentiate user mode from kernel mode Describe the approaches on how the kernel takes back control when switching processes Explain how the timer interrupt is used for the kernel to regain control Evaluate various CPU scheduling policies based on certain metrics given some assumptions on the input processes Describe how MLFQ works Describe the different approaches to proportional share scheduling Describe the challenges, and solutions, in multiprocessor scheduling</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-mechanisms.pdf">OSTEP Ch. 6</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched.pdf">OSTEP Ch. 7</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-mlfq.pdf">OSTEP Ch. 8</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-lottery.pdf">OSTEP Ch. 9</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-multi.pdf">OSTEP Ch. 10</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab02: BASH Shell Scripting</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>4</strong></td>
+<td><strong>Sep 9-13</strong></td>
+<td><em>Sep 16-20</em></td>
+<td>Address Spaces Memory API Address Translation</td>
+<td>Explain what the address space of a process is Illustrate the address space of a process Explain the function and behaviour of each section of a process’ address space: code, data, stack, heap Describe the goals for virtualizing memory Explain how the malloc(), free(), sbrk(), and other functions are used in C programs Explain the importance and mechanisms of address translation: virtual address to physical address Illustrate Limited Direct Execution with Dynamic Relocation at boot time and at run time Illustrate internal fragmentation</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-multi.pdf">OSTEP Ch. 13</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-api.pdf">OSTEP Ch. 14</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-mechanism.pdf">OSTEP Ch. 15</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab03: Process API in Linux</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>5</strong></td>
+<td><strong>Sep 16-20</strong></td>
+<td><em>Sep 23-27 Sep 30-Oct 4 Oct 7-11</em></td>
+<td>Segmentation Free Space Management Paging TLB Swapping Mechanisms Advanced Page Tables</td>
+<td>Illustrate how segmentation works Explain how the hardware determines the segment and offset within a segment given a memory address Illustrate external fragmentation Describe a basic algorithm for implementing malloc() Illustrate how paging works Illustrate how the TLB helps in improving paging performance Illustrate how paged-segmentation works Illustrate how multi-level paging works</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-segmentation.pdf">OSTEP Ch. 16</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-freespace.pdf">OSTEP Ch. 17</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-paging.pdf">OSTEP Ch. 18</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-tlbs.pdf">OSTEP Ch. 19</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-smalltables.pdf">OSTEP Ch. 20</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab04: CPU Scheduling Simulations</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>6</strong></td>
+<td><strong>Sep 23-27</strong></td>
+<td></td>
+<td>Policies and Mechanisms for Memory (reading assignment)</td>
+<td>Explain the role and implementation of swap space Illustrate what happens during a page fault Explain what thrashing is</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys.pdf">OSTEP Ch. 21</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys-policy.pdf">OSTEP Ch. 22</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/vm-complete.pdf">OSTEP Ch. 23</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab05: Understanding the PC Boot Process</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>7</strong></td>
+<td><strong>Sep 30-Oct 4</strong></td>
+<td></td>
+<td>(Review and Exam Week)</td>
+<td></td>
+<td></td>
+<td>Lab06: Virtual Memory Simulation</td>
+<td></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"></td>
+<td></td>
+<td></td>
+<td><strong>EXAM 1 (Oct 3, Thu, 7PM-9PM)</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>8</strong></td>
+<td><strong>Oct 7-11</strong></td>
+<td>Nov 4-8</td>
+<td>Concurrency Thread API Locks</td>
+<td>Explain what a thread is and its advantages Differentiate a process from a thread Explain terms related to concurrency: race condition, critical section, mutual exclusion, atomicity Write multithreaded programs using the PThreads API Describe the lock abstraction Describe and evaluate different lock implementations Describe how basic data structures are implemented to support concurrent access Explain what a thread is and its advantages Differentiate a process from a thread Explain terms related to concurrency: race condition, critical section, mutual exclusion, atomicity Write multithreaded programs using the PThreads API Describe the lock abstraction Describe and evaluate different lock implementations Describe how basic data structures are implemented to support concurrent access</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">OSTEP Ch. 26</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-api.pdf">OSTEP Ch. 27</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf">OSTEP Ch. 28</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks-usage.pdf">OSTEP Ch. 29</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab07: Unix System V Shared Memory API</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"></td>
+<td><strong>Oct 14-19</strong></td>
+<td></td>
+<td><strong>READING BREAK</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>9</strong></td>
+<td><strong>Oct 21-24</strong></td>
+<td>Nov 11-15</td>
+<td>Lock-based concurrent data structures Condition Variables Semaphores</td>
+<td>Articulate when and how to use condition variables in concurrent programs Articulate when and how to use semaphores in concurrent programs Describe and evaluate solutions to the Bounded-Buffer Problem Articulate when and how to use reader-writer locks in concurrent programs Describe and evaluate solutions to the Dining Philosophers Problem Implement semaphores using locks and condition variables Describe some non-deadlock concurrency bugs Explain why deadlocks occur Describe the approaches on how to prevent and avoid deadlocks as well as detect and recover from it Describe how event-based concurrency works Explain how select() works Explain what asynchronous I/O is</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-cv.pdf">OSTEP Ch. 30</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf">OSTEP Ch. 31</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">OSTEP Ch. 32</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-events.pdf">OSTEP Ch. 33</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab08: Programming with PThreads</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>10</strong></td>
+<td><strong>Oct 28-Nov 1</strong></td>
+<td>Nov 18-22</td>
+<td>Common Concurrency Problems Event-based Concurrency I/O Devices HDD</td>
+<td>Describe modern computer system architecture Describe a basic I/O device and its interface Differentiate programmed I/O from interrupt-driven I/O Explain how Direct Memory Access (DMA) works Describe approaches on how the CPU interacts with the hardware: I/O instructions and memory-mapped I/O Describe what a device driver is and how it interacts with the kernel Explain how a simple IDE Disk driver works Explain the interface and geometry of hard disk drives Explain the factors that contribute to disk performance Calculate the I/O time and rate of I/O of a disk given a disk specification and different workloads Describe various disk scheduling algorithms and their properties</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/file-devices.pdf">OSTEP Ch. 36</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/file-disks.pdf">OSTEP Ch. 37</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/file-raid.pdf">OSTEP Ch. 38</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab09: Thread Synchronization in PThreads</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>11</strong></td>
+<td><strong>Nov 4-8</strong></td>
+<td>Nov 25-30 Dec 2-6</td>
+<td>Files and Directories File System Implementation</td>
+<td>Explain the file and directory abstractions as well as associated terminologies Describe and use the File System API: creating, reading and writing, renaming, mounting, etc. Describe a simple File System Implementation Explain the importance of caching and buffering in File Systems Describe how the Fast File System works</td>
+<td><a href="https://pages.cs.wisc.edu/~remzi/OSTEP/file-intro.pdf">OSTEP Ch. 39</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/file-implementation.pdf">OSTEP Ch. 40</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/file-ffs.pdf">OSTEP Ch. 41</a> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/file-journaling.pdf">OSTEP Ch. 42</a> <a href="https://youtube.com/playlist?list=PLRJWiLCmxyxi2RCPVYfewxJIWJzc_colw">YouTube Videos</a></td>
+<td>Lab10a: [ICS-OS] Building and Booting ICS-OS Lab10b: [ICS-OS] Command Line Interface, System Calls, and System Utilities</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>12</strong></td>
+<td><strong>Nov 11-15</strong></td>
+<td></td>
+<td><em>(buffer week)</em></td>
+<td></td>
+<td></td>
+<td>Lab11: [ICS-OS] Environment Variables, Processes, and Threads</td>
+<td><em>F2F:</em> Discussion/Quizzes/Lab <em>Async:</em> Readings/Videos/Consultation via Slack</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>13</strong></td>
+<td><strong>Nov 18-22</strong></td>
+<td></td>
+<td><em>(buffer week)</em></td>
+<td></td>
+<td></td>
+<td>*Lab12: [ICS-OS] Implementing Lottery Scheduling in ICS-OS</td>
+<td></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>14</strong></td>
+<td><strong>Nov 25-30</strong></td>
+<td></td>
+<td>(Review and Exam Week)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"></td>
+<td></td>
+<td></td>
+<td><strong>EXAM 2</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>15</strong></td>
+<td><strong>Dec 2-6</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>16</strong></td>
+<td><strong>Dec 9-12</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>VI. References</strong></p>
+<ul>
+<li>[OSTEP]Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau. 2018. Operating Systems: Three Easy Pieces. CreateSpace Independent Publishing Platform, North Charleston, SC, USA. (<em>http://pages.cs.wisc.edu/~remzi/OSTEP/</em>)<br />
+</li>
+<li>[OSBOOK10]Operating System Concepts, 10th Edition by Abraham Silberschatz, Peter B. Galvin, Greg Gagne (<em>https://www.os-book.com/OS10/</em>)<br />
+</li>
+<li>[ICS-OS]J. A. C. Hermocilla. Ics-os: A kernel programming approach to teaching operating system concepts. Philippine Information Technology Journal, 2(2):25–30, 2009. (<em>https://github.com/srg-ics-uplb/ics-os</em>).</li>
+</ul>
+<p><strong>VII. Grading</strong></p>
+<ul>
+<li><p>Your <strong>final standing</strong> will be based on the following requirements. No Final Exam.:<br />
+Two Lecture Exams 40%<br />
+Lecture Quizzes/Homework/Problem Set 10%<br />
+ICS-OS Project 10%<br />
+Laboratory 40%<br />
+<strong>Total 100%</strong></p></li>
+<li><p>We shall be using the following <strong>grading scale</strong> to transmute your final standing to a numerical grade:</p></li>
+</ul>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: center;">95.00</th>
+<th style="text-align: center;">100.00</th>
+<th style="text-align: center;">1.00</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">90.00</td>
+<td style="text-align: center;">94.99</td>
+<td style="text-align: center;"><strong>1.25</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">85.00</td>
+<td style="text-align: center;">89.99</td>
+<td style="text-align: center;"><strong>1.50</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">80.00</td>
+<td style="text-align: center;">84.99</td>
+<td style="text-align: center;"><strong>1.75</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">75.00</td>
+<td style="text-align: center;">79.99</td>
+<td style="text-align: center;"><strong>2.00</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">70.00</td>
+<td style="text-align: center;">74.99</td>
+<td style="text-align: center;"><strong>2.25</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">65.00</td>
+<td style="text-align: center;">69.99</td>
+<td style="text-align: center;"><strong>2.50</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">60.00</td>
+<td style="text-align: center;">64.99</td>
+<td style="text-align: center;"><strong>2.75</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">55.00</td>
+<td style="text-align: center;">59.99</td>
+<td style="text-align: center;"><strong>3.00</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">54.99</td>
+<td style="text-align: center;"><strong>5.00</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>VIII. On Course Requirements</strong></p>
+<p><strong>Attendance</strong></p>
+<ul>
+<li>Attendance is required. Rules on excessive absences will apply. A student will be marked late when he/she arrives 20 minutes after the class has started. Three lates are equivalent to 1 unexcused absence.</li>
+</ul>
+<p><strong>Exams</strong></p>
+<ul>
+<li>Lecture Exams will be in person which may be scheduled outside of class hours.</li>
+</ul>
+<h4 id="labs"><strong>Labs</strong></h4>
+<ul>
+<li>You will need an Ubuntu Desktop 20.04 (64-bit, virtual or physical). We will use Docker for some labs including ICS-OS Labs. Delivery and submission of lab exercises will be done through Github Classroom. Links to the labs will be posted in Slack or Google Classroom.</li>
+</ul>
+<h4 id="other-activities"><strong>Other activities</strong></h4>
+<ul>
+<li>We will use a Slack workspace for asynchronous discussions and synchronous sessions.</li>
+</ul>
+<p><strong>IX. On Academic Integrity</strong></p>
+<p>Intellectual honesty is one of the most important values which this university upholds. Therefore, as a student of the University of the Philippines, it is expected that any work you submit for this course is your own. This means that cheating in exercises, plagiarism and other forms of intellectual dishonesty will not be tolerated. It is said that each one of us has his own brilliant idea and therefore you should not miss the chance of discovering yours.<br />
+If you are caught cheating in this course, the policy below will be followed:</p>
+<ul>
+<li>for the first offense, you will receive a score of zero for quiz/exam/exercise; and<br />
+</li>
+<li>for the second offense, you will receive a final grade of 5.0 for the course.</li>
+</ul>
+<p><strong>X. Teaching Staff</strong></p>
+<p>The faculty members handling the course for this semester are the following:</p>
+<ul>
+<li>Joseph Anthony C. Hermocilla (jchermocilla@up.edu.ph)<br />
+</li>
+<li>Aldrin Joseph J. Hao (ajhao@up.edu.ph)<br />
+</li>
+<li>Leonard Paul Garchitorena (lagarchitorena@up.edu.ph)<br />
+</li>
+<li>Carlo Tumibay (jitumibay@up.edu.ph)<br />
+</li>
+<li>Fermin Roberto Lapitan (fglapitan@up.edu.ph)<br />
+</li>
+<li>Von Arellano (vbarellano@up.edu.ph)<br />
+</li>
+<li>Val Randolf Madrid (vmmadrid@up.edu.ph)<br />
+</li>
+<li>Perico Dan B. Dionisio (pbdionisio@up.edu.ph)</li>
+</ul>
+<p>Feel free to email or message them in Slack if you have concerns about CMSC 125 this semester.</p>
