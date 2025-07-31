@@ -93,12 +93,12 @@ This course will require that you have taken CMSC 123, Data Structures.
 * Lecture Exams will be in person which may be scheduled outside of class hours.
 
 
-#### **Labs**
+**Labs**
 
 * You will need an Ubuntu Desktop 20.04 (64-bit, virtual or physical). We will use Docker for some labs including ICS-OS Labs. Delivery and submission of lab exercises will be done through Github Classroom. Links to the labs will be posted in Slack or Google Classroom. 
 
 
-#### **Other activities**
+**Other activities**
 
 * We will use a Slack workspace for asynchronous discussions and synchronous sessions. 
 
