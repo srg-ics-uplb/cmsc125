@@ -52,9 +52,9 @@ Upon completing the course, students must be able to:
 
 | Course Outcomes | A | B | C | D | E | F | G |
 |-----------------|---|---|---|---|---|---|---|
-| CO 1. Describe the purpose and functions of an operating system. | D | D | R | R | R | R | R | 
-| CO 2. Design and implement programs to perform simple operating system tasks. | D | D | R | R | R | R | R | 
-| CO 3. Implement and evaluate the performance of different operating system algorithms. | D | D | R | R | R | R | R |
+| CO 1. Describe the purpose and functions of an operating system. | D | D | R | R | R | D | R | 
+| CO 2. Design and implement programs to perform simple operating system tasks. | D | D | R | R | D | R | R | 
+| CO 3. Implement and evaluate the performance of different operating system algorithms. | D | D | R | R | R | D | R |
 
 > **Legend:** I – Introduced; D – Demonstrated; R – Reinforced
 
