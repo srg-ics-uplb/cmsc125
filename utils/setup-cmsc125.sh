@@ -38,6 +38,7 @@ virtualbox-guest-additions-iso
 vim
 nano
 gedit
+openssh-server
 dkms
 linux-headers-generic
 "
