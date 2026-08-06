@@ -1,12 +1,16 @@
 #!/bin/bash
 #
-# deploy-ova.sh - Copy an .ova file to several machines and import it
+# deploy-ova.sh - Copy an .ova file to several machines, then import it
 #                 into VirtualBox on each one.
 #
 # Usage: ./deploy-ova.sh hosts.txt appliance.ova [ssh-user]
 #
 # hosts.txt has one IP address per line. Blank lines and lines
 # starting with # are ignored.
+#
+# The OVA is copied to a ".ova" folder in the remote user's home
+# directory and kept there as a backup. All copies happen first,
+# then all imports.
 #
 # Target: Ubuntu 26.04, VirtualBox installed on the remote machines.
 # SSH keys should already be set up (ssh-copy-id user@ip).
@@ -34,49 +38,84 @@ if [ ! -f "$OVA_FILE" ]; then
     exit 1
 fi
 
-echo "Deploying $OVA_NAME as VM '$VM_NAME' (user: $SSH_USER)"
+# ---------------------------------------------------------------
+# Read the hosts file into a list, skipping blanks and comments
+# ---------------------------------------------------------------
+hosts=()
+
+while read -r line; do
+    if [ -z "$line" ] || [ "${line:0:1}" = "#" ]; then
+        continue
+    fi
+    hosts+=("$line")
+done < "$HOSTS_FILE"
+
+if [ ${#hosts[@]} -eq 0 ]; then
+    echo "No machines listed in $HOSTS_FILE"
+    exit 1
+fi
+
+echo "Deploying $OVA_NAME as VM '$VM_NAME'"
+echo "User: $SSH_USER   Machines: ${#hosts[@]}"
 echo
 
 failed=0
+copied=()        # machines where the copy worked
 
-# Read the hosts file one line at a time
-while read -r host; do
+# ---------------------------------------------------------------
+# Step 1: copy the OVA to every machine's home directory
+# ---------------------------------------------------------------
+echo "########## STEP 1: COPYING ##########"
+echo
 
-    # Skip blank lines and comments
-    if [ -z "$host" ] || [ "${host:0:1}" = "#" ]; then
-        continue
-    fi
+for host in "${hosts[@]}"; do
+    echo "Copying to $host ..."
 
-    echo "=== $host ==="
-
-    # Step 1: copy the OVA into /tmp on the remote machine
-    echo "Copying..."
-    if ! scp "$OVA_FILE" "$SSH_USER@$host:/tmp/"; then
-        echo "Copy failed."
+    # scp cannot create folders, so make it first with ssh.
+    # The remote shell expands ~ to the remote home directory.
+    if ! ssh -n "$SSH_USER@$host" "mkdir -p ~/.ova"; then
+        echo "  Could not create the .ova folder."
         failed=$((failed + 1))
         echo
         continue
     fi
 
-    # Step 2: import it, then delete the copied file to save space.
-    # The -n flag stops ssh from eating the lines of hosts.txt.
-    echo "Importing..."
-    if ssh -n "$SSH_USER@$host" \
-        "VBoxManage import /tmp/$OVA_NAME --vsys 0 --vmname '$VM_NAME' && rm /tmp/$OVA_NAME"; then
-        echo "Done."
+    if scp "$OVA_FILE" "$SSH_USER@$host:~/.ova/"; then
+        echo "  OK"
+        copied+=("$host")
     else
-        echo "Import failed."
+        echo "  Copy failed."
         failed=$((failed + 1))
     fi
-
     echo
+done
 
-done < "$HOSTS_FILE"
+# ---------------------------------------------------------------
+# Step 2: import the OVA on every machine that got a copy
+# ---------------------------------------------------------------
+echo "########## STEP 2: IMPORTING ##########"
+echo
 
+for host in "${copied[@]}"; do
+    echo "Importing on $host ..."
+
+    # The OVA stays in ~/.ova afterwards as a backup.
+    if ssh -n "$SSH_USER@$host" \
+        "VBoxManage import ~/.ova/$OVA_NAME --vsys 0 --vmname '$VM_NAME'"; then
+        echo "  OK"
+    else
+        echo "  Import failed."
+        failed=$((failed + 1))
+    fi
+    echo
+done
+
+# ---------------------------------------------------------------
 # Final report
+# ---------------------------------------------------------------
 if [ "$failed" -eq 0 ]; then
-    echo "Finished. All machines succeeded."
+    echo "Finished. All ${#hosts[@]} machines succeeded."
 else
-    echo "Finished. $failed machine(s) failed."
+    echo "Finished with $failed error(s)."
     exit 1
 fi
