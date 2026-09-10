@@ -1,4 +1,4 @@
-i<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -35,6 +35,7 @@ body{
 .seg-0{--g:var(--code);--gt:var(--code-tint);--gi:var(--code-ink)}
 .seg-1{--g:var(--heap);--gt:var(--heap-tint);--gi:var(--heap-ink)}
 .seg-3{--g:var(--stack);--gt:var(--stack-tint);--gi:var(--stack-ink)}
+.seg-2{--g:#7d8b99;--gt:#e3e8ec;--gi:#4d596b}
 
 /* ---------- Header & controls ---------- */
 .top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:22px}
@@ -54,6 +55,21 @@ select{padding:6px 8px}
 
 .panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
 
+/* ---------- Your own address ---------- */
+.custom{margin-bottom:12px;padding:12px 18px}
+.crow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.clabel{font-weight:700}
+#customVA{font-family:var(--mono);font-size:1rem;width:200px;padding:7px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink)}
+#customVA::placeholder{color:#8a96a3}
+#customVA[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 2px #ffd6d6}
+.chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.chips > span{font-size:.9rem;color:var(--ink-soft)}
+.chip{font-size:.85rem;padding:3px 10px;border-width:1.5px;border-radius:999px}
+.chip b{font-family:var(--mono)}
+#btnClear{margin-left:auto;font-size:.88rem;padding:5px 10px;border-width:1.5px}
+.cmsg{margin:6px 0 0;font-size:.88rem;color:var(--ink-soft)}
+.cmsg.err{color:var(--bad);font-weight:600}
+
 /* ---------- Step card ---------- */
 .card{border-width:3px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start;min-height:172px;margin-bottom:12px}
 .step-count{margin:0 0 2px;font-size:.9rem;color:var(--ink-soft)}
@@ -62,7 +78,7 @@ select{padding:6px 8px}
 .calc{margin:0;align-self:center;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre;overflow-x:auto}
 
 /* ---------- Timeline ---------- */
-.timeline{display:flex;gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
+.timeline{display:flex;flex-wrap:wrap;row-gap:10px;gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
 .tl-group{min-width:52px;display:flex;flex-direction:column;gap:5px}
 .tl-steps{display:flex;gap:3px}
 .tl-step{flex:1;height:16px;padding:0;border:0;border-radius:2px;background:var(--g);opacity:.28;min-width:6px}
@@ -71,6 +87,7 @@ select{padding:6px 8px}
 .kind-start,.kind-note{--g:#7d8b99}
 .kind-fault{--g:var(--bad)}
 .kind-fault .tl-step{background:repeating-linear-gradient(135deg,var(--g) 0 4px,#fff 4px 6px)}
+.tl-group.mine .tl-label{color:var(--ink);font-weight:700}
 .tl-label{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ---------- Main grid ---------- */
@@ -153,6 +170,8 @@ select{padding:6px 8px}
 .slot .omark.bad{border-color:var(--bad)}
 .slot .omark.bad .olbl{color:var(--bad)}
 .slot .negbar{position:absolute;top:62%;height:2px;background:var(--ink);transition:opacity .4s}
+.slot .negbar.hide{opacity:0}
+.slot .valid.none{display:none}
 .slot .negbar::before{content:"";position:absolute;left:-2px;top:-5px;border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:9px solid var(--ink)}
 .slot .negbar span{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-family:var(--mono);font-size:12px;font-weight:700;background:var(--panel);padding:0 4px;border-radius:3px;white-space:nowrap}
 .slot-ticks{position:relative;height:20px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
@@ -169,7 +188,7 @@ select{padding:6px 8px}
 .keyrow{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;font-size:.84rem;color:var(--ink-soft)}
 .keyrow span{display:flex;align-items:center;gap:6px}
 .sw{width:16px;height:12px;border:1px solid var(--ink);display:inline-block}
-.sw.in{background:#dfe6ec}
+.sw.in{background:var(--gt,#dfe6ec)}
 .sw.out{background:repeating-linear-gradient(135deg,#fdf0f0 0 3px,#efc6c6 3px 4px)}
 
 /* ---------- Code & results ---------- */
@@ -212,6 +231,9 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);bord
   .main{grid-template-columns:1fr}
   .tl-label{display:none}
   .tl-group{min-width:0}
+  #customVA{width:100%}
+  .chips{margin-left:0}
+  #btnClear{margin-left:0}
   .timeline{gap:5px}
   .bits{gap:8px}
   .bcol.segcol{min-width:62px}
@@ -250,6 +272,23 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);bord
       </label>
     </div>
   </header>
+
+  <section class="panel custom" aria-label="Translate your own address">
+    <div class="crow">
+      <label for="customVA" class="clabel">Translate your own address</label>
+      <input id="customVA" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 5000 or 0x1388" aria-describedby="customMsg">
+      <button id="btnCustom" type="button">Translate</button>
+      <div class="chips">
+        <span>Or try</span>
+        <button class="chip" type="button" data-va="2047"><b>2047</b> last code byte</button>
+        <button class="chip" type="button" data-va="2048"><b>2048</b> just past code</button>
+        <button class="chip" type="button" data-va="14336"><b>14336</b> lowest stack byte</button>
+        <button class="chip" type="button" data-va="9000"><b>9000</b> unused slot</button>
+      </div>
+      <button id="btnClear" type="button" hidden>Remove my addresses</button>
+    </div>
+    <p class="cmsg" id="customMsg" role="status">Use decimal, hex (0x…) or binary (0b…), from 0 to 16383.</p>
+  </section>
 
   <section class="panel card" aria-live="polite">
     <div>
@@ -362,6 +401,10 @@ const SEGS = {
   1: { bits: '01', name: 'Heap',  base: 34 * KB, size: 3 * KB, pos: 1, prot: 'Read-Write' },
   3: { bits: '11', name: 'Stack', base: 28 * KB, size: 2 * KB, pos: 0, prot: 'Read-Write' },
 };
+// Slot 10 holds no segment. It behaves like a segment of size 0.
+const UNUSED = { bits: '10', name: 'Unused', base: null, size: 0, pos: 1, prot: '—', unused: true };
+const segOf = s => SEGS[s] || UNUSED;
+
 const vaRange = s => { const g = SEGS[s]; const start = g.pos ? s * SLOT : (s + 1) * SLOT - g.size; return [start, start + g.size]; };
 const paRange = s => { const g = SEGS[s]; return g.pos ? [g.base, g.base + g.size] : [g.base - g.size, g.base]; };
 
@@ -384,17 +427,103 @@ const bin14 = v => v.toString(2).padStart(14, '0');
 const binFmt = v => { const b = bin14(v); return `${b.slice(0, 2)} ${b.slice(2, 6)} ${b.slice(6, 10)} ${b.slice(10)}`; };
 const hex4 = v => '0x' + v.toString(16).toUpperCase().padStart(4, '0');
 const minus = n => (n < 0 ? `−${-n}` : `${n}`);
+const SEGFAULT = 'The hardware traps into the OS, which usually ends the process with a segmentation fault.';
 
 /* =========================================================
    Steps
    ========================================================= */
 const steps = [], groups = [], results = [];
-const addGroup = (label, kind, s = null) => { groups.push({ label, kind, s, start: steps.length, count: 0 }); return groups.length - 1; };
+const addGroup = (label, kind, s = null, va = null) => {
+  groups.push({ label, kind, s, va, start: steps.length, count: 0 });
+  return groups.length - 1;
+};
 const snap = (g, o) => {
   groups[g].count++;
   steps.push(Object.assign({ va: null, s: null, off: null, stage: 0, fault: false, summary: false, lines: [], calc: [] },
     o, { group: g, results: JSON.parse(JSON.stringify(results)) }));
 };
+
+/* Builds every step for one virtual address and returns its timeline group. */
+function translate (va, opts = {}) {
+  const s = va >> 12, off = va & 0xFFF, seg = segOf(s), name = seg.name.toLowerCase();
+  const eff = seg.pos ? off : off - SLOT;
+  const ok = seg.pos ? off < seg.size : -eff <= seg.size;
+  const g = addGroup(opts.label || `VA ${va}`, ok ? 'tr' : 'fault', s, va);
+  const base = { va, s, off };
+
+  snap(g, { ...base, stage: 1,
+    title: opts.title || `Translate virtual address ${va}`,
+    body: opts.intro || `The CPU needs to reach virtual address ${va}. The hardware sees it as a 14-bit binary number, since the address space holds 2^14 bytes.`,
+    calc: [`${va} (decimal)`, `= ${binFmt(va)} (binary)`, `= ${hex4(va)}`] });
+
+  snap(g, { ...base, stage: 2, lines: [0, 1],
+    title: 'Split into segment and offset',
+    body: seg.unused
+      ? 'The top two bits choose the segment and the low twelve bits are the offset inside it. Bits 10 select slot 10, which this process does not use.'
+      : `The top two bits choose the segment and the low twelve bits are the offset inside it. Bits ${seg.bits} select the ${name} segment.`,
+    calc: [`Segment = (${va} & 0x3000) >> 12 = ${seg.bits} (binary) = ${s}  → ${seg.name}`,
+           `Offset  = ${va} & 0xFFF = ${off}`] });
+
+  if (seg.unused) {
+    snap(g, { ...base, stage: 3, lines: [2],
+      title: 'Look up segment 10',
+      body: 'Row 10 of the segment table is empty. An unused segment acts like one with size 0, so no offset can fall inside it.',
+      calc: ['Base[2] = none', 'Size[2] = 0', 'treated as growing positive'] });
+  } else {
+    snap(g, { ...base, stage: 3, lines: [2],
+      title: `Look up the ${name} segment`,
+      body: seg.pos
+        ? `Row ${seg.bits} gives a base of ${seg.base / KB}K and a size of ${seg.size / KB}K, and says this segment grows positive, so the offset can be used as it is. Protection is ${seg.prot}.`
+        : `Row ${seg.bits} gives a base of ${seg.base / KB}K and a size of ${seg.size / KB}K. The stack grows negative (toward lower addresses), so the offset needs one more step before it can be used.`,
+      calc: [`Base[${s}] = ${seg.base / KB}K = ${seg.base}`, `Size[${s}] = ${seg.size / KB}K = ${seg.size}`,
+             `GrowsPositive[${s}] = ${seg.pos}`, `Protection = ${seg.prot}`] });
+  }
+
+  if (!seg.pos) {
+    snap(g, { ...base, stage: 4, lines: [5, 6],
+      title: 'Stack grows backward: make the offset negative',
+      body: `The stack fills its 4KB slot from the top down. Subtracting the maximum segment size turns offset ${off} into a distance below the base.`,
+      calc: ['Offset = Offset − MAX_SEG_SIZE', `       = ${off} − 4096 = ${minus(eff)}`] });
+  }
+
+  if (!ok) {
+    results.push({ va, s, off: eff, pa: null });
+    let body, calc;
+    if (seg.unused) {
+      body = `With a size of 0, offset ${off} is outside, so no physical address is formed. ${SEGFAULT}`;
+      calc = ['Size[2] = 0', `Offset >= Size[2]  →  ${off} >= 0   ✗`, 'RaiseException(PROTECTION_FAULT)'];
+    } else if (seg.pos) {
+      body = `The ${name} is only ${seg.size / KB}K, so its valid offsets run from 0 to ${seg.size - 1}. Offset ${off} is outside, so no physical address is formed. ${SEGFAULT}`;
+      calc = [`Size[${s}] = ${seg.size}`, `Offset >= Size[${s}]  →  ${off} >= ${seg.size}   ✗`, 'RaiseException(PROTECTION_FAULT)'];
+    } else {
+      body = `The stack is only ${seg.size / KB}K, so it reaches at most ${seg.size} bytes below the base. ${minus(eff)} goes further, so no physical address is formed. ${SEGFAULT}`;
+      calc = [`Size[${s}] = ${seg.size}`, `|Offset| > Size[${s}]  →  |${minus(eff)}| = ${-eff} > ${seg.size}   ✗`, 'RaiseException(PROTECTION_FAULT)'];
+    }
+    snap(g, { ...base, stage: 5, fault: true, lines: seg.pos ? [3, 4] : [7, 8],
+      title: 'Out of bounds: the hardware faults', body, calc });
+    return g;
+  }
+
+  snap(g, { ...base, stage: 5, lines: seg.pos ? [3] : [7],
+    title: 'Check the bounds',
+    body: seg.pos
+      ? `The offset must be less than the segment's size, or the address falls outside the segment and the hardware faults. ${off} is inside the ${seg.size / KB}K ${name}.`
+      : `For a negative offset the hardware checks that its absolute value is no more than the size. ${-eff} bytes below the base is inside the ${seg.size / KB}K stack.`,
+    calc: seg.pos
+      ? [`Offset < Size[${s}]`, `${off} < ${seg.size}   ✓ in bounds`]
+      : [`|Offset| ≤ Size[${s}]`, `|${minus(eff)}| = ${-eff} ≤ ${seg.size}   ✓ in bounds`] });
+
+  const pa = seg.base + eff;
+  results.push({ va, s, off: eff, pa });
+  snap(g, { ...base, stage: 6, lines: [10, 11],
+    title: `Add the base: physical address ${pa}`,
+    body: seg.pos
+      ? `The physical address is the segment's base plus the offset. Virtual address ${va} is stored at physical address ${pa}.`
+      : `Adding a negative offset moves below the base. Virtual address ${va} is stored at physical address ${pa}.`,
+    calc: ['PhysAddr = Base[' + s + '] + Offset',
+           seg.pos ? `         = ${seg.base} + ${off} = ${pa}` : `         = ${seg.base} + (${minus(eff)}) = ${pa}`] });
+  return g;
+}
 
 (function build () {
   const g0 = addGroup('start', 'start');
@@ -405,59 +534,6 @@ const snap = (g, o) => {
            'bits 13–12 → segment   bits 11–0 → offset',
            'largest offset = 2^12 − 1 = 4095',
            'physical memory = 64KB = 65536 bytes'] });
-
-  function translate (va) {
-    const s = va >> 12, off = va & 0xFFF, seg = SEGS[s];
-    const g = addGroup(`VA ${va}`, 'tr', s);
-    const base = { va, s, off };
-
-    snap(g, { ...base, stage: 1,
-      title: `Translate virtual address ${va}`,
-      body: `The CPU needs to reach virtual address ${va}. The hardware sees it as a 14-bit binary number, since the address space holds 2^14 bytes.`,
-      calc: [`${va} (decimal)`, `= ${binFmt(va)} (binary)`, `= ${hex4(va)}`] });
-
-    snap(g, { ...base, stage: 2, lines: [0, 1],
-      title: 'Split into segment and offset',
-      body: `The top two bits choose the segment and the low twelve bits are the offset inside it. Bits ${seg.bits} select the ${seg.name.toLowerCase()} segment.`,
-      calc: [`Segment = (${va} & 0x3000) >> 12 = ${seg.bits} (binary) = ${s}  → ${seg.name}`,
-             `Offset  = ${va} & 0xFFF = ${off}`] });
-
-    snap(g, { ...base, stage: 3, lines: [2],
-      title: `Look up the ${seg.name.toLowerCase()} segment`,
-      body: seg.pos
-        ? `Row ${seg.bits} gives a base of ${seg.base / KB}K and a size of ${seg.size / KB}K, and says this segment grows positive, so the offset can be used as it is. Protection is ${seg.prot}.`
-        : `Row ${seg.bits} gives a base of ${seg.base / KB}K and a size of ${seg.size / KB}K. The stack grows negative (toward lower addresses), so the offset needs one more step before it can be used.`,
-      calc: [`Base[${s}] = ${seg.base / KB}K = ${seg.base}`, `Size[${s}] = ${seg.size / KB}K = ${seg.size}`,
-             `GrowsPositive[${s}] = ${seg.pos}`, `Protection = ${seg.prot}`] });
-
-    let eff = off;
-    if (!seg.pos) {
-      eff = off - SLOT;
-      snap(g, { ...base, stage: 4, lines: [5, 6],
-        title: 'Stack grows backward: make the offset negative',
-        body: `The stack fills its 4KB slot from the top down. Subtracting the maximum segment size turns offset ${off} into a distance below the base.`,
-        calc: [`Offset = Offset − MAX_SEG_SIZE`, `       = ${off} − 4096 = ${minus(eff)}`] });
-    }
-
-    snap(g, { ...base, stage: 5, lines: seg.pos ? [3] : [7],
-      title: 'Check the bounds',
-      body: seg.pos
-        ? `The offset must be less than the segment's size, or the address falls outside the segment and the hardware faults. ${off} is inside the ${seg.size / KB}K ${seg.name.toLowerCase()}.`
-        : `For a negative offset the hardware checks that its absolute value is no more than the size. ${-eff} bytes below the base is inside the ${seg.size / KB}K stack.`,
-      calc: seg.pos
-        ? [`Offset < Size[${s}]`, `${off} < ${seg.size}   ✓ in bounds`]
-        : [`|Offset| ≤ Size[${s}]`, `|${minus(eff)}| = ${-eff} ≤ ${seg.size}   ✓ in bounds`] });
-
-    const pa = seg.base + eff;
-    results.push({ va, s, off: eff, pa });
-    snap(g, { ...base, stage: 6, lines: [10, 11],
-      title: `Add the base: physical address ${pa}`,
-      body: seg.pos
-        ? `The physical address is the segment's base plus the offset. Virtual address ${va} is stored at physical address ${pa}.`
-        : `Adding a negative offset moves below the base. Virtual address ${va} is stored at physical address ${pa}, which is ${pa / KB}K.`,
-      calc: [`PhysAddr = Base[${s}] + Offset`,
-             seg.pos ? `         = ${seg.base} + ${off} = ${pa}` : `         = ${seg.base} + (${minus(eff)}) = ${pa}`] });
-  }
 
   translate(100);
   translate(4200);
@@ -474,19 +550,13 @@ const snap = (g, o) => {
     body: 'Each segment lands somewhere different in physical memory. Only the parts of the address space that are in use take up physical memory, so the large empty gap between heap and stack costs nothing.',
     calc: rows });
 
-  /* Bonus: an address past the end of the heap */
-  const va = 7168, s = va >> 12, off = va & 0xFFF, seg = SEGS[s];
-  const gf = addGroup('7168 faults', 'fault');
-  snap(gf, { va, s, off, stage: 2, lines: [0, 1],
+  translate(7168, {
+    label: '7168 faults',
     title: 'What if the address is 7168?',
-    body: `7168 is 7K, just past the end of the heap in the virtual address space. Its top bits are still ${seg.bits}, so the hardware treats it as a heap address with offset ${off}.`,
-    calc: [`${va} = ${binFmt(va)}`, `Segment = ${seg.bits} = ${s}  → ${seg.name}`, `Offset  = ${va} & 0xFFF = ${off}`] });
-  results.push({ va, s, off, pa: null });
-  snap(gf, { va, s, off, stage: 5, fault: true, lines: [3, 4],
-    title: 'Out of bounds: the hardware faults',
-    body: `The heap is only 3K, so its valid offsets run from 0 to 3071. Offset ${off} is outside, so no physical address is formed. The hardware traps into the OS, which usually ends the process with a segmentation fault.`,
-    calc: [`Size[${s}] = ${seg.size}`, `Offset >= Size[${s}]  →  ${off} >= ${seg.size}   ✗`, 'RaiseException(PROTECTION_FAULT)'] });
+    intro: '7168 is 7K, just past the end of the heap in the virtual address space. Watch what the hardware does with an address that no segment covers.' });
 })();
+
+const BUILTIN = { steps: steps.length, groups: groups.length, results: results.length };
 
 /* =========================================================
    Static drawing
@@ -518,8 +588,7 @@ buildMem($('paMem'), PA_MAX, 8 * KB, [
   }),
 ], false);
 
-/* Bits */
-function buildBits () {
+(function buildBits () {
   let segHTML = '', offHTML = '';
   for (let i = 13; i >= 0; i--) {
     const nib = (i === 7 || i === 3) ? ' nib' : '';
@@ -528,13 +597,11 @@ function buildBits () {
   }
   $('segBits').innerHTML = segHTML;
   $('offBits').innerHTML = offHTML;
-}
-buildBits();
+})();
 
-/* Segment table */
 $('segtab').querySelector('tbody').innerHTML = [0, 1, 2, 3].map(s => {
   const g = SEGS[s];
-  if (!g) return `<tr class="unused" data-s="2"><td class="nm"><span class="sb">10</span>unused</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+  if (!g) return `<tr class="unused seg-2" data-s="2"><td class="nm"><span class="sb">10</span>unused</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
   return `<tr class="seg-${s}" data-s="${s}"><td class="nm"><span class="sb">${g.bits}</span>${g.name}</td>` +
     `<td class="c-base"><span class="v">${g.base / KB}K</span></td><td class="c-size"><span class="v">${g.size / KB}K</span></td>` +
     `<td class="c-grow"><span class="v">${g.pos}</span></td><td class="nm"><span class="v">${g.prot}</span></td></tr>`;
@@ -599,14 +666,14 @@ function renderMemory (step) {
 
   const vaMarks = [], paMarks = [];
   if (step.summary) {
-    step.results.forEach((r, i) => {
+    step.results.filter(r => r.pa != null).forEach((r, i) => {
       vaMarks.push({ key: 't' + i, y: r.va, label: r.va, cls: `colored seg-${r.s}` });
       paMarks.push({ key: 't' + i, y: r.pa, label: r.pa, cls: `colored seg-${r.s}` });
     });
   } else if (step.va != null) {
     vaMarks.push({ key: 'va', y: step.va, label: step.va, cls: step.fault ? 'fault' : (known ? `colored seg-${step.s}` : ''), title: `virtual address ${step.va}` });
-    if (step.stage >= 3 && !step.fault) {
-      const g = SEGS[step.s];
+    const g = SEGS[step.s];
+    if (g && step.stage >= 3 && !step.fault) {
       if (step.stage >= 6) {
         const pa = g.base + (g.pos ? step.off : step.off - SLOT);
         paMarks.push({ key: 'pa', y: pa, label: pa, cls: `colored seg-${step.s}`, title: `physical address ${pa}` });
@@ -634,7 +701,7 @@ function renderBits (step, animate) {
   $('vaDec').textContent = step.va ?? '—';
   $('vaHex').textContent = step.va != null ? hex4(step.va) : '';
   if (split) {
-    const g = SEGS[step.s];
+    const g = segOf(step.s);
     $('segLabel').innerHTML = `segment<br><code>${g.bits}</code> = ${g.name}`;
     let off = `offset<br><code>${step.off}</code>`;
     if (!g.pos && step.stage >= 4) off += ` − 4096 = <code>${minus(step.off - SLOT)}</code>`;
@@ -653,18 +720,19 @@ function renderTable (step) {
 
 function renderSlot (step) {
   const panel = $('slotPanel'), on = step.va != null && step.stage >= 3;
-  panel.classList.toggle('off', !on);
   const verdict = $('verdict');
+  const neg = $('slotNeg');
   if (!on) {
+    panel.className = 'panel slotpanel off';
+    neg.classList.add('hide');
     verdict.className = 'verdict wait';
     verdict.textContent = step.summary ? 'Pick a step for one address to see its offset.' : 'Shown once the segment is known.';
-    $('slotNeg').style.opacity = 0;
     return;
   }
-  const g = SEGS[step.s], pct = n => (n / SLOT * 100) + '%';
-  $('slot').className = `slot seg-${step.s}`;
-  $('swIn').style.background = `var(--${g.name.toLowerCase()}-tint)`;
+  const g = segOf(step.s), pct = n => (n / SLOT * 100) + '%', name = g.name.toLowerCase();
+  panel.className = `panel slotpanel seg-${step.s}`;
   const valid = $('slotValid');
+  valid.classList.toggle('none', !g.size);
   valid.style.left = g.pos ? '0%' : pct(SLOT - g.size);
   valid.style.width = pct(g.size);
 
@@ -673,17 +741,23 @@ function renderSlot (step) {
   mark.className = `omark${p < .12 ? ' edge-l' : ''}${p > .88 ? ' edge-r' : ''}${step.fault ? ' bad' : ''}`;
   mark.querySelector('.olbl').textContent = `offset ${step.off}`;
 
-  const neg = $('slotNeg');
-  const showNeg = !g.pos && step.stage >= 4;
-  neg.style.opacity = showNeg ? 1 : 0;
+  neg.classList.toggle('hide', !(!g.pos && step.stage >= 4));
   neg.style.left = pct(step.off);
   neg.style.width = pct(SLOT - step.off);
   neg.querySelector('span').textContent = minus(step.off - SLOT);
 
+  const n = step.off - SLOT;
   if (step.stage >= 5) {
-    if (step.fault) { verdict.className = 'verdict bad'; verdict.textContent = `✗ ${step.off} ≥ ${g.size}: outside the ${g.name.toLowerCase()}, so the access faults`; }
-    else if (g.pos) { verdict.className = 'verdict ok'; verdict.textContent = `✓ ${step.off} < ${g.size}: inside the ${g.name.toLowerCase()}`; }
-    else { const n = step.off - SLOT; verdict.className = 'verdict ok'; verdict.textContent = `✓ |${minus(n)}| = ${-n} ≤ ${g.size}: inside the stack`; }
+    if (step.fault) {
+      verdict.className = 'verdict bad';
+      if (g.unused) verdict.textContent = `✗ ${step.off} ≥ 0: slot 10 holds no segment, so the access faults`;
+      else if (g.pos) verdict.textContent = `✗ ${step.off} ≥ ${g.size}: outside the ${name}, so the access faults`;
+      else verdict.textContent = `✗ |${minus(n)}| = ${-n} > ${g.size}: outside the stack, so the access faults`;
+    } else if (g.pos) {
+      verdict.className = 'verdict ok'; verdict.textContent = `✓ ${step.off} < ${g.size}: inside the ${name}`;
+    } else {
+      verdict.className = 'verdict ok'; verdict.textContent = `✓ |${minus(n)}| = ${-n} ≤ ${g.size}: inside the stack`;
+    }
   } else {
     verdict.className = 'verdict wait';
     verdict.textContent = g.pos ? 'Bounds not checked yet.' : 'Bounds not checked yet. The stack is measured down from the top of its slot.';
@@ -693,7 +767,7 @@ function renderSlot (step) {
 function renderCode (step) {
   $('code').innerHTML = CODE.map((t, i) => {
     const cur = step.lines.includes(i);
-    const bad = cur && step.fault && i === 4;
+    const bad = cur && step.fault && (i === 4 || i === 8);
     return `<div class="ln${cur ? ' cur' : ''}${bad ? ' badline' : ''}"><span class="no">${i + 1}</span><code>${t}</code></div>`;
   }).join('');
 }
@@ -704,7 +778,7 @@ function renderResults (step, animate) {
   $('results').innerHTML = rs.length ? rs.map((r, i) => {
     const fresh = animate && i >= prevResultCount ? ' class="fresh"' : '';
     const phys = r.pa == null ? '<td class="faulted">fault</td>' : `<td>${r.pa}</td>`;
-    return `<tr${fresh}><td>${r.va}</td><td class="nm">${SEGS[r.s].name}</td><td>${minus(r.off)}</td>${phys}</tr>`;
+    return `<tr${fresh}><td>${r.va}</td><td class="nm">${segOf(r.s).name}</td><td>${minus(r.off)}</td>${phys}</tr>`;
   }).join('') : '<tr class="empty"><td colspan="4">No addresses translated yet.</td></tr>';
   prevResultCount = rs.length;
 }
@@ -718,19 +792,20 @@ function renderCard (i) {
 }
 
 function buildTimeline () {
-  $('timeline').innerHTML = groups.map(g => {
+  $('timeline').innerHTML = groups.map((g, gi) => {
     let btns = '';
     for (let i = g.start; i < g.start + g.count; i++) {
       btns += `<button class="tl-step" type="button" data-i="${i}" aria-label="Step ${i + 1}: ${steps[i].title}" title="Step ${i + 1}: ${steps[i].title}"></button>`;
     }
     const segCls = g.s != null ? ` seg-${g.s}` : '';
-    return `<div class="tl-group kind-${g.kind}${segCls}" style="flex:${g.count} 1 0"><div class="tl-steps">${btns}</div><div class="tl-label">${g.label}</div></div>`;
+    const mine = gi >= BUILTIN.groups ? ' mine' : '';
+    return `<div class="tl-group kind-${g.kind}${segCls}${mine}" style="flex:${g.count} 1 0"><div class="tl-steps">${btns}</div><div class="tl-label">${g.label}</div></div>`;
   }).join('');
-  $('timeline').addEventListener('click', e => {
-    const b = e.target.closest('.tl-step');
-    if (b) { stop(); go(+b.dataset.i); }
-  });
 }
+$('timeline').addEventListener('click', e => {
+  const b = e.target.closest('.tl-step');
+  if (b) { stop(); go(+b.dataset.i); }
+});
 function renderTimeline (i) {
   document.querySelectorAll('.tl-step').forEach(b => {
     const k = +b.dataset.i;
@@ -743,7 +818,7 @@ function renderTimeline (i) {
 /* =========================================================
    Controls
    ========================================================= */
-let current = 0, timer = null;
+let current = 0, timer = null, playUntil = 0;
 
 function render (i, animate = true) {
   current = i;
@@ -764,15 +839,17 @@ function render (i, animate = true) {
 }
 function go (i) { if (i >= 0 && i < steps.length && i !== current) render(i); }
 
-function play () {
-  if (current === steps.length - 1) render(0);
+function play (until = steps.length - 1) {
+  stop();
+  playUntil = until;
+  if (current >= playUntil) render(0);
   $('btnPlay').textContent = 'Pause';
   const tick = () => {
-    if (current >= steps.length - 1) { stop(); return; }
+    if (current >= playUntil) { stop(); return; }
     go(current + 1);
     timer = setTimeout(tick, +$('speed').value);
   };
-  timer = setTimeout(tick, current === 0 ? 700 : +$('speed').value);
+  timer = setTimeout(tick, +$('speed').value);
 }
 function stop () { clearTimeout(timer); timer = null; $('btnPlay').textContent = 'Play'; }
 function toggle () { timer ? stop() : play(); }
@@ -783,12 +860,76 @@ $('btnPlay').onclick = toggle;
 $('btnRestart').onclick = () => { stop(); render(0); };
 
 document.addEventListener('keydown', e => {
-  if (e.target.closest('select')) return;
+  if (e.target.closest('select, input')) return;
   if (e.key === 'ArrowRight') { stop(); go(current + 1); e.preventDefault(); }
   else if (e.key === 'ArrowLeft') { stop(); go(current - 1); e.preventDefault(); }
   else if (e.key === ' ' && !e.target.closest('button')) { toggle(); e.preventDefault(); }
   else if (e.key === 'Home') { stop(); render(0); }
 });
+
+/* =========================================================
+   Your own address
+   ========================================================= */
+const HINT = 'Use decimal, hex (0x…) or binary (0b…), from 0 to 16383.';
+
+function parseVA (raw) {
+  const t = raw.trim().replace(/[_\s]/g, '');
+  if (t === '') return { err: 'Type a virtual address first, for example 5000.' };
+  let v = NaN;
+  if (/^0x[0-9a-f]+$/i.test(t)) v = parseInt(t.slice(2), 16);
+  else if (/^0b[01]+$/i.test(t)) v = parseInt(t.slice(2), 2);
+  else if (/^\d+$/.test(t)) v = parseInt(t, 10);
+  if (Number.isNaN(v)) return { err: `“${raw.trim()}” is not an address. ${HINT}` };
+  if (v >= VA_MAX) return { err: `${v} is past the end of the 16KB address space. Virtual addresses run from 0 to 16383.` };
+  return { v };
+}
+
+function translateCustom (raw) {
+  const input = $('customVA'), msg = $('customMsg');
+  const r = parseVA(raw);
+  if (r.err) {
+    msg.textContent = r.err;
+    msg.className = 'cmsg err';
+    input.setAttribute('aria-invalid', 'true');
+    input.focus();
+    return;
+  }
+  input.removeAttribute('aria-invalid');
+  stop();
+  let gi = groups.findIndex(g => g.va === r.v);
+  if (gi < 0) {
+    gi = translate(r.v);
+    buildTimeline();
+    msg.textContent = `Added ${r.v} to the end of the timeline.`;
+  } else {
+    msg.textContent = `${r.v} is already in the timeline, so it plays from there.`;
+  }
+  msg.className = 'cmsg';
+  $('btnClear').hidden = groups.length <= BUILTIN.groups;
+  const g = groups[gi];
+  render(g.start);
+  play(g.start + g.count - 1);
+}
+
+function clearCustom () {
+  stop();
+  steps.length = BUILTIN.steps;
+  groups.length = BUILTIN.groups;
+  results.length = BUILTIN.results;
+  buildTimeline();
+  $('btnClear').hidden = true;
+  $('customMsg').textContent = HINT;
+  $('customMsg').className = 'cmsg';
+  render(Math.min(current, steps.length - 1), false);
+}
+
+$('btnCustom').onclick = () => translateCustom($('customVA').value);
+$('customVA').addEventListener('keydown', e => { if (e.key === 'Enter') translateCustom(e.target.value); });
+$('customVA').addEventListener('input', e => {
+  if (e.target.getAttribute('aria-invalid')) { e.target.removeAttribute('aria-invalid'); $('customMsg').textContent = HINT; $('customMsg').className = 'cmsg'; }
+});
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => { $('customVA').value = c.dataset.va; translateCustom(c.dataset.va); });
+$('btnClear').onclick = clearCustom;
 
 let resizeT;
 window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => render(current, false), 150); });
