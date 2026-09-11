@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A memory trace with paging</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#d3dbe2;
+  --bad:#c92a2a;
+  --mark:#ffd43b;
+  --pt:#a5d8ff;
+  --arr:#1864ab;
+  --code:#172033;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important}
+.page{max-width:1280px;margin:0 auto;padding:32px 28px 48px}
+
+/* ---------- Header ---------- */
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:70ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+h3{font-size:.95rem;margin:14px 0 6px;font-weight:700}
+.sub{margin:0 0 12px;font-size:.88rem;color:var(--ink-soft)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.speed{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-soft)}
+select{padding:6px 8px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+
+/* ---------- Setup ---------- */
+.setup{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;margin-bottom:12px;align-items:start}
+.assume{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin:0;font-size:.92rem}
+.assume dt{color:var(--ink-soft)}
+.assume dd{margin:0;font-family:var(--mono);font-size:.86rem}
+.trow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end}
+.trow label{display:flex;flex-direction:column;font-size:.84rem;color:var(--ink-soft);gap:3px}
+.trow input{font-family:var(--mono);font-size:1rem;width:96px;padding:6px 8px;border:2px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink)}
+.trow input[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 2px #ffd6d6}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.chips > span{font-size:.88rem;color:var(--ink-soft)}
+.chip{font-size:.85rem;padding:3px 10px;border-width:1.5px;border-radius:999px}
+.tmsg{margin:8px 0 0;font-size:.88rem;color:var(--ink-soft)}
+.tmsg.err{color:var(--bad);font-weight:600}
+
+/* ---------- Step card ---------- */
+.card{border-width:3px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start;min-height:186px;margin-bottom:12px}
+.step-count{margin:0 0 2px;font-size:.9rem;color:var(--ink-soft)}
+.card h2{font-size:1.5rem;line-height:1.2;margin:0 0 8px}
+.card p.body{margin:0;max-width:64ch}
+.calc{margin:0;align-self:center;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* ---------- Timeline ---------- */
+.timeline{display:flex;flex-wrap:wrap;gap:10px;row-gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
+.tl-group{min-width:40px;display:flex;flex-direction:column;gap:5px}
+.tl-steps{display:flex;gap:2px}
+.tl-step{flex:1;height:16px;padding:0;border:0;border-radius:2px;background:var(--g);opacity:.28;min-width:3px}
+.tl-step:hover{opacity:.6}
+.tl-step.done{opacity:1}
+.tl-step.now{opacity:1;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.tl-step.pte{background:var(--pt)}
+.tl-label{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Main ---------- */
+.main{display:block}
+.side{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;margin-top:20px;align-items:start}
+.chartwrap{overflow-x:auto}
+svg.chart{display:block;width:100%;max-width:1040px;min-width:620px;height:auto;margin:0 auto;font-family:var(--sans)}
+.chart .axis{stroke:var(--ink);stroke-width:1.5;fill:none}
+.chart .tick text,.chart .tlabel{font-family:var(--mono);font-size:12px;fill:var(--ink-soft)}
+.chart .lane-title{font-size:13px;font-weight:600;fill:var(--ink)}
+.chart .gridline{stroke:var(--line);stroke-width:1}
+.chart .xtitle{font-size:14px;font-weight:700;fill:var(--ink)}
+.dot{opacity:0;transform:scale(.2);transform-box:fill-box;transform-origin:center;transition:opacity .25s,transform .4s cubic-bezier(.3,1.7,.5,1);stroke:var(--ink);stroke-width:1.5}
+.dot.on{opacity:1;transform:scale(1)}
+.dot.pt{fill:var(--pt)}
+.dot.array{fill:var(--arr)}
+.dot.code{fill:var(--code)}
+.note{opacity:0;transition:opacity .3s}
+.note.on{opacity:1}
+.note text{font-size:12.5px;fill:var(--ink)}
+.note line{stroke:var(--ink);stroke-width:1.2}
+.ilabel{font-family:var(--mono);font-size:11px;fill:var(--ink-soft);opacity:0;transition:opacity .3s}
+.ilabel.on{opacity:1}
+#cursor{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:5 4;transition:transform .45s cubic-bezier(.6,.05,.3,1),opacity .3s}
+#halo{fill:none;stroke:var(--mark);stroke-width:5;transition:transform .45s cubic-bezier(.6,.05,.3,1),opacity .3s}
+#nowLabel{font-family:var(--mono);font-size:12.5px;font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-width:4px;transition:transform .45s cubic-bezier(.6,.05,.3,1),opacity .3s}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0 0;padding:0;list-style:none;font-size:.86rem;color:var(--ink-soft)}
+.legend li{display:flex;align-items:center;gap:7px}
+.sw{width:13px;height:13px;border:1.5px solid var(--ink);display:inline-block}
+
+/* code listing */
+.src{font-family:var(--mono);font-size:13px;margin:0 0 10px;padding:8px 10px;background:#fff;border:1.5px solid var(--line);border-radius:5px;white-space:pre}
+table.asm{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+.asm th{font-family:var(--sans);text-align:left;font-weight:600;font-size:.8rem;color:var(--ink-soft);border-bottom:2px solid var(--ink);padding:3px 6px}
+.asm td{padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap;transition:background-color .3s}
+.asm tr.cur td{background:#ffe8a3}
+.asm tr.cur td:first-child{box-shadow:inset 4px 0 0 var(--ink)}
+.reg{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.reg span{font-family:var(--mono);font-size:13px;border:2px solid var(--ink);border-radius:5px;padding:2px 8px;background:#fff}
+
+/* translation */
+dl.xl{display:grid;grid-template-columns:auto 1fr;gap:0;margin:0;border:1.5px solid var(--ink);border-radius:6px;overflow:hidden;background:#fff}
+.xl dt,.xl dd{margin:0;padding:6px 10px;border-top:1px solid var(--line);transition:background-color .3s}
+.xl dt:first-of-type,.xl dd:first-of-type{border-top:0}
+.xl dt{font-size:.85rem;color:var(--ink-soft);background:#f4f6f8}
+.xl dd{font-family:var(--mono);font-size:13px}
+.xl .hl{background:#fff3bf}
+.xl dt.hl{background:#ffe8a3;color:var(--ink);font-weight:600}
+.xl .bits b{color:var(--arr)}
+.xl .bits i{font-style:normal;color:var(--ink-soft)}
+.kind{display:inline-block;font-family:var(--sans);font-size:.8rem;font-weight:700;border-radius:999px;padding:1px 9px;border:2px solid var(--ink)}
+.kind.pt{background:var(--pt)}
+.kind.array{background:var(--arr);color:#fff;border-color:var(--arr)}
+.kind.code{background:var(--code);color:#fff}
+
+/* ---------- Lower ---------- */
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;margin-top:20px;align-items:start}
+.ptgrid{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:2px}
+.pte{height:26px;border:1px solid #b9c4ce;border-radius:2px;background:#fff;font-family:var(--mono);font-size:9.5px;display:grid;place-items:center;color:#9aa6b2;transition:box-shadow .25s}
+.pte.code{background:var(--code);color:#fff;border-color:var(--code)}
+.pte.array{background:var(--arr);color:#fff;border-color:var(--arr)}
+.pte.now{box-shadow:0 0 0 3px var(--mark),0 0 0 5px var(--ink);position:relative;z-index:2}
+table.tbl{width:100%;border-collapse:collapse;margin-top:12px}
+.tbl th{text-align:left;font-weight:600;font-size:.82rem;color:var(--ink-soft);border-bottom:2px solid var(--ink);padding:4px 8px;white-space:nowrap}
+.tbl td{padding:5px 8px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px;white-space:nowrap;transition:background-color .3s}
+.tbl td.txt{font-family:var(--sans);font-size:.88rem}
+.tbl tr.cur td{background:#ffe8a3}
+.frames{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
+.frame{border:2px solid var(--ink);border-radius:4px;background:var(--hatch);min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:4px 2px;text-align:center;transition:box-shadow .25s}
+.frame b{font-family:var(--mono);font-size:12px}
+.frame span{font-size:10.5px;line-height:1.15;color:var(--ink-soft)}
+.frame.pt{background:var(--pt)}
+.frame.code{background:var(--code);color:#fff}
+.frame.code span{color:#d5dbe5}
+.frame.array{background:var(--arr);color:#fff}
+.frame.array span{color:#d0e4f7}
+.frame.now{box-shadow:0 0 0 3px var(--mark),0 0 0 5px var(--ink)}
+.counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}
+.count{border:2px solid var(--ink);border-radius:6px;background:#fff;padding:6px 8px}
+.count b{display:block;font-family:var(--mono);font-size:1.4rem;line-height:1.1}
+.count span{font-size:.8rem;color:var(--ink-soft)}
+.split{margin-top:10px}
+.sbar{display:flex;height:20px;border:2px solid var(--ink);border-radius:4px;overflow:hidden;background:#fff}
+.sbar i{display:block;height:100%;transition:width .3s}
+.sbar .a{background:var(--pt)}
+.sbar .b{background:var(--code)}
+.sbar .c{background:var(--arr)}
+.split p{margin:4px 0 0;font-size:.85rem;color:var(--ink-soft)}
+
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+
+@media (max-width: 1100px){
+  .side,.lower{grid-template-columns:1fr}
+}
+@media (max-width: 980px){
+  .top,.setup{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .card{grid-template-columns:1fr;gap:12px;min-height:0}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.75rem}
+  .tl-label{display:none}
+  .tl-group{min-width:0}
+  .ptgrid{grid-template-columns:repeat(8,minmax(0,1fr))}
+  .frames{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .counts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion: reduce){
+  .dot,#cursor,#halo,#nowLabel{transition:opacity .2s !important}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>A memory trace with paging</h1>
+      <p class="intro">Follow every memory access made by a loop that zeroes an array, as in the Paging chapter of OSTEP (Chapter 18). Each reference to code or data first needs a read of the page table, so the trace shows the cost of paging one access at a time.</p>
+    </div>
+    <div class="controls">
+      <button id="btnRestart" type="button">Restart</button>
+      <button id="btnPrev" type="button">Back</button>
+      <button id="btnPlay" type="button">Play</button>
+      <button id="btnNext" type="button" class="primary">Next step</button>
+      <label class="speed">Speed
+        <select id="speed">
+          <option value="2400">Slow</option>
+          <option value="1400" selected>Normal</option>
+          <option value="650">Fast</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <div class="setup">
+    <section class="panel" aria-label="Assumptions">
+      <h2>Assumptions</h2>
+      <dl class="assume">
+        <dt>Virtual address space</dt><dd>64KB (16-bit addresses)</dd>
+        <dt>Page size</dt><dd>1KB (10-bit offset, 6-bit VPN)</dd>
+        <dt>Page table</dt><dd>linear, at physical 1024, 4-byte entries</dd>
+        <dt>Code</dt><dd>VPN 1 → PFN 4, 4-byte instructions</dd>
+        <dt>Array</dt><dd>1000 ints at 40000–43999</dd>
+        <dt>Array pages</dt><dd>VPN 39→7, 40→8, 41→9, 42→10</dd>
+      </dl>
+    </section>
+    <section class="panel" aria-label="Trace window">
+      <h2>Which iterations to trace</h2>
+      <p class="sub">Each iteration of the loop makes 10 memory accesses.</p>
+      <div class="trow">
+        <label>Start at i =
+          <input type="number" id="startIter" min="0" max="999" step="1" value="0">
+        </label>
+        <label>Iterations (1–8)
+          <input type="number" id="countIter" min="1" max="8" step="1" value="5">
+        </label>
+        <button type="button" id="btnTrace">Trace</button>
+      </div>
+      <div class="chips">
+        <span>Or try</span>
+        <button type="button" class="chip" data-s="0" data-n="5">first 5 iterations</button>
+        <button type="button" class="chip" data-s="238" data-n="4">i = 238–241, into page 40</button>
+        <button type="button" class="chip" data-s="996" data-n="4">last 4 iterations</button>
+      </div>
+      <p class="tmsg" id="tMsg" role="status">i runs from 0 to 999.</p>
+    </section>
+  </div>
+
+  <section class="panel card" aria-live="polite">
+    <div>
+      <p class="step-count" id="stepCount"></p>
+      <h2 id="stepTitle"></h2>
+      <p class="body" id="stepBody"></p>
+    </div>
+    <pre class="calc" id="stepCalc"></pre>
+  </section>
+
+  <nav class="timeline" id="timeline" aria-label="Jump to a step"></nav>
+
+  <div class="main">
+    <section class="panel">
+      <h2 id="chartTitle">A virtual and physical memory trace</h2>
+      <p class="sub">Each square is one memory access. Code and array accesses are plotted by virtual address (left axis), with the matching physical address on the right.</p>
+      <div class="chartwrap"><svg class="chart" id="chart" viewBox="0 0 900 590" role="img" aria-label="Memory trace chart"></svg></div>
+      <ul class="legend">
+        <li><span class="sw" style="background:var(--pt)"></span>Page-table read</li>
+        <li><span class="sw" style="background:var(--arr)"></span>Array write</li>
+        <li><span class="sw" style="background:var(--code)"></span>Instruction fetch</li>
+      </ul>
+    </section>
+
+    <div class="side">
+      <section class="panel">
+        <h2>The program</h2>
+<pre class="src">int array[1000];
+for (i = 0; i &lt; 1000; i++)
+    array[i] = 0;</pre>
+        <table class="asm" id="asm">
+          <thead><tr><th>VA</th><th>PA</th><th>Instruction</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="reg">
+          <span>edi = 40000</span>
+          <span id="regEax">eax = 0</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>This access</h2>
+        <p class="sub" id="accessSub">Nothing accessed yet.</p>
+        <dl class="xl" id="xl"></dl>
+      </section>
+    </div>
+  </div>
+
+  <div class="lower">
+    <section class="panel">
+      <h2>The page table</h2>
+      <p class="sub">64 entries × 4 bytes, at physical 1024–1279. Only five entries are used.</p>
+      <div class="ptgrid" id="ptgrid"></div>
+      <table class="tbl" id="ptList"></table>
+    </section>
+
+    <section class="panel">
+      <h2>Physical memory</h2>
+      <p class="sub">Frames 0–11, 1KB each. The highlighted frame holds the current access.</p>
+      <div class="frames" id="frames"></div>
+      <div class="counts">
+        <div class="count"><b id="cAll">0</b><span>accesses</span></div>
+        <div class="count"><b id="cPt">0</b><span>page-table reads</span></div>
+        <div class="count"><b id="cCode">0</b><span>instruction fetches</span></div>
+        <div class="count"><b id="cArr">0</b><span>array writes</span></div>
+      </div>
+      <div class="split">
+        <div class="sbar"><i class="a" id="sA"></i><i class="b" id="sB"></i><i class="c" id="sC"></i></div>
+        <p id="splitText">Half of every access goes to the page table.</p>
+      </div>
+      <p class="kbd-hint">Keyboard: <kbd>←</kbd> <kbd>→</kbd> to step, <kbd>Space</kbd> to play or pause.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   Setup from the slides
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const PAGE = 1024, PT_BASE = 1024, PTE_SIZE = 4, ARRAY_VA = 40000, N_ELEMS = 1000;
+const MAP = { 1: 4, 39: 7, 40: 8, 41: 9, 42: 10 };
+const INSTR = [
+  { va: 1024, name: 'mov', asm: 'mov DWORD PTR [edi+eax*4], 0x0' },
+  { va: 1028, name: 'inc', asm: 'inc eax' },
+  { va: 1032, name: 'cmp', asm: 'cmp eax, 0x3e8' },
+  { va: 1036, name: 'jne', asm: 'jne  1024' },
+];
+const translate = va => {
+  const vpn = va >> 10, off = va & 1023, pfn = MAP[vpn];
+  return { va, vpn, off, pteAddr: PT_BASE + vpn * PTE_SIZE, pfn, pa: pfn * PAGE + off };
+};
+const bin = (v, n) => v.toString(2).padStart(n, '0');
+const elemRange = pfn => { const vpn = Object.keys(MAP).find(k => MAP[k] === pfn); const lo = Math.max(0, Math.ceil((vpn * PAGE - ARRAY_VA) / 4)); const hi = Math.min(N_ELEMS - 1, Math.floor(((+vpn + 1) * PAGE - 1 - ARRAY_VA) / 4)); return [lo, hi]; };
+
+/* =========================================================
+   Build the trace
+   ========================================================= */
+let start = 0, count = 5;
+let accesses = [], steps = [], groups = [];
+
+function buildTrace () {
+  accesses = []; steps = []; groups = [];
+  for (let i = start; i < start + count; i++) {
+    const refs = [
+      { kind: 'code', instr: 0, va: INSTR[0].va },
+      { kind: 'array', instr: 0, va: ARRAY_VA + 4 * i },
+      { kind: 'code', instr: 1, va: INSTR[1].va },
+      { kind: 'code', instr: 2, va: INSTR[2].va },
+      { kind: 'code', instr: 3, va: INSTR[3].va },
+    ];
+    refs.forEach((r, j) => {
+      const t = translate(r.va);
+      const common = { iter: i, ref: j, kind: r.kind, instr: r.instr, ...t };
+      accesses.push({ ...common, phase: 'pte', lane: 'pt', plotY: t.pteAddr });
+      accesses.push({ ...common, phase: 'mem', lane: r.kind, plotY: r.va });
+    });
+  }
+
+  const group = (label, color) => { groups.push({ label, color, start: steps.length, count: 0 }); return groups.length - 1; };
+  const snap = (g, o) => { groups[g].count++; steps.push({ group: g, upto: -1, calc: [], ...o }); };
+
+  const g0 = group('start', '#7d8b99');
+  const touched = [...new Set(accesses.filter(a => a.kind === 'array').map(a => a.vpn))];
+  snap(g0, {
+    title: 'Tracing a loop that zeroes an array',
+    body: `The loop runs four instructions per iteration, and mov also writes one array element. Every one of those five references needs a page-table read first, so each iteration makes 10 memory accesses. This trace follows iterations ${start}–${start + count - 1}.`,
+    calc: [`accesses ${start * 10}–${(start + count) * 10 - 1}`, 'code: VPN 1 → PFN 4', `array: VPN ${touched.join(', ')} → PFN ${touched.map(v => MAP[v]).join(', ')}`, 'page table: PA 1024 + VPN × 4'],
+  });
+
+  let g = null, seenPte = new Set();
+  accesses.forEach((a, k) => {
+    if (a.ref === 0 && a.phase === 'pte') g = group(`i = ${a.iter}`, a.iter % 2 ? '#495a73' : '#172033');
+    const absK = a.iter * 10 + a.ref * 2 + (a.phase === 'mem' ? 1 : 0);
+    const ins = INSTR[a.instr];
+    let title, body, calc;
+    if (a.phase === 'pte') {
+      const first = !seenPte.has(a.vpn); seenPte.add(a.vpn);
+      if (a.kind === 'code') {
+        title = `Read the page-table entry for ${ins.name}`;
+        body = first
+          ? `Before the CPU can fetch ${ins.name} from virtual address ${a.va}, the MMU reads page ${a.vpn}'s entry from the page table at physical ${a.pteAddr}. That read is a memory access of its own.`
+          : `Fetching ${ins.name} at virtual address ${a.va} starts, again, with a read of page ${a.vpn}'s entry at ${a.pteAddr}.`;
+      } else {
+        const crossed = a.off < 4 && a.vpn !== 39;
+        title = `Read the page-table entry for array[${a.iter}]`;
+        body = `mov writes 0 to array[${a.iter}] at virtual address ${a.va}` +
+          (crossed ? `, the first element on page ${a.vpn}. That means a different entry this time, at ${a.pteAddr}.` : `. The MMU first reads page ${a.vpn}'s entry at physical ${a.pteAddr}.`);
+      }
+      calc = [`VPN = ${a.va} >> 10 = ${a.vpn}, offset = ${a.off}`, `PTEAddr = 1024 + ${a.vpn} × 4 = ${a.pteAddr}`, `PTE[${a.vpn}].PFN = ${a.pfn}`];
+    } else if (a.kind === 'code') {
+      title = `Fetch ${ins.name} from physical ${a.pa}`;
+      body = `With frame ${a.pfn} known, the instruction itself is read.`;
+      if (a.instr === 1) body += ` It adds 1 to eax, which becomes ${a.iter + 1}.`;
+      if (a.instr === 2) body += ` It compares eax with 1000 (0x3e8).`;
+      if (a.instr === 3) body += a.iter === N_ELEMS - 1
+        ? ' Now eax is 1000, so the jump is not taken and the loop ends.'
+        : ' Since eax is still below 1000, it jumps back to 1024 for the next iteration.';
+      calc = [`PA = ${a.pfn} × 1024 + ${a.off} = ${a.pa}`, `${ins.va}: ${ins.asm}`];
+    } else {
+      title = `Write array[${a.iter}] at physical ${a.pa}`;
+      body = `Now the write itself reaches frame ${a.pfn}. The data access cost two memory accesses, just like each instruction fetch.`;
+      calc = [`VA = 40000 + 4 × ${a.iter} = ${a.va}`, `PA = ${a.pfn} × 1024 + ${a.off} = ${a.pa}`, `array[${a.iter}] = 0`];
+    }
+    snap(g, { upto: k, title: `Access ${absK}: ${title.charAt(0).toLowerCase() + title.slice(1)}`, body, calc });
+  });
+
+  const n = accesses.length;
+  const gr = group('end', '#7d8b99');
+  snap(gr, { upto: n - 1, final: true,
+    title: 'Half of all accesses read the page table',
+    body: 'Every fetch and every array write was preceded by a page-table read, so paging doubled the number of memory accesses. Real systems avoid most of these extra reads with a TLB (Chapter 19).',
+    calc: [`accesses:           ${n}`, `page-table reads:   ${n / 2}`, `instruction fetches: ${count * 4}`, `array writes:       ${count}`] });
+}
+
+/* =========================================================
+   Chart
+   ========================================================= */
+const X0 = 130, X1 = 770;
+const LANES = {
+  pt:    { top: 40,  bottom: 190 },
+  array: { top: 262, bottom: 362 },
+  code:  { top: 434, bottom: 534 },
+};
+let chart = null;
+
+function scale (v, lo, hi, top, bottom) { return bottom - (v - lo) / (hi - lo) * (bottom - top); }
+
+function buildChart () {
+  const n = accesses.length, dx = (X1 - X0) / n, size = Math.max(6, Math.min(13, dx * 0.85));
+  const xOf = k => X0 + k * dx + dx / 2;
+  const arrVAs = accesses.filter(a => a.lane === 'array').map(a => a.va);
+  const arrLo = Math.floor(Math.min(...arrVAs) / 50) * 50;
+  const arrHi = arrLo + Math.max(100, Math.ceil((Math.max(...arrVAs) - arrLo + 4) / 50) * 50);
+  const ranges = { pt: [1024, 1224], array: [arrLo, arrHi], code: [1024, 1124] };
+  const yOf = a => { const [lo, hi] = ranges[a.lane]; const L = LANES[a.lane]; return scale(a.plotY, lo, hi, L.top, L.bottom); };
+  const toPA = (lane, va) => lane === 'code' ? va - 1024 + 4096 : translate(va).pa;
+
+  let h = '';
+  const tick = (x, y, label, side) => {
+    const dir = side === 'left' ? -1 : 1;
+    return `<g class="tick"><line class="axis" x1="${x}" y1="${y}" x2="${x + dir * 7}" y2="${y}"/><text x="${x + dir * 11}" y="${y + 4}" text-anchor="${side === 'left' ? 'end' : 'start'}">${label}</text></g>`;
+  };
+  const laneAxes = (lane, leftTitle, rightTitle, leftTicks) => {
+    const L = LANES[lane], [lo, hi] = ranges[lane];
+    const xl = X0 - 14, xr = X1 + 14;
+    let s = `<line class="axis" x1="${xl}" y1="${L.bottom}" x2="${xr}" y2="${L.bottom}"/>`;
+    s += `<line class="axis" x1="${xr}" y1="${L.top}" x2="${xr}" y2="${L.bottom}"/>`;
+    if (leftTicks) s += `<line class="axis" x1="${xl}" y1="${L.top}" x2="${xl}" y2="${L.bottom}"/>`;
+    for (let v = lo; v <= hi; v += 50) {
+      const y = scale(v, lo, hi, L.top, L.bottom);
+      if (v > lo) s += `<line class="gridline" x1="${xl}" y1="${y}" x2="${xr}" y2="${y}"/>`;
+      s += tick(xr, y, lane === 'pt' ? v : toPA(lane, v), 'right');
+      if (leftTicks) s += tick(xl, y, v, 'left');
+    }
+    const mid = (L.top + L.bottom) / 2;
+    if (leftTitle) s += `<text class="lane-title" transform="translate(28 ${mid}) rotate(-90)" text-anchor="middle">${leftTitle}</text>`;
+    s += `<text class="lane-title" transform="translate(${xr + 88} ${mid}) rotate(-90)" text-anchor="middle">${rightTitle}</text>`;
+    return s;
+  };
+  h += laneAxes('pt', '', 'Page table (PA)', false);
+  h += laneAxes('array', 'Array (VA)', 'Array (PA)', true);
+  h += laneAxes('code', 'Code (VA)', 'Code (PA)', true);
+
+  // x axis
+  const xb = LANES.code.bottom;
+  for (let k = 0; k <= n; k += 10) {
+    const x = X0 + k * dx;
+    h += `<line class="axis" x1="${x}" y1="${xb}" x2="${x}" y2="${xb + 6}"/><text class="tlabel" x="${x}" y="${xb + 22}" text-anchor="middle">${start * 10 + k}</text>`;
+  }
+  h += `<text class="xtitle" x="${(X0 + X1) / 2}" y="${xb + 48}" text-anchor="middle">Memory access</text>`;
+
+  // cursor, halo and label sit under the dots
+  h += `<line id="cursor" x1="0" y1="18" x2="0" y2="${xb}" style="opacity:0"/>`;
+
+  // page-table callouts: first read of each distinct entry
+  const seen = new Set();
+  accesses.forEach((a, k) => {
+    if (a.lane !== 'pt' || seen.has(a.vpn)) return;
+    seen.add(a.vpn);
+    const x = xOf(k), y = yOf(a);
+    const above = a.vpn !== 1;
+    const ty = above ? y - 26 : y - 30, tx = Math.max(X0 - 110, x - 70);
+    h += `<g class="note" data-k="${k}"><line x1="${tx + 50}" y1="${ty + 4}" x2="${x - 4}" y2="${y - 7}"/><text x="${tx}" y="${ty}">Page Table[${a.vpn}]</text></g>`;
+  });
+
+  // instruction labels on the first iteration
+  accesses.forEach((a, k) => {
+    if (a.iter !== start || a.phase !== 'mem') return;
+    const L = LANES[a.lane];
+    const x = xOf(k);
+    h += `<text class="ilabel" data-k="${k}" text-anchor="end" transform="translate(${x + 4} ${L.top + 2}) rotate(-90)">${INSTR[a.instr].name}</text>`;
+  });
+
+  // dots
+  accesses.forEach((a, k) => {
+    const x = xOf(k), y = yOf(a);
+    const t = a.phase === 'pte' ? `PTE[${a.vpn}] at PA ${a.pteAddr}` : `${a.kind === 'code' ? INSTR[a.instr].name : `array[${a.iter}]`}: VA ${a.va} → PA ${a.pa}`;
+    h += `<rect class="dot ${a.lane}" data-k="${k}" x="${x - size / 2}" y="${y - size / 2}" width="${size}" height="${size}"><title>Access ${start * 10 + k}: ${t}</title></rect>`;
+  });
+  h += `<circle id="halo" cx="0" cy="0" r="${size * 0.95}" style="opacity:0"/>`;
+  h += `<text id="nowLabel" x="0" y="0" style="opacity:0"></text>`;
+
+  $('chart').innerHTML = h;
+  $('chartTitle').textContent = `A virtual and physical memory trace: iteration${count > 1 ? 's' : ''} ${start}${count > 1 ? `–${start + count - 1}` : ''}`;
+  chart = {
+    dots: [...$('chart').querySelectorAll('.dot')],
+    notes: [...$('chart').querySelectorAll('.note')],
+    ilabels: [...$('chart').querySelectorAll('.ilabel')],
+    xOf, yOf, size,
+  };
+}
+
+function renderChart (step) {
+  const upto = step.upto;
+  chart.dots.forEach((d, k) => d.classList.toggle('on', k <= upto));
+  chart.notes.forEach(nt => nt.classList.toggle('on', +nt.dataset.k <= upto));
+  chart.ilabels.forEach(l => l.classList.toggle('on', +l.dataset.k <= upto));
+  const cur = $('cursor'), halo = $('halo'), lbl = $('nowLabel');
+  if (upto < 0 || step.final) {
+    [cur, halo, lbl].forEach(el => { el.style.opacity = 0; });
+    return;
+  }
+  const a = accesses[upto], x = chart.xOf(upto), y = chart.yOf(a);
+  cur.style.opacity = 1; cur.style.transform = `translateX(${x}px)`;
+  halo.style.opacity = 1; halo.style.transform = `translate(${x}px, ${y}px)`;
+  const text = a.phase === 'pte' ? `PA ${a.pteAddr}` : `PA ${a.pa}`;
+  lbl.textContent = text;
+  const right = x > X1 - 90;
+  lbl.setAttribute('text-anchor', right ? 'end' : 'start');
+  lbl.style.opacity = 1;
+  lbl.style.transform = `translate(${x + (right ? -12 : 12)}px, ${y - 12}px)`;
+}
+
+/* =========================================================
+   Side and lower panels
+   ========================================================= */
+function renderProgram (step) {
+  const a = step.upto >= 0 && !step.final ? accesses[step.upto] : null;
+  $('asm').querySelector('tbody').innerHTML = INSTR.map((ins, i) =>
+    `<tr class="${a && a.instr === i ? 'cur' : ''}"><td>${ins.va}</td><td>${ins.va - 1024 + 4096}</td><td>${ins.asm}</td></tr>`).join('');
+  let eax = start;
+  if (a) eax = a.instr >= 1 && !(a.instr === 1 && a.phase === 'pte') ? a.iter + 1 : a.iter;
+  if (step.final) eax = start + count;
+  $('regEax').textContent = `eax = ${eax}`;
+}
+
+function renderAccess (step) {
+  const a = step.upto >= 0 && !step.final ? accesses[step.upto] : null;
+  if (!a) {
+    $('accessSub').textContent = step.final ? 'The trace is complete.' : 'Nothing accessed yet.';
+    $('xl').innerHTML = '<dt>Virtual address</dt><dd>—</dd><dt>VPN | offset</dt><dd>—</dd><dt>Page-table entry</dt><dd>—</dd><dt>Physical address</dt><dd>—</dd>';
+    return;
+  }
+  const isPte = a.phase === 'pte';
+  const what = a.kind === 'code' ? `fetch of ${INSTR[a.instr].name}` : `write to array[${a.iter}]`;
+  $('accessSub').innerHTML = `Access ${a.iter * 10 + a.ref * 2 + (isPte ? 0 : 1)}: ` +
+    (isPte ? `<span class="kind pt">page table</span> read for the ${what}` : `<span class="kind ${a.kind}">${a.kind === 'code' ? 'code' : 'array'}</span> ${what}`);
+  const b = bin(a.va, 16);
+  const row = (label, val, hl) => `<dt class="${hl ? 'hl' : ''}">${label}</dt><dd class="${hl ? 'hl' : ''}">${val}</dd>`;
+  $('xl').innerHTML =
+    row('Virtual address', `${a.va}`, false) +
+    row('VPN | offset', `<span class="bits"><b>${b.slice(0, 6)}</b> <i>${b.slice(6)}</i></span><br>VPN ${a.vpn}, offset ${a.off}`, false) +
+    row('Page-table entry', `PA 1024 + ${a.vpn} × 4 = <strong>${a.pteAddr}</strong><br>holds PFN ${a.pfn}`, isPte) +
+    row('Physical address', `${a.pfn} × 1024 + ${a.off} = <strong>${a.pa}</strong>`, !isPte) +
+    row('This access touches', isPte ? `PA ${a.pteAddr} (page table)` : `PA ${a.pa} (${a.kind === 'code' ? 'code' : 'array'})`, true);
+}
+
+function buildLower () {
+  let g = '';
+  for (let v = 0; v < 64; v++) {
+    const cls = v === 1 ? 'code' : MAP[v] ? 'array' : '';
+    g += `<div class="pte ${cls}" data-v="${v}" title="VPN ${v}: entry at PA ${PT_BASE + v * 4}${MAP[v] ? `, PFN ${MAP[v]}` : ', unused'}">${v}</div>`;
+  }
+  $('ptgrid').innerHTML = g;
+  let f = '';
+  for (let fr = 0; fr < 12; fr++) {
+    let cls = '', label = 'other';
+    if (fr === 1) { cls = 'pt'; label = 'page table'; }
+    else if (fr === 4) { cls = 'code'; label = 'code'; }
+    else if (fr >= 7 && fr <= 10) { const [lo, hi] = elemRange(fr); cls = 'array'; label = `array ${lo}–${hi}`; }
+    f += `<div class="frame ${cls}" data-f="${fr}"><b>${fr}</b><span>${label}</span></div>`;
+  }
+  $('frames').innerHTML = f;
+}
+
+function renderLower (step) {
+  const a = step.upto >= 0 && !step.final ? accesses[step.upto] : null;
+  document.querySelectorAll('#ptgrid .pte').forEach(el => el.classList.toggle('now', !!a && a.phase === 'pte' && +el.dataset.v === a.vpn));
+  $('ptList').innerHTML = '<thead><tr><th>VPN</th><th>Entry at</th><th>PFN</th><th>Holds</th></tr></thead><tbody>' +
+    Object.keys(MAP).map(v => {
+      const holds = +v === 1 ? 'code' : (() => { const [lo, hi] = elemRange(MAP[v]); return `array[${lo}–${hi}]`; })();
+      return `<tr class="${a && a.vpn === +v ? 'cur' : ''}"><td>${v}</td><td>${PT_BASE + v * 4}</td><td>${MAP[v]}</td><td class="txt">${holds}</td></tr>`;
+    }).join('') + '</tbody>';
+  const frameNow = a ? (a.phase === 'pte' ? 1 : a.pfn) : null;
+  document.querySelectorAll('#frames .frame').forEach(el => el.classList.toggle('now', +el.dataset.f === frameNow));
+
+  const done = accesses.slice(0, step.upto + 1);
+  const cPt = done.filter(x => x.phase === 'pte').length;
+  const cCode = done.filter(x => x.phase === 'mem' && x.kind === 'code').length;
+  const cArr = done.filter(x => x.phase === 'mem' && x.kind === 'array').length;
+  $('cAll').textContent = done.length; $('cPt').textContent = cPt; $('cCode').textContent = cCode; $('cArr').textContent = cArr;
+  const tot = Math.max(1, done.length);
+  $('sA').style.width = `${cPt / tot * 100}%`; $('sB').style.width = `${cCode / tot * 100}%`; $('sC').style.width = `${cArr / tot * 100}%`;
+  $('splitText').textContent = done.length
+    ? `${Math.round(cPt / tot * 100)}% of the accesses so far went to the page table.`
+    : 'Half of every access will go to the page table.';
+}
+
+function renderCard (i) {
+  const s = steps[i];
+  $('stepCount').textContent = `Step ${i + 1} of ${steps.length}`;
+  $('stepTitle').textContent = s.title;
+  $('stepBody').textContent = s.body;
+  $('stepCalc').textContent = s.calc.join('\n');
+}
+
+function buildTimeline () {
+  $('timeline').innerHTML = groups.map(g => {
+    let b = '';
+    for (let i = g.start; i < g.start + g.count; i++) {
+      const s = steps[i], a = s.upto >= 0 && !s.final ? accesses[s.upto] : null;
+      const t = s.title.replace(/"/g, '&quot;');
+      b += `<button class="tl-step${a && a.phase === 'pte' ? ' pte' : ''}" type="button" data-i="${i}" aria-label="Step ${i + 1}: ${t}" title="Step ${i + 1}: ${t}"></button>`;
+    }
+    return `<div class="tl-group" style="flex:${g.count} 1 0;--g:${g.color}"><div class="tl-steps">${b}</div><div class="tl-label">${g.label}</div></div>`;
+  }).join('');
+}
+$('timeline').addEventListener('click', e => {
+  const b = e.target.closest('.tl-step');
+  if (b) { stop(); go(+b.dataset.i); }
+});
+
+/* =========================================================
+   Playback
+   ========================================================= */
+let current = 0, timer = null;
+
+function render (i, animate = true) {
+  current = i;
+  const root = document.documentElement;
+  if (!animate) root.classList.add('instant');
+  const step = steps[i];
+  renderCard(i);
+  document.querySelectorAll('.tl-step').forEach(b => {
+    const k = +b.dataset.i;
+    b.classList.toggle('done', k < i);
+    b.classList.toggle('now', k === i);
+    b.setAttribute('aria-current', k === i ? 'step' : 'false');
+  });
+  renderChart(step);
+  renderProgram(step);
+  renderAccess(step);
+  renderLower(step);
+  $('btnPrev').disabled = i === 0;
+  $('btnNext').disabled = i === steps.length - 1;
+  if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('instant')));
+}
+function go (i) { if (i >= 0 && i < steps.length && i !== current) render(i); }
+
+function play () {
+  stop();
+  if (current >= steps.length - 1) render(0);
+  $('btnPlay').textContent = 'Pause';
+  const tick = () => {
+    if (current >= steps.length - 1) { stop(); return; }
+    go(current + 1);
+    timer = setTimeout(tick, +$('speed').value);
+  };
+  timer = setTimeout(tick, +$('speed').value);
+}
+function stop () { clearTimeout(timer); timer = null; $('btnPlay').textContent = 'Play'; }
+
+$('btnNext').onclick = () => { stop(); go(current + 1); };
+$('btnPrev').onclick = () => { stop(); go(current - 1); };
+$('btnPlay').onclick = () => (timer ? stop() : play());
+$('btnRestart').onclick = () => { stop(); render(0); };
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select, input')) return;
+  if (e.key === 'ArrowRight') { stop(); go(current + 1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stop(); go(current - 1); e.preventDefault(); }
+  else if (e.key === ' ' && !e.target.closest('button')) { timer ? stop() : play(); e.preventDefault(); }
+  else if (e.key === 'Home') { stop(); render(0); }
+});
+
+/* =========================================================
+   Trace window
+   ========================================================= */
+function setMsg (t, err) { $('tMsg').textContent = t; $('tMsg').className = 'tmsg' + (err ? ' err' : ''); }
+
+function applyWindow (s, n, autoplay) {
+  const sOk = Number.isInteger(s) && s >= 0 && s <= 999;
+  const nOk = Number.isInteger(n) && n >= 1 && n <= 8;
+  $('startIter').toggleAttribute('aria-invalid', !sOk); if (sOk) $('startIter').removeAttribute('aria-invalid');
+  $('countIter').toggleAttribute('aria-invalid', !nOk); if (nOk) $('countIter').removeAttribute('aria-invalid');
+  if (!sOk) { setMsg('Start must be a whole number from 0 to 999.', true); return; }
+  if (!nOk) { setMsg('Iterations must be a whole number from 1 to 8.', true); return; }
+  let note = '';
+  if (s + n > N_ELEMS) { n = N_ELEMS - s; $('countIter').value = n; note = ` The loop ends at i = 999, so only ${n} iteration${n === 1 ? '' : 's'} fit.`; }
+  stop();
+  start = s; count = n;
+  buildTrace(); buildChart(); buildTimeline();
+  render(0, false);
+  const cross = [240, 496, 752].find(b => b > s && b < s + n);
+  setMsg(`Tracing i = ${s}${n > 1 ? `–${s + n - 1}` : ''}, accesses ${s * 10}–${(s + n) * 10 - 1}.${cross ? ` The array moves onto a new page at i = ${cross}.` : ''}${note}`, false);
+  if (autoplay) play();
+}
+
+$('btnTrace').onclick = () => applyWindow(Number($('startIter').value), Number($('countIter').value), true);
+['startIter', 'countIter'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') $('btnTrace').click(); }));
+document.querySelectorAll('.chip').forEach(c => {
+  c.onclick = () => { $('startIter').value = c.dataset.s; $('countIter').value = c.dataset.n; applyWindow(+c.dataset.s, +c.dataset.n, true); };
+});
+
+let resizeT;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => render(current, false), 150); });
+
+buildLower();
+applyWindow(0, 5, false);
+</script>
+</body>
+</html>
