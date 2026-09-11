@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Managing free space: fit strategies, slab and buddy allocators</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#d3dbe2;
+  --other:#4d596b;
+  --bad:#c92a2a;
+  --ok:#2b8a3e;
+  --mark:#ffd43b;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --brow: 38px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important}
+.page{max-width:1240px;margin:0 auto;padding:32px 28px 48px}
+
+/* ---------- Header ---------- */
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:68ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+.sub{margin:0 0 14px;font-size:.88rem;color:var(--ink-soft)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.speed{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-soft)}
+select{padding:6px 8px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+
+/* ---------- Mode tabs ---------- */
+.modes{display:flex;flex-wrap:wrap;margin:0 0 12px;border:2px solid var(--ink);border-radius:8px;overflow:hidden;background:var(--panel);width:fit-content;max-width:100%}
+.modes button{border:0;border-radius:0;padding:10px 22px;font-weight:600;font-size:1rem;background:transparent}
+.modes button + button{border-left:2px solid var(--ink)}
+.modes button[aria-selected="true"]{background:var(--ink);color:#fff}
+
+/* ---------- Editor ---------- */
+.editor{margin-bottom:12px;padding:12px 18px}
+.erow{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.erow + .erow{margin-top:10px}
+.elabel{font-weight:700}
+.seg{display:flex;flex-wrap:wrap;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 14px;font-size:.92rem;background:#fff}
+.seg button + button{border-left:2px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+#opsInput{flex:1 1 320px;min-width:0;font-family:var(--mono);font-size:.98rem;padding:7px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink)}
+#opsInput[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 2px #ffd6d6}
+.emsg{margin:6px 0 0;font-size:.88rem;color:var(--ink-soft)}
+.emsg.err{color:var(--bad);font-weight:600}
+.emsg code{font-family:var(--mono);font-size:.92em;background:#fff;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+
+/* ---------- Step card ---------- */
+.card{border-width:3px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start;min-height:180px;margin-bottom:12px}
+.step-count{margin:0 0 2px;font-size:.9rem;color:var(--ink-soft)}
+.card h2{font-size:1.5rem;line-height:1.2;margin:0 0 8px}
+.card p.body{margin:0;max-width:64ch}
+.calc{margin:0;align-self:center;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* ---------- Timeline ---------- */
+.timeline{display:flex;flex-wrap:wrap;gap:10px;row-gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
+.tl-group{min-width:48px;display:flex;flex-direction:column;gap:5px}
+.tl-steps{display:flex;gap:3px}
+.tl-step{flex:1;height:16px;padding:0;border:0;border-radius:2px;background:var(--g);opacity:.28;min-width:6px}
+.tl-step:hover:not(:disabled){background:var(--g);opacity:.6}
+.tl-step.done{opacity:1}
+.tl-step.now{opacity:1;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.kind-free .tl-step{background:repeating-linear-gradient(135deg,var(--g) 0 4px,#fff 4px 6px)}
+.kind-fail .tl-step{background:repeating-linear-gradient(135deg,var(--bad) 0 4px,#fff 4px 6px)}
+.tl-label{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Shared bits ---------- */
+.stack{display:flex;flex-direction:column;gap:20px}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.flash{animation:flash 1.5s ease-out}
+@keyframes flash{0%,35%{box-shadow:0 0 0 4px var(--mark)}100%{box-shadow:0 0 0 4px rgba(255,212,59,0)}}
+.entering,.leaving{opacity:0}
+.code{font-family:var(--mono);font-size:13.5px;overflow-x:auto;padding-left:10px}
+.ln{display:grid;grid-template-columns:28px 1fr;align-items:center;border-radius:4px;padding:1px 0;position:relative}
+.ln .no{color:#9aa6b2;font-size:12px;text-align:right;padding-right:10px}
+.ln code{font-family:inherit;white-space:pre}
+.ln.cur{background:#ffe8a3}
+.ln.cur::before{content:"";position:absolute;left:-10px;top:50%;transform:translateY(-50%);border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:8px solid var(--ink)}
+.ln.cur.badline{background:#ffd6d6}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0;padding:0;list-style:none;font-size:.85rem;color:var(--ink-soft)}
+.legend li{display:flex;align-items:center;gap:6px}
+.sw{width:16px;height:12px;border:1px solid var(--ink);display:inline-block}
+.sw.s-free{background:var(--hatch)}
+.sw.s-other{background:var(--other)}
+.sw.s-req{background:linear-gradient(90deg,#c77700 0 33%,#0b7285 33% 66%,#5f3dc4 66%)}
+.sw.s-waste{background:repeating-linear-gradient(135deg,#0b7285 0 3px,#bfe3e8 3px 5px)}
+table.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-weight:600;font-size:.84rem;color:var(--ink-soft);border-bottom:2px solid var(--ink);padding:4px 8px;white-space:nowrap}
+.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px;white-space:nowrap}
+.tbl td.txt{font-family:var(--sans);font-size:.9rem}
+.tbl td.bad{color:var(--bad);font-family:var(--sans);font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c);margin-right:6px;vertical-align:0}
+
+/* ---------- Fit: heap bar ---------- */
+.heap{position:relative;padding:26px 0 46px}
+.hbar{position:relative;height:78px;border:2px solid var(--ink);background:#fff}
+.hchunk{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:2px solid var(--ink);overflow:hidden;font-size:12px;line-height:1.15;text-align:center;transition:left .6s cubic-bezier(.6,.05,.3,1),width .6s cubic-bezier(.6,.05,.3,1),opacity .45s,background-color .45s,color .45s}
+.hchunk:last-child{border-right:0}
+.hchunk .hs{font-family:var(--mono);font-weight:700;font-size:15px}
+.hchunk.free{background:var(--hatch);color:var(--ink)}
+.hchunk.other{background:var(--other);color:#fff}
+.hchunk.req{background:var(--c);color:#fff}
+.hchunk.narrow .hl{display:none}
+.hchunk.narrow .hs{font-size:12px}
+.hchunk.cursor{box-shadow:inset 0 0 0 4px var(--ink);z-index:2}
+.hchunk.chosen{box-shadow:inset 0 0 0 4px var(--mark);z-index:2}
+.hticks{position:absolute;left:0;right:0;top:106px;height:16px;font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+.hticks span{position:absolute;transform:translateX(-50%)}
+.hticks span:first-child{transform:none}
+.hticks span:last-child{transform:translateX(-100%)}
+.hmark{position:absolute;transform:translateX(-50%);font-size:12.5px;font-weight:700;white-space:nowrap;transition:left .55s cubic-bezier(.6,.05,.3,1),opacity .3s}
+.hmark.top{top:4px}
+.hmark.bottom{bottom:2px;color:#8d4a1f}
+.hmark.off{opacity:0}
+
+/* ---------- Fit: free list ---------- */
+.chain{display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px 0}
+.ln-item{display:flex;align-items:flex-start}
+.ln-head,.ln-null{font-family:var(--mono);font-size:13px;font-weight:700;padding:3px 9px;border-radius:5px;margin-top:14px}
+.ln-head{background:var(--ink);color:#fff}
+.ln-null{border:2px solid var(--ink-soft);color:var(--ink-soft)}
+.ln-arrow{width:28px;height:2px;background:var(--ink);position:relative;margin:26px 8px 0 0}
+.ln-arrow::after{content:"";position:absolute;right:-8px;top:-5px;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid var(--ink)}
+.fnode{position:relative;margin-top:14px;border:2px solid var(--ink);border-radius:5px;background:#fff;font-family:var(--mono);font-size:13px;min-width:74px;text-align:center}
+.fn-top{padding:4px 8px;font-weight:700}
+.fn-v{border-top:1px solid var(--ink);padding:2px 6px;font-family:var(--sans);font-size:11.5px;white-space:nowrap}
+.fnode.v-small .fn-v{background:#f1f3f5;color:var(--ink-soft)}
+.fnode.v-leader .fn-v{background:#fff3bf}
+.fnode.v-beaten .fn-v{background:#f1f3f5}
+.fnode.v-chosen .fn-v{background:var(--mark);font-weight:700}
+.fnode.cursor{box-shadow:0 0 0 3px var(--ink)}
+.fnode .rtag{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);font-family:var(--sans);font-size:11px;font-weight:700;color:#8d4a1f;white-space:nowrap}
+
+/* ---------- Fit: compare ---------- */
+.cmp{display:flex;flex-direction:column;gap:6px}
+.cmp-row{display:grid;grid-template-columns:100px minmax(0,1fr) 270px;gap:14px;align-items:center;padding:8px 10px;border:2px solid transparent;border-radius:6px;background:transparent;text-align:left;font-size:.92rem;width:100%}
+.cmp-row:hover{background:#fff}
+.cmp-row.me{border-color:var(--ink);background:#fff}
+.cmp-row .nm{font-weight:700}
+.mini{position:relative;height:30px;border:1.5px solid var(--ink);background:#fff;overflow:hidden}
+.mc{position:absolute;top:0;bottom:0;border-right:1.5px solid var(--ink);display:grid;place-items:center;font-family:var(--mono);font-size:11px;overflow:hidden}
+.mc.free{background:var(--hatch)}
+.mc.other{background:var(--other);color:#fff}
+.mc.req{background:var(--c);color:#fff}
+.cmp-row .st{color:var(--ink-soft)}
+.cmp-row .st b{color:var(--ink)}
+.cmp-row .st .fail{color:var(--bad);font-weight:700}
+
+/* ---------- Slab ---------- */
+.pages{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.pg{border:2px solid var(--ink);border-radius:6px;padding:6px 8px;min-height:60px;background:var(--hatch);transition:background-color .4s}
+.pg b{font-family:var(--mono);display:block}
+.pg span{font-size:.84rem;color:var(--ink-soft)}
+.pg.used{background:var(--t)}
+.pg.used span{color:var(--ink)}
+.slabs{display:flex;flex-direction:column;gap:10px}
+.slab{border:2px solid var(--ink);border-radius:6px;background:#fff;overflow:hidden}
+.slab-h{display:flex;justify-content:space-between;gap:8px;padding:4px 10px;background:var(--t);font-size:.88rem;border-bottom:1px solid var(--ink)}
+.slab-h b{font-family:var(--mono)}
+.objs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:10px}
+.obj{height:38px;border-radius:4px;display:grid;place-items:center;font-family:var(--mono);font-size:12.5px;font-weight:700;background:var(--c);color:#fff;border:2px solid var(--c);transition:background-color .35s,color .35s}
+.obj.free{background:#fff;color:var(--ink-soft);border:2px dashed #98a9b7;font-family:var(--sans);font-weight:400;font-size:12px}
+.nothing{margin:0;color:var(--ink-soft);font-size:.9rem}
+
+/* ---------- Buddy ---------- */
+.tree{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px}
+.tlabels{display:flex;flex-direction:column}
+.tlabels span{height:var(--brow);display:flex;align-items:center;justify-content:flex-end;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+.tarea{position:relative;height:calc(var(--brow) * 7);background:repeating-linear-gradient(to bottom,transparent 0 calc(var(--brow) - 1px),var(--line) calc(var(--brow) - 1px) var(--brow))}
+.bblk{position:absolute;height:calc(var(--brow) - 8px);margin-top:3px;border:2px solid var(--ink);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;overflow:hidden;white-space:nowrap;transition:left .5s,width .5s,top .5s,opacity .45s,background-color .4s,border-color .4s,color .4s}
+.bblk.split{background:transparent;border-color:#a7b4c0;color:#8a96a3}
+.bblk.free{background:var(--hatch)}
+.bblk.used{background:var(--c);color:#fff}
+.bblk .bt{position:relative;z-index:1;font-weight:700}
+.bblk .bw{position:absolute;right:0;top:0;bottom:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.75) 0 3px,rgba(255,255,255,.2) 3px 6px)}
+.bblk.hl{box-shadow:0 0 0 3px var(--ink);z-index:3}
+.memrow{margin-top:14px}
+.bmem{position:relative;height:44px;border:2px solid var(--ink);background:#fff}
+.bmem .bblk{top:0;height:100%;margin:0;border-radius:0;border-width:0 2px 0 0}
+.bticks{position:relative;height:18px;margin-left:56px;font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+.bticks span{position:absolute;top:3px;transform:translateX(-50%)}
+.bticks span:first-child{transform:none}
+.bticks span:last-child{transform:translateX(-100%)}
+.flists{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}
+.flrow{display:grid;grid-template-columns:52px 1fr;align-items:center;gap:8px;min-height:28px}
+.flrow .sz{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);text-align:right}
+.flrow .items{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.flrow .none{color:#9aa6b2;font-size:.85rem}
+.fchip{font-family:var(--mono);font-size:12.5px;border:1.5px solid var(--ink);border-radius:4px;padding:0 6px;background:#fff}
+
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 980px){
+  .top{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .card{grid-template-columns:1fr;gap:12px;min-height:0}
+  .row2{grid-template-columns:1fr}
+  .cmp-row{grid-template-columns:90px minmax(0,1fr)}
+  .cmp-row .st{grid-column:2}
+}
+@media (max-width: 640px){
+  :root{--brow:32px}
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.75rem}
+  .modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+  .modes button{padding:8px 4px;font-size:.85rem;line-height:1.2}
+  .tl-label{display:none}
+  .tl-group{min-width:0}
+  .timeline{gap:5px}
+  .pages{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hchunk .hl{display:none}
+  .hchunk .hs{font-size:12px}
+  .cmp-row{grid-template-columns:1fr}
+  .cmp-row .st{grid-column:auto}
+  .tree{grid-template-columns:36px minmax(0,1fr)}
+  .bticks{margin-left:44px}
+}
+@media (prefers-reduced-motion: reduce){
+  .hchunk,.bblk,.hmark{transition:opacity .2s !important}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>Managing free space</h1>
+      <p class="intro">Four ways to choose a free chunk, and two allocators built for speed, following the Free-Space Management chapter of OSTEP. Each scenario plays step by step, and you can type your own sequence of requests.</p>
+    </div>
+    <div class="controls">
+      <button id="btnRestart" type="button">Restart</button>
+      <button id="btnPrev" type="button">Back</button>
+      <button id="btnPlay" type="button">Play</button>
+      <button id="btnNext" type="button" class="primary">Next step</button>
+      <label class="speed">Speed
+        <select id="speed">
+          <option value="3600">Slow</option>
+          <option value="2300" selected>Normal</option>
+          <option value="1300">Fast</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <div class="modes" role="tablist" aria-label="Allocator">
+    <button type="button" role="tab" data-mode="fit" aria-selected="true">Fit strategies</button>
+    <button type="button" role="tab" data-mode="slab" aria-selected="false">Slab allocator</button>
+    <button type="button" role="tab" data-mode="buddy" aria-selected="false">Buddy allocator</button>
+  </div>
+
+  <section class="panel editor" aria-label="Operations">
+    <div class="erow" id="stratRow">
+      <span class="elabel">Strategy</span>
+      <div class="seg" id="strats">
+        <button type="button" data-s="first" aria-pressed="true">First fit</button>
+        <button type="button" data-s="best" aria-pressed="false">Best fit</button>
+        <button type="button" data-s="worst" aria-pressed="false">Worst fit</button>
+        <button type="button" data-s="next" aria-pressed="false">Next fit</button>
+      </div>
+    </div>
+    <div class="erow">
+      <label class="elabel" for="opsInput">Operations</label>
+      <input id="opsInput" type="text" autocomplete="off" spellcheck="false" aria-describedby="opsMsg">
+      <button id="btnRun" type="button">Run</button>
+      <button id="btnExample" type="button">Use the example</button>
+    </div>
+    <p class="emsg" id="opsMsg" role="status"></p>
+  </section>
+
+  <section class="panel card" aria-live="polite">
+    <div>
+      <p class="step-count" id="stepCount"></p>
+      <h2 id="stepTitle"></h2>
+      <p class="body" id="stepBody"></p>
+    </div>
+    <pre class="calc" id="stepCalc"></pre>
+  </section>
+
+  <nav class="timeline" id="timeline" aria-label="Jump to a step"></nav>
+
+  <!-- ===================== Fit strategies ===================== -->
+  <div class="stack" id="view-fit" role="tabpanel">
+    <section class="panel">
+      <h2>Heap</h2>
+      <p class="sub">100 bytes. A, B and C belong to other code. Headers are ignored to keep the numbers simple.</p>
+      <div class="heap">
+        <div class="hmark top off" id="fitCursor">▼ checking</div>
+        <div class="hbar" id="fitBar"></div>
+        <div class="hticks" id="fitTicks"></div>
+        <div class="hmark bottom off" id="fitRover">▲ rover</div>
+      </div>
+      <ul class="legend">
+        <li><span class="sw s-free"></span>Free</li>
+        <li><span class="sw s-other"></span>In use by other code</li>
+        <li><span class="sw s-req"></span>Given to a request (r1, r2, …)</li>
+      </ul>
+    </section>
+    <div class="row2">
+      <section class="panel">
+        <h2>Free list</h2>
+        <p class="sub">Kept in address order. Each chunk is written as size@address.</p>
+        <div class="chain" id="fitList"></div>
+      </section>
+      <section class="panel">
+        <h2 id="fitCodeTitle">First fit</h2>
+        <p class="sub">The search the allocator runs.</p>
+        <div class="code" id="fitCode"></div>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>Same operations, all four strategies</h2>
+      <p class="sub" id="cmpSub"></p>
+      <div class="cmp" id="cmp"></div>
+    </section>
+  </div>
+
+  <!-- ===================== Slab ===================== -->
+  <div class="stack" id="view-slab" role="tabpanel" hidden>
+    <section class="panel">
+      <h2>Page pool</h2>
+      <p class="sub">6 pages of 4KB. Caches take whole pages from here and give them back when they are empty.</p>
+      <div class="pages" id="slabPages"></div>
+    </section>
+    <div class="row2">
+      <section class="panel">
+        <h2>inode cache</h2>
+        <p class="sub">1KB objects, 4 per slab.</p>
+        <div class="slabs" id="slab-inode"></div>
+      </section>
+      <section class="panel">
+        <h2>lock cache</h2>
+        <p class="sub">512B objects, 8 per slab.</p>
+        <div class="slabs" id="slab-lock"></div>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>What the allocator runs</h2>
+      <p class="sub">Allocation never searches or splits: it takes a ready object from a slab.</p>
+      <div class="code" id="slabCode"></div>
+    </section>
+  </div>
+
+  <!-- ===================== Buddy ===================== -->
+  <div class="stack" id="view-buddy" role="tabpanel" hidden>
+    <section class="panel">
+      <h2>Buddy tree</h2>
+      <p class="sub">A 64KB pool. Each row halves the block size, and only blocks that exist are drawn.</p>
+      <div class="tree">
+        <div class="tlabels" id="budLabels"></div>
+        <div class="tarea" id="budTree"></div>
+      </div>
+      <div class="tree memrow">
+        <div class="tlabels"><span style="height:44px">memory</span></div>
+        <div class="bmem" id="budMem"></div>
+      </div>
+      <div class="bticks"><span style="left:0">0</span><span style="left:25%">16KB</span><span style="left:50%">32KB</span><span style="left:75%">48KB</span><span style="left:100%">64KB</span></div>
+      <ul class="legend">
+        <li><span class="sw s-free"></span>Free block</li>
+        <li><span class="sw" style="background:transparent;border-color:#a7b4c0"></span>Split into two buddies</li>
+        <li><span class="sw s-waste"></span>In use, with rounding waste striped</li>
+      </ul>
+    </section>
+    <div class="row2">
+      <section class="panel">
+        <h2>Free lists by size</h2>
+        <p class="sub">One list per block size, holding block addresses in KB.</p>
+        <div class="flists" id="budLists"></div>
+        <h2>Requests</h2>
+        <table class="tbl" id="budReqs"></table>
+      </section>
+      <section class="panel">
+        <h2>What the allocator runs</h2>
+        <p class="sub">Buddies differ in exactly one address bit, so finding one is a single XOR.</p>
+        <div class="code" id="budCode"></div>
+      </section>
+    </div>
+  </div>
+
+  <p class="kbd-hint">Keyboard: <kbd>←</kbd> <kbd>→</kbd> to step, <kbd>Space</kbd> to play or pause.</p>
+</div>
+
+<script>
+/* =========================================================
+   Helpers
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const clone = o => JSON.parse(JSON.stringify(o));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const REQ_COLORS = ['#c77700', '#0b7285', '#5f3dc4', '#a61e4d', '#2b8a3e', '#1864ab', '#8d4a1f', '#5c7c1a'];
+const reqColor = id => REQ_COLORS[(id - 1) % REQ_COLORS.length];
+const GRAY = '#7d8b99';
+const B = n => `${n} byte${n === 1 ? '' : 's'}`;
+
+function newBuild () {
+  const b = { steps: [], groups: [] };
+  b.group = (label, o = {}) => { b.groups.push({ label, color: GRAY, kind: 'op', op: null, ...o, start: b.steps.length, count: 0 }); return b.groups.length - 1; };
+  b.snap = (g, o) => { b.groups[g].count++; b.steps.push({ group: g, lines: [], calc: [], ...o }); };
+  return b;
+}
+
+function renderCodeInto (el, lines, cur = [], bad = []) {
+  el.innerHTML = lines.map((t, i) => {
+    const c = cur.includes(i), bd = c && bad.includes(i);
+    return `<div class="ln${c ? ' cur' : ''}${bd ? ' badline' : ''}"><span class="no">${i + 1}</span><code>${esc(t)}</code></div>`;
+  }).join('');
+}
+
+/* Keyed, absolutely positioned boxes that animate between steps */
+function syncAbs (container, store, items, animate) {
+  const keys = new Set(items.map(i => String(i.key)));
+  for (const [k, el] of store) {
+    if (!keys.has(k) && !el.classList.contains('leaving')) {
+      el.classList.add('leaving');
+      el._t = setTimeout(() => { if (el.classList.contains('leaving')) { el.remove(); store.delete(k); } }, animate ? 520 : 0);
+    }
+  }
+  for (const it of items) {
+    const k = String(it.key);
+    let el = store.get(k), fresh = false;
+    if (!el) {
+      el = document.createElement('div');
+      container.appendChild(el);
+      store.set(k, el);
+      fresh = true;
+    } else {
+      clearTimeout(el._t);
+    }
+    const applyStyle = () => { for (const [p, v] of Object.entries(it.style)) el.style.setProperty(p, v); };
+    if (fresh) applyStyle();
+    el.className = it.cls + (fresh && animate ? ' entering' : '');
+    if (el._html !== it.html) { el.innerHTML = it.html; el._html = it.html; }
+    el.title = it.title || '';
+    if (fresh && animate) void el.offsetWidth;
+    applyStyle();
+    el.classList.remove('entering');
+    if (it.flash && animate) { void el.offsetWidth; el.classList.add('flash'); }
+  }
+}
+
+/* =========================================================
+   FIT STRATEGIES
+   ========================================================= */
+const STRATS = ['first', 'best', 'worst', 'next'];
+const FIT_NAMES = { first: 'First fit', best: 'Best fit', worst: 'Worst fit', next: 'Next fit' };
+const FIT_EXAMPLE = '15, 5, 12, free 2, 20';
+const fitInitial = () => [
+  { start: 0,  size: 10, type: 'free' },
+  { start: 10, size: 10, type: 'other', label: 'A' },
+  { start: 20, size: 30, type: 'free' },
+  { start: 50, size: 10, type: 'other', label: 'B' },
+  { start: 60, size: 20, type: 'free' },
+  { start: 80, size: 20, type: 'other', label: 'C' },
+];
+
+const FREE_TAIL = ['free(ptr):', '    put chunk back in the free list by address', '    merge it with free neighbours'];
+const FIT_CODE = {
+  first: ['malloc(request):', '    for each chunk in free list:', '        if chunk.size >= request:', '            split chunk, return its start', '    return NULL', ...FREE_TAIL],
+  best: ['malloc(request):', '    best = NULL', '    for each chunk in free list:', '        if chunk.size >= request and', '           (best == NULL or chunk.size < best.size):', '            best = chunk', '    if best == NULL: return NULL', '    split best, return its start', ...FREE_TAIL],
+  worst: ['malloc(request):', '    worst = NULL', '    for each chunk in free list:', '        if chunk.size >= request and', '           (worst == NULL or chunk.size > worst.size):', '            worst = chunk', '    if worst == NULL: return NULL', '    split worst, return its start', ...FREE_TAIL],
+  next: ['malloc(request):', '    chunk = rover            // where the last search stopped', '    repeat:', '        if chunk.size >= request:', '            split chunk, rover = end of new allocation', '            return its start', '        chunk = next(chunk)  // wraps around to the head', '    until chunk == rover', '    return NULL', ...FREE_TAIL],
+};
+const FIT_LINES = {
+  first: { intro: [0, 1], small: [1, 2], fit: [2], split: [3], fail: [4], free: [5, 6], merge: [7] },
+  best:  { intro: [0, 1], small: [2, 3], leader: [3, 4, 5], beaten: [3, 4], split: [7], fail: [6], free: [8, 9], merge: [10] },
+  worst: { intro: [0, 1], small: [2, 3], leader: [3, 4, 5], beaten: [3, 4], split: [7], fail: [6], free: [8, 9], merge: [10] },
+  next:  { intro: [0, 1], small: [3, 6], fit: [3], split: [4, 5], fail: [7, 8], free: [9, 10], merge: [11] },
+};
+const FIT_RULE = {
+  first: n => `First fit walks the free list from the head and takes the first chunk with at least ${n} bytes.`,
+  best: n => `Best fit checks every chunk and takes the smallest one with at least ${n} bytes, so as little as possible is left over.`,
+  worst: n => `Worst fit checks every chunk and takes the largest one, hoping the piece left over is still big enough to be useful.`,
+  next: n => `Next fit is first fit that starts where the last search stopped (the rover) instead of at the head. The first chunk with at least ${n} bytes wins.`,
+};
+
+function fitStats (chunks) {
+  const f = chunks.filter(c => c.type === 'free');
+  return { n: f.length, largest: f.length ? Math.max(...f.map(c => c.size)) : 0, total: f.reduce((a, c) => a + c.size, 0) };
+}
+function fitSearchStart (chunks, rover) {
+  const fl = chunks.filter(c => c.type === 'free');
+  const si = fl.findIndex(c => c.start + c.size > rover);
+  return fl.length ? fl[si < 0 ? 0 : si].start : null;
+}
+
+function parseSizesOps (text, max, unit, maxOps) {
+  const toks = text.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  if (!toks.length) return { err: 'Enter at least one operation, for example 15, 5, free 1.' };
+  if (toks.length > maxOps) return { err: `Use at most ${maxOps} operations so the timeline stays readable.` };
+  const ops = []; let n = 0; const freed = new Set();
+  for (const t of toks) {
+    let m;
+    if ((m = t.match(/^(?:malloc\s*\(?\s*)?(\d+)\s*(?:kb|k|b|bytes?)?\s*\)?$/))) {
+      const size = +m[1];
+      if (size < 1 || size > max) return { err: `“${t}” is out of range: sizes run from 1 to ${max}${unit}.` };
+      ops.push({ kind: 'malloc', size, id: ++n });
+    } else if ((m = t.match(/^free\s*\(?\s*r?(\d+)\s*\)?$/))) {
+      const ref = +m[1];
+      if (ref < 1 || ref > n) return { err: `“${t}” refers to request ${ref}, but ${n === 0 ? 'no requests come' : `only ${n} request${n === 1 ? ' comes' : 's come'}`} before it.` };
+      if (freed.has(ref)) return { err: `Request ${ref} is freed twice. Each request can be freed once.` };
+      freed.add(ref);
+      ops.push({ kind: 'free', ref });
+    } else {
+      return { err: `“${t}” isn't an operation. Use a size such as 15, or free followed by a request number, such as free 1.` };
+    }
+  }
+  return { ops };
+}
+
+function fitRun (strat, ops, b) {
+  const name = FIT_NAMES[strat], L = FIT_LINES[strat], lname = name.toLowerCase();
+  let chunks = fitInitial(), rover = 0, failed = 0;
+  const reqs = {}, after = [];
+  const free = () => chunks.filter(c => c.type === 'free');
+  const flStr = () => { const f = free(); return f.length ? f.map(c => `${c.size}@${c.start}`).join(' → ') : '(empty)'; };
+  const view = (extra = {}) => ({ chunks: clone(chunks), rover: strat === 'next' ? rover : null, verdicts: {}, cursor: null, chosen: null, flash: [], strat, ...extra });
+  let g = null;
+  const snap = o => { if (b) b.snap(g, o); };
+
+  if (b) {
+    g = b.group('start', { kind: 'note', op: -1 });
+    snap({ opIndex: -1, opDone: true, lines: [],
+      title: `${name}: the starting heap`,
+      body: 'The heap holds 100 bytes. Chunks A, B and C are in use by other code, and between them sit free chunks of 10, 30 and 20 bytes, the free list from OSTEP\'s example.' + (strat === 'next' ? ' The rover starts at the beginning of the heap.' : ''),
+      calc: [`free list (size@address): ${flStr()}`, `operations: ${ops.map(opLabel).join(', ')}`, ...(strat === 'next' ? ['rover = 0'] : [])],
+      view: view() });
+  }
+
+  ops.forEach((op, k) => {
+    const base = { opIndex: k, opDone: false };
+    if (op.kind === 'malloc') {
+      const { size, id } = op;
+      if (b) g = b.group(`malloc(${size})`, { color: reqColor(id), op: k });
+      const fl = free();
+      let order = fl;
+      if (strat === 'next' && fl.length) {
+        let si = fl.findIndex(c => c.start + c.size > rover); if (si < 0) si = 0;
+        order = fl.slice(si).concat(fl.slice(0, si));
+      }
+      const introCalc = [`request: ${B(size)} for r${id}`, `free list: ${flStr()}`];
+      if (strat === 'next') introCalc.push(order.length ? `rover = ${rover} → start at ${order[0].size}@${order[0].start}` : `rover = ${rover}`);
+      snap({ ...base, title: `malloc(${size}) with ${lname}`, body: FIT_RULE[strat](size), calc: introCalc, lines: L.intro, view: view() });
+
+      const verdicts = {}; let chosen = null;
+      for (const c of order) {
+        const fits = c.size >= size;
+        let title, body, lines, v;
+        if (strat === 'first' || strat === 'next') {
+          v = fits ? 'chosen' : 'small';
+          lines = fits ? L.fit : L.small;
+          if (fits) {
+            chosen = c;
+            title = `${c.size}@${c.start} fits`;
+            body = strat === 'first'
+              ? `It holds ${B(c.size)}, enough for ${size}. First fit stops at the first chunk that fits without looking any further.`
+              : `It holds ${B(c.size)}, enough for ${size}. Next fit stops at the first chunk that fits after the rover.`;
+          } else {
+            title = `${c.size}@${c.start} is too small`;
+            body = `It holds ${B(c.size)}, fewer than ${size}, so the search moves on${strat === 'next' ? ', wrapping to the head after the last chunk' : ''}.`;
+          }
+        } else {
+          const word = strat === 'best' ? 'smaller' : 'larger';
+          const better = fits && (!chosen || (strat === 'best' ? c.size < chosen.size : c.size > chosen.size));
+          if (!fits) {
+            v = 'small'; lines = L.small;
+            title = `${c.size}@${c.start} is too small`;
+            body = `It holds ${B(c.size)}, fewer than ${size}. ${name} still has to check the rest of the list.`;
+          } else if (better) {
+            const prev = chosen;
+            if (prev) verdicts[prev.start] = 'beaten';
+            chosen = c; v = 'leader'; lines = L.leader;
+            title = `${c.size}@${c.start} is the ${strat === 'best' ? 'best' : 'largest'} so far`;
+            body = prev
+              ? `It fits, and at ${B(c.size)} it is ${word} than the ${prev.size}-byte chunk found earlier, so it becomes the candidate.`
+              : `It holds ${B(c.size)}, enough for ${size}, so it becomes the candidate. ${name} keeps looking in case a ${word} chunk also fits.`;
+          } else {
+            v = 'beaten'; lines = L.beaten;
+            title = `${c.size}@${c.start} fits, but is not ${word}`;
+            body = `It holds ${B(c.size)}, but the candidate at ${chosen.start} has ${chosen.size}, which is ${strat === 'best' ? 'a tighter fit' : 'larger'}. The candidate stays.`;
+          }
+        }
+        verdicts[c.start] = v;
+        const calc = [`${c.size} ≥ ${size}?  ${fits ? 'yes' : 'no'}`];
+        if (strat === 'best' || strat === 'worst') calc.push(`candidate: ${chosen ? `${chosen.size}@${chosen.start}` : 'none'}`);
+        snap({ ...base, title, body, calc, lines, view: view({ verdicts: { ...verdicts }, cursor: c.start }) });
+        if ((strat === 'first' || strat === 'next') && fits) break;
+      }
+
+      if (chosen) {
+        verdicts[chosen.start] = 'chosen';
+        const at = chosen.start, old = chosen.size, rem = old - size;
+        const parts = [{ start: at, size, type: 'req', id }];
+        if (rem > 0) parts.push({ start: at + size, size: rem, type: 'free' });
+        chunks.splice(chunks.indexOf(chosen), 1, ...parts);
+        reqs[id] = 'live';
+        if (strat === 'next') rover = at + size;
+        snap({ ...base, opDone: true,
+          title: rem ? `Split the ${old}-byte chunk` : 'Exact fit: use the whole chunk',
+          body: (rem
+            ? `The first ${B(size)} go to r${id}, so malloc returns address ${at}. The other ${B(rem)} stay on the free list at ${at + size}.`
+            : `The chunk is exactly ${B(size)}, so it leaves the free list and malloc returns address ${at}.`) +
+            (strat === 'next' ? ` The rover moves to ${at + size}.` : ''),
+          calc: [`r${id} = malloc(${size}) → ${at}`, rem ? `left over: ${old} − ${size} = ${B(rem)} at ${at + size}` : 'left over: 0 bytes', `free list: ${flStr()}`],
+          lines: L.split, view: view({ verdicts: { ...verdicts }, flash: [at, at + size], chosen: at }) });
+      } else {
+        failed++; reqs[id] = null;
+        const st = fitStats(chunks);
+        if (b) b.groups[g].kind = 'fail';
+        snap({ ...base, opDone: true, fail: true,
+          title: 'No chunk fits: malloc returns NULL',
+          body: st.total >= size
+            ? `${B(st.total)} are free in total, but the largest single chunk holds only ${st.largest}. This is external fragmentation: the free space is split into pieces too small to use.`
+            : `Only ${B(st.total)} are free in total, fewer than the ${size} requested.`,
+          calc: [`largest free chunk = ${st.largest} < ${size}`, `total free = ${st.total}`, `r${id} = NULL`],
+          lines: L.fail, view: view({ verdicts: { ...verdicts } }) });
+      }
+    } else {
+      const { ref } = op;
+      if (b) g = b.group(`free r${ref}`, { color: reqColor(ref), kind: 'free', op: k });
+      if (reqs[ref] === null) {
+        snap({ ...base, opDone: true, title: `free(r${ref}) does nothing`,
+          body: `Request ${ref} got NULL with ${lname}, and freeing NULL has no effect.`,
+          calc: [`r${ref} = NULL`], lines: L.free, view: view() });
+      } else {
+        const c = chunks.find(ch => ch.type === 'req' && ch.id === ref);
+        c.type = 'free'; delete c.id; reqs[ref] = 'freed';
+        const idx = chunks.indexOf(c);
+        const left = chunks[idx - 1] && chunks[idx - 1].type === 'free' ? chunks[idx - 1] : null;
+        const right = chunks[idx + 1] && chunks[idx + 1].type === 'free' ? chunks[idx + 1] : null;
+        snap({ ...base, opDone: !(left || right),
+          title: `free(r${ref}): ${B(c.size)} at ${c.start} come back`,
+          body: 'The chunk goes back on the free list in address order.' +
+            (left || right ? ' A neighbour in memory is free too, so the next step merges them.' : ' Both neighbours in memory are in use, so nothing can merge.'),
+          calc: [`free list: ${flStr()}`], lines: L.free, view: view({ flash: [c.start], cursor: c.start }) });
+        if (left || right) {
+          const parts = [left, c, right].filter(Boolean);
+          const merged = { start: parts[0].start, size: parts.reduce((a, p) => a + p.size, 0), type: 'free' };
+          chunks.splice(chunks.indexOf(parts[0]), parts.length, merged);
+          snap({ ...base, opDone: true, title: 'Coalesce with free neighbours',
+            body: `Chunks that touch in memory merge into one ${merged.size}-byte chunk at ${merged.start}. Without this, the free list would fill up with small pieces.`,
+            calc: [`${parts.map(p => `${p.size}@${p.start}`).join(' + ')} → ${merged.size}@${merged.start}`, `free list: ${flStr()}`],
+            lines: L.merge, view: view({ flash: [merged.start] }) });
+        }
+      }
+    }
+    after.push({ chunks: clone(chunks), failed });
+  });
+
+  if (b) {
+    g = b.group('result', { kind: 'note', op: ops.length });
+    const st = fitStats(chunks), mallocs = ops.filter(o => o.kind === 'malloc').length;
+    snap({ opIndex: ops.length - 1, opDone: true, lines: [],
+      title: `${name}: after every operation`,
+      body: `${mallocs - failed} of ${mallocs} requests succeeded. The panel at the bottom runs the same operations with all four strategies, so you can see which one left the most useful free space.`,
+      calc: [`free list: ${flStr()}`, `free chunks: ${st.n}, largest: ${st.largest}, total free: ${st.total}`, `failed requests: ${failed}`],
+      view: view() });
+  }
+  return { after };
+}
+
+function opLabel (op) { return op.kind === 'malloc' ? `malloc(${op.size})` : `free r${op.ref}`; }
+
+const fitStore = new Map();
+function buildFitTicks () {
+  let h = '';
+  for (let v = 0; v <= 100; v += 10) h += `<span style="left:${v}%">${v}</span>`;
+  $('fitTicks').innerHTML = h;
+}
+buildFitTicks();
+
+const VERDICT_TXT = {
+  small: () => '✗ too small',
+  leader: s => (s === 'best' ? '★ best so far' : '★ largest so far'),
+  beaten: () => 'fits, not picked',
+  chosen: () => '✓ picked',
+};
+
+function renderFit (step, animate) {
+  const v = step.view;
+  const items = v.chunks.map(c => {
+    const label = c.type === 'free' ? 'free' : c.type === 'other' ? c.label : `r${c.id}`;
+    const cls = ['hchunk', c.type];
+    if (c.size < 7) cls.push('narrow');
+    if (v.cursor === c.start) cls.push('cursor');
+    if (v.chosen === c.start) cls.push('chosen');
+    return {
+      key: c.start, cls: cls.join(' '),
+      style: { left: c.start + '%', width: c.size + '%', '--c': c.type === 'req' ? reqColor(c.id) : 'transparent' },
+      html: `<span class="hs">${c.size}</span><span class="hl">${label}</span>`,
+      title: `${label}: ${c.size} bytes, ${c.start}–${c.start + c.size - 1}`,
+      flash: v.flash.includes(c.start),
+    };
+  });
+  syncAbs($('fitBar'), fitStore, items, animate);
+
+  const cur = v.chunks.find(c => c.start === v.cursor);
+  $('fitCursor').classList.toggle('off', !cur);
+  if (cur) $('fitCursor').style.left = (cur.start + cur.size / 2) + '%';
+  const showRover = v.strat === 'next' && v.rover != null;
+  $('fitRover').classList.toggle('off', !showRover);
+  if (showRover) $('fitRover').style.left = Math.min(v.rover, 100) + '%';
+
+  const startAt = v.strat === 'next' ? fitSearchStart(v.chunks, v.rover) : null;
+  let html = '<span class="ln-head">head</span>';
+  v.chunks.filter(c => c.type === 'free').forEach(c => {
+    const vd = v.verdicts[c.start];
+    const cls = ['fnode'];
+    if (vd) cls.push('v-' + vd);
+    if (v.cursor === c.start) cls.push('cursor');
+    if (animate && v.flash.includes(c.start)) cls.push('flash');
+    html += `<span class="ln-item"><span class="ln-arrow" aria-hidden="true"></span><div class="${cls.join(' ')}">` +
+      (startAt === c.start ? '<span class="rtag">rover starts here</span>' : '') +
+      `<div class="fn-top">${c.size}@${c.start}</div>${vd ? `<div class="fn-v">${VERDICT_TXT[vd](v.strat)}</div>` : ''}</div></span>`;
+  });
+  html += '<span class="ln-item"><span class="ln-arrow" aria-hidden="true"></span><span class="ln-null">NULL</span></span>';
+  $('fitList').innerHTML = html;
+
+  $('fitCodeTitle').textContent = FIT_NAMES[v.strat];
+  renderCodeInto($('fitCode'), FIT_CODE[v.strat], step.lines, step.fail ? step.lines : []);
+
+  const k = step.opDone ? step.opIndex : step.opIndex - 1;
+  $('cmpSub').textContent = k < 0
+    ? 'Before any operation. Click a row to switch strategy.'
+    : `After operation ${k + 1} of ${parsedOps.length}, ${opLabel(parsedOps[k])}. Click a row to switch strategy.`;
+  $('cmp').innerHTML = STRATS.map(s => {
+    const st = k < 0 ? { chunks: fitInitial(), failed: 0 } : build.cmp[s].after[k];
+    const stats = fitStats(st.chunks);
+    const bar = st.chunks.map(c => {
+      const label = c.size >= 8 ? (c.type === 'free' ? c.size : c.type === 'other' ? c.label : `r${c.id}`) : '';
+      return `<span class="mc ${c.type}" style="left:${c.start}%;width:${c.size}%;${c.type === 'req' ? `--c:${reqColor(c.id)}` : ''}">${label}</span>`;
+    }).join('');
+    return `<button type="button" class="cmp-row${s === strategy ? ' me' : ''}" data-s="${s}" aria-pressed="${s === strategy}">` +
+      `<span class="nm">${FIT_NAMES[s]}</span><span class="mini">${bar}</span>` +
+      `<span class="st"><b>${stats.n}</b> free chunk${stats.n === 1 ? '' : 's'}, largest <b>${stats.largest}</b>` +
+      (st.failed ? `, <span class="fail">${st.failed} failed</span>` : ', none failed') + '</span></button>';
+  }).join('');
+}
+
+/* =========================================================
+   SLAB ALLOCATOR
+   ========================================================= */
+const SLAB_PAGES = 6;
+const SLAB_TYPES = {
+  inode: { obj: '1KB', per: 4, color: '#0b7285', tint: '#cdeef1' },
+  lock:  { obj: '512B', per: 8, color: '#5f3dc4', tint: '#e5dbff' },
+};
+const SLAB_EXAMPLE = 'inode, inode, inode, inode, lock, inode, free inode2, inode, free inode5, reclaim';
+const SLAB_CODE = [
+  'alloc(cache):',
+  '    slab = a slab in cache with a free object',
+  '    if there is no such slab:',
+  '        page = take a page from the page pool',
+  '        slab = carve page into objects, construct each one',
+  '    obj = take a free object from slab    // already built',
+  '    return obj',
+  'free(obj):',
+  '    put obj back in its slab              // stays built',
+  'reclaim():',
+  '    return the pages of empty slabs to the pool',
+];
+
+function parseSlab (text) {
+  const toks = text.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  if (!toks.length) return { err: 'Enter at least one operation, for example inode, lock, free inode1.' };
+  if (toks.length > 30) return { err: 'Use at most 30 operations so the timeline stays readable.' };
+  const ops = [];
+  for (const t of toks) {
+    let m;
+    if ((m = t.match(/^(?:alloc\s+)?(inode|lock)$/))) ops.push({ kind: 'alloc', type: m[1] });
+    else if ((m = t.match(/^free\s+(inode|lock)\s*(\d+)$/))) ops.push({ kind: 'free', name: m[1] + (+m[2]) });
+    else if (t === 'reclaim') ops.push({ kind: 'reclaim' });
+    else return { err: `“${t}” isn't an operation. Use inode or lock to allocate, free inode2 to free an object, or reclaim.` };
+  }
+  const check = slabRun(ops, null);
+  return check.err ? check : { ops };
+}
+
+function slabRun (ops, b) {
+  const pages = Array(SLAB_PAGES).fill(null);
+  const caches = { inode: [], lock: [] };
+  const count = { inode: 0, lock: 0 };
+  const live = {};
+  const used = s => s.objs.filter(Boolean).length;
+  const state = s => { const u = used(s); return u === 0 ? 'empty' : u === s.objs.length ? 'full' : 'partial'; };
+  const freePages = () => pages.map((p, i) => (p ? null : `P${i}`)).filter(Boolean).join(', ') || 'none';
+  const view = (extra = {}) => ({ pages: [...pages], caches: clone(caches), flash: [], ...extra });
+  let g = null;
+  const snap = o => { if (b) b.snap(g, o); };
+
+  if (b) {
+    g = b.group('start', { kind: 'note', op: -1 });
+    snap({ title: 'Object caches on top of a page pool',
+      body: 'The kernel allocates many objects of a few fixed sizes, such as inodes and locks. A slab allocator keeps one cache per type, and each cache carves whole pages into slabs of equal-sized objects.',
+      calc: ['page pool: 6 pages × 4KB = 24KB', 'inode cache: 1KB objects, 4 per slab', 'lock cache: 512B objects, 8 per slab'],
+      view: view() });
+  }
+
+  for (let k = 0; k < ops.length; k++) {
+    const op = ops[k];
+    if (op.kind === 'alloc') {
+      const T = SLAB_TYPES[op.type], type = op.type;
+      if (b) g = b.group(type, { color: T.color, op: k });
+      let slab = caches[type].find(s => s.objs.includes(null));
+      let grew = false;
+      if (!slab) {
+        const pi = pages.indexOf(null);
+        if (pi < 0) {
+          if (b) { b.groups[g].kind = 'fail'; b.groups[g].label = `${type} fails`; }
+          snap({ fail: true, lines: [2, 3],
+            title: `No free page: the ${type} allocation fails`,
+            body: `Every ${type} slab is full and all ${SLAB_PAGES} pages are taken, so the cache cannot grow. Freeing objects and reclaiming empty slabs would make room.`,
+            calc: [`${type} slabs: ${caches[type].length}, all full`, 'free pages: none'], view: view() });
+          continue;
+        }
+        pages[pi] = type;
+        slab = { page: pi, objs: Array(T.per).fill(null), prev: Array(T.per).fill(null) };
+        caches[type].push(slab);
+        grew = true;
+        snap({ lines: [1, 2, 3, 4],
+          title: `No free ${type} object: grow the cache`,
+          body: `No ${type} slab has a free object, so the cache takes page P${pi} from the pool and carves it into ${T.per} ${type} objects. Each is initialized once, now, so later allocations skip that work.`,
+          calc: [`page P${pi} = 4KB`, `4KB ÷ ${T.obj} = ${T.per} objects`, `free pages left: ${freePages()}`],
+          view: view({ flash: [`page:${pi}`, `slab:${pi}`] }) });
+      }
+      const slot = slab.objs.indexOf(null);
+      const name = `${type}${++count[type]}`;
+      const prev = slab.prev[slot];
+      slab.objs[slot] = name; slab.prev[slot] = name;
+      live[name] = { type, page: slab.page, slot };
+      if (b) b.groups[g].label = name;
+      let body;
+      if (grew) body = `${name} is the first object handed out from the new slab. From now on, ${type} requests take ready objects until this slab is full.`;
+      else if (prev) body = `The first ${type} slab with a free object is on page P${slab.page}. ${name} reuses the slot that ${prev} gave back, and that object is still initialized, so there is nothing to search, split or set up.`;
+      else body = `The first ${type} slab with a free object is on page P${slab.page}. Taking its next free slot is a constant-time step: no searching and no splitting.`;
+      snap({ lines: grew ? [5, 6] : [1, 5, 6],
+        title: `Hand out ${name}`, body,
+        calc: [`${name} → page P${slab.page}, slot ${slot}`, `slab P${slab.page}: ${used(slab)} of ${T.per} in use (${state(slab)})`],
+        view: view({ flash: [`obj:${slab.page}:${slot}`] }) });
+    } else if (op.kind === 'free') {
+      const it = live[op.name];
+      if (!it) return { err: `“free ${op.name}”: there is no live ${op.name} at that point in the sequence.` };
+      const T = SLAB_TYPES[it.type];
+      if (b) g = b.group(`free ${op.name}`, { color: T.color, kind: 'free', op: k });
+      const slab = caches[it.type].find(s => s.page === it.page);
+      slab.objs[it.slot] = null;
+      delete live[op.name];
+      snap({ lines: [7, 8],
+        title: `free ${op.name}`,
+        body: `${op.name} goes back to its slab on page P${it.page}. The object is not torn down; it stays initialized for the next ${it.type} allocation.` +
+          (state(slab) === 'empty' ? ' The slab is now empty, but the cache holds on to the page until memory is needed elsewhere.' : ''),
+        calc: [`slab P${it.page}: ${used(slab)} of ${T.per} in use (${state(slab)})`],
+        view: view({ flash: [`obj:${it.page}:${it.slot}`] }) });
+    } else {
+      if (b) g = b.group('reclaim', { op: k });
+      const returned = [];
+      for (const type of Object.keys(caches)) {
+        caches[type] = caches[type].filter(s => {
+          if (used(s) === 0) { returned.push(s.page); pages[s.page] = null; return false; }
+          return true;
+        });
+      }
+      const n = returned.length;
+      snap({ lines: [9, 10],
+        title: n ? `Reclaim ${n} empty slab${n > 1 ? 's' : ''}` : 'Reclaim: no empty slabs',
+        body: n
+          ? 'When memory runs low, the allocator gives the pages of empty slabs back to the page pool, where any cache or other kernel code can use them.'
+          : 'Every slab still holds at least one live object, so there is nothing to give back.',
+        calc: [`returned: ${n ? returned.map(p => `P${p}`).join(', ') : 'none'}`, `free pages: ${freePages()}`],
+        view: view({ flash: returned.map(p => `page:${p}`) }) });
+    }
+  }
+
+  if (b) {
+    g = b.group('result', { kind: 'note', op: ops.length });
+    const line = type => {
+      const ss = caches[type];
+      return `${type} cache: ${ss.length} slab${ss.length === 1 ? '' : 's'}, ${ss.reduce((a, s) => a + used(s), 0)} live object${ss.reduce((a, s) => a + used(s), 0) === 1 ? '' : 's'}`;
+    };
+    snap({ title: 'After every operation',
+      body: 'Objects of one type never share a slab with another type, so there is no external fragmentation inside a cache. Freed objects stay built and are handed out again first, which keeps allocation fast.',
+      calc: [line('inode'), line('lock'), `free pages: ${freePages()}`], view: view() });
+  }
+  return {};
+}
+
+function renderSlab (step, animate) {
+  const v = step.view, fl = new Set(animate ? v.flash : []);
+  $('slabPages').innerHTML = v.pages.map((p, i) => {
+    const T = p && SLAB_TYPES[p];
+    return `<div class="pg${p ? ' used' : ''}${fl.has(`page:${i}`) ? ' flash' : ''}" style="${T ? `--t:${T.tint}` : ''}"><b>P${i}</b><span>${p ? `${p} slab` : 'free'}</span></div>`;
+  }).join('');
+  for (const type of Object.keys(SLAB_TYPES)) {
+    const T = SLAB_TYPES[type], slabs = v.caches[type];
+    $(`slab-${type}`).innerHTML = slabs.length ? slabs.map(s => {
+      const u = s.objs.filter(Boolean).length;
+      const st = u === 0 ? 'empty' : u === s.objs.length ? 'full' : 'partial';
+      const objs = s.objs.map((o, i) => `<div class="obj${o ? '' : ' free'}${fl.has(`obj:${s.page}:${i}`) ? ' flash' : ''}">${o || 'free'}</div>`).join('');
+      return `<div class="slab${fl.has(`slab:${s.page}`) ? ' flash' : ''}" style="--c:${T.color};--t:${T.tint}"><div class="slab-h"><b>page P${s.page}</b><span>${st}, ${u} of ${s.objs.length} in use</span></div><div class="objs">${objs}</div></div>`;
+    }).join('') : `<p class="nothing">No slabs yet. The cache grows when it needs its first ${type}.</p>`;
+  }
+  renderCodeInto($('slabCode'), SLAB_CODE, step.lines, step.fail ? step.lines : []);
+}
+
+/* =========================================================
+   BUDDY ALLOCATOR
+   ========================================================= */
+const BUD_SIZES = [64, 32, 16, 8, 4, 2, 1];
+const BUD_EXAMPLE = '7, 20, 3, free 1, free 3, 10';
+const BUD_CODE = [
+  'malloc(n):',
+  '    size = smallest power of two >= n',
+  '    block = smallest free block >= size',
+  '    while block.size > size:',
+  '        split block into two buddies, keep the left one',
+  '    mark block used, return it',
+  'free(block):',
+  '    mark block free',
+  '    while block.size < 64KB:',
+  '        buddy = block.address XOR block.size',
+  '        if buddy is not free: stop',
+  '        merge block and buddy into their parent',
+];
+const bin6 = n => n.toString(2).padStart(6, '0');
+const bkey = (size, addr) => `${size}@${addr}`;
+
+function budRun (ops, b) {
+  const nodes = new Map([[bkey(64, 0), { addr: 0, size: 64, state: 'free' }]]);
+  const reqs = {};
+  const freeOf = s => [...nodes.values()].filter(n => n.state === 'free' && n.size === s).sort((x, y) => x.addr - y.addr);
+  const listsStr = () => BUD_SIZES.map(s => { const f = freeOf(s); return f.length ? `${s}KB: ${f.map(n => '@' + n.addr).join(' ')}` : null; }).filter(Boolean).join('   ') || 'every list is empty';
+  const view = (extra = {}) => ({ nodes: clone([...nodes.values()]), reqs: clone(reqs), hl: [], flash: [], ...extra });
+  let g = null;
+  const snap = o => b.snap(g, o);
+
+  g = b.group('start', { kind: 'note', op: -1 });
+  snap({ title: 'One free 64KB block',
+    body: 'The allocator starts with a single free 64KB block. Every request is rounded up to a power of two, and blocks are split in half until one is the right size, as in OSTEP\'s example. The two halves of a block are buddies.',
+    calc: ['pool: 64KB, one free block at 0', 'block sizes: 64, 32, 16, 8, 4, 2, 1 KB', `operations: ${ops.map(o => (o.kind === 'malloc' ? `${o.size}KB` : `free r${o.ref}`)).join(', ')}`],
+    view: view({ hl: [bkey(64, 0)] }) });
+
+  ops.forEach((op, k) => {
+    if (op.kind === 'malloc') {
+      const n = op.size, id = op.id, need = 2 ** Math.ceil(Math.log2(n));
+      g = b.group(`malloc ${n}KB`, { color: reqColor(id), op: k });
+      snap({ lines: [0, 1],
+        title: `malloc(${n}KB): round up to a power of two`,
+        body: n === need
+          ? `${n}KB is already a power of two, so r${id} needs a block of exactly ${need}KB and nothing is wasted.`
+          : `Buddy blocks only come in powers of two, so ${n}KB is rounded up to ${need}KB. The extra ${need - n}KB inside the block is wasted: internal fragmentation.`,
+        calc: [`${n}KB → ${need}KB`, `waste = ${need} − ${n} = ${need - n}KB`], view: view() });
+
+      let found = null; const search = [];
+      for (let s = need; s <= 64; s *= 2) {
+        const f = freeOf(s);
+        if (f.length) { found = f[0]; search.push(`${s}KB list: @${f[0].addr}  ✓`); break; }
+        search.push(`${s}KB list: empty`);
+      }
+      if (!found) {
+        reqs[id] = { n, need, addr: null, status: 'null' };
+        b.groups[g].kind = 'fail';
+        const freeNodes = [...nodes.values()].filter(x => x.state === 'free');
+        const total = freeNodes.reduce((a, x) => a + x.size, 0);
+        snap({ fail: true, lines: [2],
+          title: 'No block is big enough: malloc returns NULL',
+          body: `No free list from ${need}KB up to 64KB has a block.` + (total >= need ? ` ${total}KB is free in total, but only in blocks smaller than ${need}KB.` : ` Only ${total}KB is free in total.`),
+          calc: [...search, `r${id} = NULL`], view: view() });
+        return;
+      }
+      snap({ lines: [2],
+        title: `Find a free block of at least ${need}KB`,
+        body: found.size === need
+          ? `The ${need}KB free list already holds a block at ${found.addr}, so no splitting is needed.`
+          : `The ${need}KB list is empty, so the allocator looks at bigger sizes. The first free block is ${found.size}KB at ${found.addr}, which will be split down to size.`,
+        calc: search, view: view({ hl: [bkey(found.size, found.addr)] }) });
+
+      let blk = found;
+      while (blk.size > need) {
+        const half = blk.size / 2;
+        blk.state = 'split';
+        const L = { addr: blk.addr, size: half, state: 'free' }, R = { addr: blk.addr + half, size: half, state: 'free' };
+        nodes.set(bkey(half, L.addr), L); nodes.set(bkey(half, R.addr), R);
+        snap({ lines: [3, 4],
+          title: `Split ${blk.size}KB at ${blk.addr} into two ${half}KB buddies`,
+          body: `The block is cut in half, making buddies at ${L.addr} and ${R.addr}. The right one goes on the ${half}KB free list. The left one ${half === need ? 'is the right size, so it will be used' : 'is still too big, so it is split again'}.`,
+          calc: [`${blk.size}KB @${blk.addr} → ${half}KB @${L.addr} + ${half}KB @${R.addr}`, `free lists: ${listsStr()}`],
+          view: view({ hl: [bkey(half, L.addr)], flash: [bkey(half, L.addr), bkey(half, R.addr)] }) });
+        blk = L;
+      }
+      blk.state = 'used'; blk.id = id; blk.req = n;
+      reqs[id] = { n, need, addr: blk.addr, status: 'live' };
+      snap({ lines: [5],
+        title: `Hand out ${need}KB at ${blk.addr}`,
+        body: `r${id} gets the block from ${blk.addr}KB to ${blk.addr + need}KB.` + (need > n ? ` It uses ${n}KB of it; the other ${need - n}KB are wasted until the block is freed.` : ''),
+        calc: [`r${id} → @${blk.addr}, ${need}KB block`, `used ${n}KB, wasted ${need - n}KB`, `free lists: ${listsStr()}`],
+        view: view({ hl: [bkey(need, blk.addr)], flash: [bkey(need, blk.addr)] }) });
+    } else {
+      const ref = op.ref, r = reqs[ref];
+      g = b.group(`free r${ref}`, { color: reqColor(ref), kind: 'free', op: k });
+      if (r.status === 'null') {
+        snap({ lines: [6], title: `free(r${ref}) does nothing`, body: `Request ${ref} got NULL, and freeing NULL has no effect.`, calc: [`r${ref} = NULL`], view: view() });
+        return;
+      }
+      let blk = [...nodes.values()].find(x => x.state === 'used' && x.id === ref);
+      blk.state = 'free'; delete blk.id; delete blk.req;
+      r.status = 'freed';
+      snap({ lines: [6, 7],
+        title: `free(r${ref}): ${blk.size}KB at ${blk.addr} is free`,
+        body: `The block goes back on the ${blk.size}KB free list. Next the allocator checks whether its buddy is free, so the two can merge.`,
+        calc: [`free lists: ${listsStr()}`], view: view({ hl: [bkey(blk.size, blk.addr)], flash: [bkey(blk.size, blk.addr)] }) });
+
+      while (blk.size < 64) {
+        const bAddr = blk.addr ^ blk.size;
+        const bud = nodes.get(bkey(blk.size, bAddr));
+        const calc = [`block  @${blk.addr} = ${bin6(blk.addr)}₂`, `buddy = ${blk.addr} XOR ${blk.size} = ${bin6(bAddr)}₂ = @${bAddr}`];
+        if (bud && bud.state === 'free') {
+          const pAddr = Math.min(blk.addr, bAddr), size = blk.size;
+          nodes.delete(bkey(size, blk.addr)); nodes.delete(bkey(size, bAddr));
+          const parent = nodes.get(bkey(size * 2, pAddr));
+          parent.state = 'free';
+          calc.push(`${size}KB @${pAddr} + ${size}KB @${pAddr + size} → ${size * 2}KB @${pAddr}`);
+          snap({ lines: [8, 9, 11],
+            title: `Buddy at ${bAddr} is free: merge`,
+            body: `Both ${size}KB buddies are free, so they join back into their ${size * 2}KB parent at ${pAddr}.` + (size * 2 === 64 ? ' The whole 64KB pool is one free block again.' : ' The check repeats one size up.'),
+            calc, view: view({ hl: [bkey(size * 2, pAddr)], flash: [bkey(size * 2, pAddr)] }) });
+          blk = parent;
+        } else {
+          const why = bud.state === 'used'
+            ? `The ${blk.size}KB buddy at ${bAddr} is in use by r${bud.id}`
+            : `The buddy at ${bAddr} has been split into smaller blocks, and not all of them are free`;
+          calc.push(`buddy is ${bud.state === 'used' ? 'in use' : 'split'}  ✗`);
+          snap({ lines: [8, 9, 10],
+            title: `Buddy at ${bAddr} is not free: stop`,
+            body: `${why}, so no merge is possible. The ${blk.size}KB block at ${blk.addr} stays on its free list.`,
+            calc, view: view({ hl: [bkey(blk.size, blk.addr), bkey(blk.size, bAddr)] }) });
+          break;
+        }
+      }
+    }
+  });
+
+  g = b.group('result', { kind: 'note', op: ops.length });
+  const liveReqs = Object.values(reqs).filter(r => r.status === 'live');
+  const asked = liveReqs.reduce((a, r) => a + r.n, 0), given = liveReqs.reduce((a, r) => a + r.need, 0);
+  snap({ title: 'After every operation',
+    body: 'Splitting and merging are fast because a buddy\'s address is one XOR away. The price is internal fragmentation: every request is rounded up to a power of two.',
+    calc: [`live blocks: ${liveReqs.length}, using ${given}KB for ${asked}KB requested`, `wasted inside blocks: ${given - asked}KB`, `free lists: ${listsStr()}`],
+    view: view() });
+}
+
+const budTreeStore = new Map(), budMemStore = new Map();
+$('budLabels').innerHTML = BUD_SIZES.map(s => `<span>${s}KB</span>`).join('');
+
+function renderBuddy (step, animate) {
+  const v = step.view, hl = new Set(v.hl), fl = new Set(v.flash);
+  const blockHtml = (n, big) => {
+    if (n.state === 'used') {
+      const need = n.size, waste = (need - n.req) / need * 100;
+      const txt = n.size >= 16 ? `r${n.id}: ${n.req}KB` : n.size >= 4 ? `r${n.id}` : '';
+      return `${waste > 0 ? `<span class="bw" style="width:${waste}%"></span>` : ''}<span class="bt">${txt}</span>`;
+    }
+    if (n.state === 'free') return n.size >= (big ? 4 : 2) ? `<span class="bt">${n.size}KB</span>` : '';
+    return n.size >= 8 ? `${n.size}KB` : '';
+  };
+  const rowH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--brow')) || 38;
+  const treeItems = v.nodes.map(n => {
+    const level = Math.log2(64 / n.size), k = bkey(n.size, n.addr);
+    return {
+      key: k,
+      cls: `bblk ${n.state}${hl.has(k) ? ' hl' : ''}`,
+      style: { left: `calc(${n.addr / 64 * 100}% + 1px)`, width: `calc(${n.size / 64 * 100}% - 2px)`, top: `${level * rowH}px`, '--c': n.state === 'used' ? reqColor(n.id) : 'transparent' },
+      html: blockHtml(n, true),
+      title: `${n.size}KB block at ${n.addr}KB, ${n.state === 'used' ? `used by r${n.id} (${n.req}KB)` : n.state}`,
+      flash: fl.has(k),
+    };
+  });
+  syncAbs($('budTree'), budTreeStore, treeItems, animate);
+
+  const memItems = v.nodes.filter(n => n.state !== 'split').map(n => ({
+    key: bkey(n.size, n.addr),
+    cls: `bblk ${n.state}`,
+    style: { left: `${n.addr / 64 * 100}%`, width: `${n.size / 64 * 100}%`, '--c': n.state === 'used' ? reqColor(n.id) : 'transparent' },
+    html: blockHtml(n, false),
+    title: `${n.size}KB at ${n.addr}KB`,
+  }));
+  syncAbs($('budMem'), budMemStore, memItems, animate);
+
+  $('budLists').innerHTML = BUD_SIZES.map(s => {
+    const f = v.nodes.filter(n => n.state === 'free' && n.size === s).sort((x, y) => x.addr - y.addr);
+    const items = f.length
+      ? f.map(n => `<span class="fchip${animate && fl.has(bkey(s, n.addr)) ? ' flash' : ''}">@${n.addr}</span>`).join('')
+      : '<span class="none">empty</span>';
+    return `<div class="flrow"><span class="sz">${s}KB</span><span class="items">${items}</span></div>`;
+  }).join('');
+
+  const ids = Object.keys(v.reqs).map(Number).sort((x, y) => x - y);
+  $('budReqs').innerHTML = '<thead><tr><th>Request</th><th>Asked</th><th>Block</th><th>Status</th></tr></thead><tbody>' +
+    (ids.length ? ids.map(id => {
+      const r = v.reqs[id];
+      const block = r.addr == null ? '—' : `${r.need}KB @${r.addr}`;
+      const status = r.status === 'null' ? '<td class="bad">NULL</td>' : `<td class="txt">${r.status === 'live' ? `in use${r.need > r.n ? `, ${r.need - r.n}KB wasted` : ''}` : 'freed'}</td>`;
+      return `<tr><td><span class="dot" style="--c:${reqColor(id)}"></span>r${id}</td><td>${r.n}KB</td><td>${block}</td>${status}</tr>`;
+    }).join('') : '<tr><td class="txt" colspan="4">No requests yet.</td></tr>') + '</tbody>';
+
+  renderCodeInto($('budCode'), BUD_CODE, step.lines, step.fail ? step.lines : []);
+}
+
+/* =========================================================
+   App shell: modes, editor, timeline, playback
+   ========================================================= */
+const MODES = {
+  fit: {
+    example: FIT_EXAMPLE,
+    hint: 'Sizes in bytes (1–100), or <code>free 2</code> to free request 2. Separate with commas.',
+    parse: t => parseSizesOps(t, 100, ' bytes', 12),
+    run: ops => { const b = newBuild(); b.cmp = {}; STRATS.forEach(s => { b.cmp[s] = fitRun(s, ops, null); }); fitRun(strategy, ops, b); return b; },
+    render: renderFit,
+  },
+  slab: {
+    example: SLAB_EXAMPLE,
+    hint: '<code>inode</code> or <code>lock</code> to allocate, <code>free inode2</code> to free an object, <code>reclaim</code> to return empty slabs.',
+    parse: parseSlab,
+    run: ops => { const b = newBuild(); slabRun(ops, b); return b; },
+    render: renderSlab,
+  },
+  buddy: {
+    example: BUD_EXAMPLE,
+    hint: 'Sizes in KB (1–64), or <code>free 1</code> to free request 1. Separate with commas.',
+    parse: t => parseSizesOps(t, 64, 'KB', 16),
+    run: ops => { const b = newBuild(); budRun(ops, b); return b; },
+    render: renderBuddy,
+  },
+};
+
+let mode = 'fit', strategy = 'first';
+const opsText = { fit: FIT_EXAMPLE, slab: SLAB_EXAMPLE, buddy: BUD_EXAMPLE };
+let build = null, steps = [], groups = [], parsedOps = [];
+let current = 0, timer = null, playUntil = 0;
+
+function setMsg (html, err = false) {
+  const m = $('opsMsg');
+  m.innerHTML = html;
+  m.className = 'emsg' + (err ? ' err' : '');
+  $('opsInput').toggleAttribute('aria-invalid', err);
+  if (!err) $('opsInput').removeAttribute('aria-invalid');
+}
+
+function rebuild (text) {
+  const M = MODES[mode];
+  const p = M.parse(text);
+  if (p.err) { setMsg(esc(p.err), true); return false; }
+  opsText[mode] = text;
+  parsedOps = p.ops;
+  build = M.run(p.ops);
+  steps = build.steps;
+  groups = build.groups;
+  buildTimeline();
+  setMsg(M.hint);
+  return true;
+}
+
+function buildTimeline () {
+  $('timeline').innerHTML = groups.map(g => {
+    let btns = '';
+    for (let i = g.start; i < g.start + g.count; i++) {
+      btns += `<button class="tl-step" type="button" data-i="${i}" aria-label="Step ${i + 1}: ${esc(steps[i].title)}" title="Step ${i + 1}: ${esc(steps[i].title)}"></button>`;
+    }
+    return `<div class="tl-group kind-${g.kind}" style="flex:${g.count} 1 0;--g:${g.color}"><div class="tl-steps">${btns}</div><div class="tl-label">${esc(g.label)}</div></div>`;
+  }).join('');
+}
+$('timeline').addEventListener('click', e => {
+  const btn = e.target.closest('.tl-step');
+  if (btn) { stop(); go(+btn.dataset.i); }
+});
+
+function render (i, animate = true) {
+  current = i;
+  const root = document.documentElement;
+  if (!animate) root.classList.add('instant');
+  const s = steps[i];
+  $('stepCount').textContent = `Step ${i + 1} of ${steps.length}`;
+  $('stepTitle').textContent = s.title;
+  $('stepBody').textContent = s.body;
+  $('stepCalc').textContent = s.calc.join('\n');
+  document.querySelectorAll('.tl-step').forEach(btn => {
+    const k = +btn.dataset.i;
+    btn.classList.toggle('done', k < i);
+    btn.classList.toggle('now', k === i);
+    btn.setAttribute('aria-current', k === i ? 'step' : 'false');
+  });
+  MODES[mode].render(s, animate);
+  $('btnPrev').disabled = i === 0;
+  $('btnNext').disabled = i === steps.length - 1;
+  if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('instant')));
+}
+function go (i) { if (i >= 0 && i < steps.length && i !== current) render(i); }
+
+function play (until = steps.length - 1) {
+  stop();
+  playUntil = until;
+  if (current >= playUntil) render(0);
+  $('btnPlay').textContent = 'Pause';
+  const tick = () => {
+    if (current >= playUntil) { stop(); return; }
+    go(current + 1);
+    timer = setTimeout(tick, +$('speed').value);
+  };
+  timer = setTimeout(tick, +$('speed').value);
+}
+function stop () { clearTimeout(timer); timer = null; $('btnPlay').textContent = 'Play'; }
+
+function setMode (m) {
+  stop();
+  mode = m;
+  document.querySelectorAll('.modes [role="tab"]').forEach(t => t.setAttribute('aria-selected', String(t.dataset.mode === m)));
+  for (const k of Object.keys(MODES)) $(`view-${k}`).hidden = k !== m;
+  $('stratRow').hidden = m !== 'fit';
+  $('opsInput').value = opsText[m];
+  rebuild(opsText[m]);
+  render(0, false);
+}
+
+function setStrategy (s) {
+  if (s === strategy) return;
+  const wasPlaying = !!timer;
+  stop();
+  const op = groups[steps[current].group].op;
+  strategy = s;
+  document.querySelectorAll('#strats button').forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.s === s)));
+  rebuild(opsText.fit);
+  const g = groups.find(x => x.op === op) || groups[0];
+  render(g.start);
+  if (wasPlaying) play();
+}
+
+function runInput (text) {
+  stop();
+  if (!rebuild(text)) { $('opsInput').focus(); return; }
+  render(0, false);
+  play();
+}
+
+$('btnNext').onclick = () => { stop(); go(current + 1); };
+$('btnPrev').onclick = () => { stop(); go(current - 1); };
+$('btnPlay').onclick = () => (timer ? stop() : play());
+$('btnRestart').onclick = () => { stop(); render(0); };
+$('btnRun').onclick = () => runInput($('opsInput').value);
+$('btnExample').onclick = () => { $('opsInput').value = MODES[mode].example; runInput(MODES[mode].example); };
+$('opsInput').addEventListener('keydown', e => { if (e.key === 'Enter') runInput(e.target.value); });
+document.querySelectorAll('.modes [role="tab"]').forEach(t => { t.onclick = () => { if (t.dataset.mode !== mode) setMode(t.dataset.mode); }; });
+document.querySelectorAll('#strats button').forEach(btn => { btn.onclick = () => setStrategy(btn.dataset.s); });
+$('cmp').addEventListener('click', e => { const row = e.target.closest('.cmp-row'); if (row) setStrategy(row.dataset.s); });
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select, input')) return;
+  if (e.key === 'ArrowRight') { stop(); go(current + 1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stop(); go(current - 1); e.preventDefault(); }
+  else if (e.key === ' ' && !e.target.closest('button')) { timer ? stop() : play(); e.preventDefault(); }
+  else if (e.key === 'Home') { stop(); render(0); }
+});
+
+let resizeT;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => render(current, false), 150); });
+
+setMode('fit');
+</script>
+</body>
+</html>
