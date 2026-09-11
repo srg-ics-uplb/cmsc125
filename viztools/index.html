@@ -258,6 +258,59 @@ footer a{color:var(--ink);text-underline-offset:3px}
           </div>
         </a>
       </li>
+      <li>
+        <a class="tool" href="https://srg-ics-uplb.github.io/cmsc125/viztools/paging">
+          <svg class="thumb" viewBox="0 0 220 120" aria-hidden="true">
+            <defs>
+              <pattern id="hatch3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="6" height="6" fill="#f4f7f9"/><rect width="1" height="6" fill="#c9d3db"/>
+              </pattern>
+            </defs>
+            <!-- virtual pages: code, heap, free, stack -->
+            <g stroke="#172033" stroke-width="1.5">
+              <rect x="16" y="12" width="40" height="24" fill="#fdebc8"/>
+              <rect x="16" y="36" width="40" height="24" fill="#cdeef1"/>
+              <rect x="16" y="60" width="40" height="24" fill="url(#hatch3)"/>
+              <rect x="16" y="84" width="40" height="24" fill="#d3f0d9"/>
+            </g>
+            <rect x="16" y="12" width="4" height="24" fill="#c77700"/>
+            <rect x="16" y="36" width="4" height="24" fill="#0b7285"/>
+            <rect x="16" y="84" width="4" height="24" fill="#2b8a3e"/>
+            <!-- page table -->
+            <g font-family="ui-monospace,Menlo,monospace" font-size="8" font-weight="700" text-anchor="middle">
+              <rect x="80" y="30" width="44" height="60" fill="#fff" stroke="#172033" stroke-width="1.5"/>
+              <line x1="80" y1="45" x2="124" y2="45" stroke="#172033" stroke-width="1"/>
+              <line x1="80" y1="60" x2="124" y2="60" stroke="#172033" stroke-width="1"/>
+              <line x1="80" y1="75" x2="124" y2="75" stroke="#172033" stroke-width="1"/>
+              <rect x="81" y="46" width="42" height="13" fill="#ffd43b"/>
+              <text x="102" y="41" fill="#172033">→ 3</text>
+              <text x="102" y="56" fill="#172033">→ 7</text>
+              <text x="102" y="71" fill="#8a96a3">V=0</text>
+              <text x="102" y="86" fill="#172033">→ 2</text>
+            </g>
+            <path d="M58 48 L78 52" stroke="#0b7285" stroke-width="2"/>
+            <path d="M126 52 L150 96" stroke="#0b7285" stroke-width="2"/>
+            <path d="M146 90 L151 99 L154 89 Z" fill="#0b7285"/>
+            <!-- physical frames -->
+            <g stroke="#172033" stroke-width="1.5">
+              <rect x="160" y="12" width="44" height="12" fill="#26324a"/>
+              <rect x="160" y="24" width="44" height="12" fill="url(#hatch3)"/>
+              <rect x="160" y="36" width="44" height="12" fill="#d3f0d9"/>
+              <rect x="160" y="48" width="44" height="12" fill="#fdebc8"/>
+              <rect x="160" y="60" width="44" height="12" fill="url(#hatch3)"/>
+              <rect x="160" y="72" width="44" height="12" fill="url(#hatch3)"/>
+              <rect x="160" y="84" width="44" height="12" fill="url(#hatch3)"/>
+              <rect x="160" y="96" width="44" height="12" fill="#cdeef1"/>
+            </g>
+            <rect x="160" y="96" width="44" height="12" fill="none" stroke="#172033" stroke-width="3"/>
+          </svg>
+          <div>
+            <p class="tool-title">Paging: translating addresses with a page table</p>
+            <p class="tool-desc">Split a virtual address into page number and offset, read the page-table entry from memory, check its bits, and see why page tables get expensive.</p>
+            <span class="chapter"><b>Chapter 18</b>, Paging: Introduction</span>
+          </div>
+        </a>
+      </li>
     </ul>
   </section>
 
