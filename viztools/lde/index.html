@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limited direct execution</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#c5cfd8;
+  --bad:#c92a2a;
+  --mark:#ffd43b;
+  --os:#5f3dc4;      --os-tint:#e5ddfa;
+  --hw:#c77700;      --hw-tint:#fbead0;
+  --prog:#0b7285;    --prog-tint:#cfe9ee;
+  --a:#e98b00;       --a-tint:#fdebc8;
+  --b:#0b8a9a;       --b-tint:#cdeef1;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important;animation:none !important}
+.page{max-width:1240px;margin:0 auto;padding:32px 28px 48px}
+
+/* ---------- Header ---------- */
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:68ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+.sub{margin:0 0 12px;font-size:.88rem;color:var(--ink-soft)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer}
+button:hover:not(:disabled){background:#fff;box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible,.tab:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+select{padding:5px 6px}
+.play{min-width:104px;font-weight:700}
+
+/* ---------- Scenario tabs ---------- */
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin:0 0 6px;border-bottom:3px solid var(--ink)}
+.tab{border:2px solid var(--ink);border-bottom:none;border-radius:8px 8px 0 0;background:#dde4ea;padding:9px 16px;margin-right:6px;margin-bottom:-3px;font-weight:600;font-size:.98rem;box-shadow:none}
+.tab:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.tab[aria-selected="true"]{background:var(--panel);border-bottom:3px solid var(--panel);color:var(--ink);font-weight:800}
+.tab .n{font-family:var(--mono);font-size:.8rem;color:var(--ink-soft);display:block;font-weight:600}
+.tab[aria-selected="true"] .n{color:var(--os)}
+.scen-blurb{margin:14px 0 18px;padding:12px 16px;border-left:5px solid var(--ink);background:rgba(248,250,251,.72);max-width:88ch}
+.scen-blurb p{margin:0}
+.scen-blurb b{font-weight:700}
+
+/* ---------- Main layout ---------- */
+.main{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:22px;align-items:start}
+.card{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px}
+
+/* ---------- Machine panels ---------- */
+.machine{display:flex;flex-direction:column;gap:14px}
+.mini{border:2px solid var(--ink);border-radius:8px;background:var(--panel);padding:12px 14px;transition:box-shadow .2s,background .2s}
+.mini.lit{box-shadow:0 0 0 3px var(--mark),0 0 0 5px var(--ink)}
+.mini h3{margin:0 0 8px;font-size:.82rem;font-weight:700;color:var(--ink-soft);letter-spacing:.02em}
+.cpu-mode{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.badge{font-family:var(--mono);font-size:.9rem;white-space:nowrap;font-weight:700;padding:4px 10px;border:2px solid var(--ink);border-radius:5px;transition:background .25s,color .25s}
+.badge.user{background:var(--prog-tint);color:var(--prog)}
+.badge.kernel{background:var(--os-tint);color:var(--os)}
+.badge.none{background:#dfe5ea;color:var(--ink-soft)}
+.mode-note{font-size:.82rem;color:var(--ink-soft)}
+.reg{display:grid;grid-template-columns:64px minmax(0,1fr);gap:6px 10px;font-size:.9rem;align-items:center}
+.reg dt{font-family:var(--mono);font-size:.82rem;color:var(--ink-soft)}
+.reg dd{margin:0;font-family:var(--mono);font-size:.86rem;background:#fff;border:1.5px solid var(--line);border-radius:4px;padding:2px 7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reg dd.ctxA{background:var(--a-tint);border-color:var(--a)}
+.reg dd.ctxB{background:var(--b-tint);border-color:var(--b)}
+.reg dd.ctxK{background:var(--os-tint);border-color:var(--os)}
+
+/* trap table */
+.tt{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.tt li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font-size:.84rem;border:1.5px solid var(--line);border-radius:4px;background:#fff;padding:4px 8px}
+.tt li.off{opacity:.42;background:repeating-linear-gradient(45deg,#fff,#fff 5px,#eef2f5 5px,#eef2f5 10px)}
+.tt li.hit{border:2px solid var(--os);background:var(--os-tint);font-weight:600}
+.tt code{font-family:var(--mono);font-size:.8rem;color:var(--ink-soft)}
+.tt li.hit code{color:var(--os)}
+
+/* stacks */
+.stacks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stacks.one{grid-template-columns:1fr}
+.stk{border:1.5px solid var(--line);border-radius:5px;background:#fff;padding:6px 7px;min-height:78px}
+.stk h4{margin:0 0 5px;font-size:.78rem;font-weight:700}
+.stk.A h4{color:var(--a)} .stk.B h4{color:var(--b)}
+.stk.cur{border:2px solid var(--ink);box-shadow:2px 2px 0 var(--line)}
+.frame{font-family:var(--mono);font-size:.74rem;border:1.5px solid var(--ink);border-radius:3px;padding:2px 5px;margin-bottom:3px;background:var(--hw-tint)}
+.frame.os{background:var(--os-tint)}
+.stk .empty{font-size:.74rem;color:var(--ink-soft);font-style:italic}
+
+/* process list */
+.plist{display:flex;flex-direction:column;gap:8px}
+.pcb{border:1.5px solid var(--line);border-radius:5px;background:#fff;padding:7px 9px}
+.pcb.A{border-left:5px solid var(--a)} .pcb.B{border-left:5px solid var(--b)}
+.pcb.run{border:2px solid var(--ink);border-left:5px solid var(--a);box-shadow:2px 2px 0 var(--line)}
+.pcb.B.run{border-left-color:var(--b)}
+.pcb-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pcb-head b{font-size:.92rem}
+.state{font-family:var(--mono);font-size:.74rem;padding:1px 6px;border-radius:3px;background:#e6ebef;color:var(--ink-soft)}
+.state.running{background:var(--mark);color:var(--ink);font-weight:700}
+.state.ready{background:#dfe5ea}
+.state.dead{background:#f3d6d6;color:var(--bad)}
+.slot{margin-top:5px;font-family:var(--mono);font-size:.76rem;border:1.5px dashed var(--line);border-radius:3px;padding:2px 6px;color:var(--ink-soft)}
+.slot.full{border-style:solid;border-color:var(--ink);color:var(--ink);background:var(--os-tint)}
+.pmem{font-size:.76rem;color:var(--ink-soft);margin-top:4px}
+
+/* timer */
+.timerbox{display:flex;align-items:center;gap:10px}
+.tbar{flex:1;height:16px;border:2px solid var(--ink);border-radius:4px;background:#fff;overflow:hidden}
+.tbar i{display:block;height:100%;background:var(--hw);transition:width .3s}
+.tbar.fired i{background:var(--bad)}
+.tstate{font-family:var(--mono);font-size:.8rem;min-width:58px;text-align:right}
+.tstate.fired{color:var(--bad);font-weight:700}
+
+/* ---------- Protocol table ---------- */
+.proto{overflow:hidden}
+.phead{display:grid;gap:0;border:2px solid var(--ink);border-radius:6px 6px 0 0;overflow:hidden;background:#fff}
+.phead div{padding:7px 10px;font-size:.84rem;font-weight:700;border-right:2px solid var(--ink)}
+.phead div:last-child{border-right:none}
+.phead .c-os{background:var(--os-tint);color:var(--os)}
+.phead .c-hw{background:var(--hw-tint);color:var(--hw)}
+.phead .c-prog{background:var(--prog-tint);color:var(--prog)}
+.rows{position:relative;overflow-anchor:none;border:2px solid var(--ink);border-top:none;border-radius:0 0 6px 6px;background:#fff;padding:6px;max-height:520px;overflow:auto}
+.phase{font-size:.78rem;font-weight:700;color:var(--ink-soft);border-top:2px dashed var(--line);margin:9px 2px 6px;padding-top:6px}
+.phase:first-child{border-top:none;margin-top:2px}
+.row{display:grid;gap:6px;margin-bottom:4px}
+.cell{border:1.5px solid var(--line);border-radius:5px;padding:5px 9px;font-size:.88rem;background:#fbfcfd;opacity:.5;transition:opacity .2s,box-shadow .2s,background .2s}
+.cell .op{font-family:var(--mono);font-size:.8rem}
+.cell.c-os{border-left:5px solid var(--os)}
+.cell.c-hw{border-left:5px solid var(--hw)}
+.cell.c-prog{border-left:5px solid var(--prog)}
+.cell.done{opacity:1;background:#fff}
+.cell.now{opacity:1;background:var(--mark);border-color:var(--ink);border-width:2px;box-shadow:3px 3px 0 var(--ink)}
+.cell.trap{border-color:var(--bad)}
+.cell.now.trap{background:#ffd7d7}
+.ctag{display:none}
+
+/* ---------- Explain card ---------- */
+.explain{margin:0 0 16px;min-height:201px;display:flex;flex-direction:column}
+.explain .pbar{margin-top:auto}
+.explain h3{margin:0 0 6px;font-size:1.15rem;font-weight:700}
+.explain p{margin:0 0 8px;max-width:78ch}
+.explain p:last-child{margin-bottom:0}
+.stepno{font-family:var(--mono);font-size:.82rem;color:var(--ink-soft)}
+.pbar{height:8px;border:2px solid var(--ink);border-radius:4px;background:#fff;overflow:hidden;margin:12px 0 0}
+.pbar i{display:block;height:100%;background:var(--ink);transition:width .25s}
+
+/* ---------- Key idea + legend ---------- */
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:22px;margin-top:22px;align-items:start}
+.key{border-left:5px solid var(--os)}
+.key h2{font-size:1.1rem}
+.key ul{margin:8px 0 0;padding-left:20px}
+.key li{margin-bottom:6px;max-width:70ch}
+.key li:last-child{margin-bottom:0}
+.legend{font-size:.87rem}
+.legend ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+.legend li{display:grid;grid-template-columns:16px minmax(0,1fr);gap:9px;align-items:start}
+.sw{width:14px;height:14px;border:2px solid var(--ink);border-radius:3px;margin-top:3px}
+.sw.os{background:var(--os)} .sw.hw{background:var(--hw)} .sw.prog{background:var(--prog)}
+.sw.mk{background:var(--mark)}
+code.k{font-family:var(--mono);font-size:.86em;background:#e3e9ee;border-radius:3px;padding:0 4px}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:.88rem;color:var(--ink-soft)}
+footer a{color:var(--ink);text-underline-offset:3px}
+
+@media (max-width: 1060px){
+  .main,.lower{grid-template-columns:1fr}
+  .rows{max-height:none}
+}
+@media (max-width: 760px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.8rem}
+  .top{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .phead{display:none}
+  .row{grid-template-columns:1fr !important}
+  .cell{grid-column:1 !important}
+  .ctag{display:inline;font-size:.72rem;font-weight:700;margin-right:6px}
+  .cell.c-os .ctag{color:var(--os)}
+  .cell.c-hw .ctag{color:var(--hw)}
+  .cell.c-prog .ctag{color:var(--prog)}
+  .stacks{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>Limited direct execution</h1>
+      <p class="intro">How the CPU runs a program at full speed while the operating system still keeps control, following the Mechanism: Limited Direct Execution chapter of OSTEP (Chapter 6). Walk through the four protocols one line at a time and watch the mode bit, the kernel stack and the saved registers change.</p>
+    </div>
+    <div class="controls">
+      <button id="btnBack" title="Previous step">&#9664; Back</button>
+      <button id="btnPlay" class="play">&#9654; Play</button>
+      <button id="btnNext" title="Next step">Next &#9654;</button>
+      <button id="btnReset">Restart</button>
+      <select id="speed" aria-label="Animation speed">
+        <option value="1800">Slow</option>
+        <option value="1150" selected>Normal</option>
+        <option value="650">Fast</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="Protocol"></div>
+  <div class="scen-blurb"><p id="blurb"></p></div>
+
+  <div class="main">
+
+    <!-- ============ machine state ============ -->
+    <section class="machine" aria-label="Machine state">
+
+      <div class="mini" id="mCpu">
+        <h3>CPU</h3>
+        <div class="cpu-mode">
+          <span class="badge none" id="modeBadge">no mode bit</span>
+          <span class="mode-note" id="modeNote"></span>
+        </div>
+        <dl class="reg">
+          <dt>PC</dt><dd id="regPc">&mdash;</dd>
+          <dt>registers</dt><dd id="regCtx">&mdash;</dd>
+        </dl>
+      </div>
+
+      <div class="mini" id="mTrap">
+        <h3>Trap table (set at boot, in kernel mode)</h3>
+        <ul class="tt" id="trapTable"></ul>
+      </div>
+
+      <div class="mini" id="mTimer" hidden>
+        <h3>Interrupt timer</h3>
+        <div class="timerbox">
+          <div class="tbar" id="tbar"><i style="width:0%"></i></div>
+          <span class="tstate" id="tstate">off</span>
+        </div>
+      </div>
+
+      <div class="mini" id="mStack">
+        <h3>Kernel stacks &mdash; saved by the hardware</h3>
+        <div class="stacks" id="stacks"></div>
+      </div>
+
+      <div class="mini" id="mProc">
+        <h3>Process list &mdash; saved by the OS</h3>
+        <div class="plist" id="plist"></div>
+      </div>
+
+    </section>
+
+    <!-- ============ protocol ============ -->
+    <section class="proto" aria-label="Protocol">
+      <div class="card explain">
+        <span class="stepno" id="stepNo"></span>
+        <h3 id="exTitle">&nbsp;</h3>
+        <p id="exBody"></p>
+        <div class="pbar"><i id="pbar" style="width:0%"></i></div>
+      </div>
+      <div class="phead" id="phead"></div>
+      <div class="rows" id="rows"></div>
+
+      <p class="kbd-hint">Keys: <kbd>&#8594;</kbd> next, <kbd>&#8592;</kbd> back, <kbd>space</kbd> play or pause, <kbd>1</kbd>&ndash;<kbd>4</kbd> switch protocol.</p>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="card key">
+      <h2 id="keyTitle">What to take away</h2>
+      <ul id="keyList"></ul>
+    </section>
+    <section class="card legend">
+      <h2>Reading the table</h2>
+      <ul>
+        <li><span class="sw os"></span><span>The <b>OS</b> column runs in kernel mode, with full privilege.</span></li>
+        <li><span class="sw hw"></span><span>The <b>hardware</b> column happens by itself, with no software involved.</span></li>
+        <li><span class="sw prog"></span><span>The <b>program</b> column runs in user mode, on the real CPU, at full speed.</span></li>
+        <li><span class="sw mk"></span><span>The highlighted line is the one running now.</span></li>
+      </ul>
+      <p style="margin:12px 0 0;color:var(--ink-soft)">Registers are saved twice on a switch: the hardware pushes them onto the <b>kernel stack</b> on every trap, and the OS copies them into the <b>process structure</b> when it decides to switch.</p>
+    </section>
+  </div>
+
+  <footer>
+    Based on <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/">Operating Systems: Three Easy Pieces</a> by Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau, Chapter 6.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   State helpers
+   ========================================================= */
+function baseState(){
+  return {
+    mode:'none',            // 'none' | 'user' | 'kernel'
+    modeNote:'',
+    pc:'\u2014',
+    ctx:'\u2014',           // text in the register box
+    ctxKind:'',             // '', 'A', 'B', 'K'
+    trap:{on:false, hit:null, entries:[]},
+    timer:null,             // {pct, label, fired}
+    stacks:[],              // [{id:'A', frames:[], cur:true}]
+    procs:[],               // [{id, state, saved, mem}]
+    lit:[]                  // panel ids to highlight
+  };
+}
+const TT_SYS  = {k:'syscall',  name:'system call handler', addr:'0x1e2c'};
+const TT_TIME = {k:'timer',    name:'timer handler',       addr:'0x3a40'};
+const TT_ILL  = {k:'illegal',  name:'illegal instruction', addr:'0x2b18'};
+
+function stk(id,frames,cur){ return {id, frames:frames||[], cur:!!cur}; }
+function proc(id,state,saved,mem){ return {id, state:state, saved:saved||null, mem:mem||'\u2014'}; }
+
+/* =========================================================
+   Scenario 1 - plain direct execution
+   ========================================================= */
+const DIRECT = {
+  n:'1', tab:'Direct execution', tabNote:'no limits',
+  blurb:'Just run the program on the CPU. The OS starts it, jumps to <code class="k">main()</code>, and the program runs as fast as the hardware allows. Nothing here is limited, and that is exactly the problem: the program has full privilege, and while it runs the OS is not running at all.',
+  cols:[{k:'os',label:'OS'},{k:'prog',label:'Program'}],
+  panels:{trap:false, timer:false, stack:false, proc:true},
+  init(){
+    const s = baseState();
+    s.modeNote = 'There is no user mode. Whatever runs has full privilege.';
+    s.procs = [proc('A','not created')];
+    return s;
+  },
+  key:[
+    'Direct execution is simply running the program on the CPU. It is fast, because the program is real machine code on real hardware, not something the OS interprets.',
+    '<b>First problem: restricted operations.</b> The program can read any disk block, touch any memory and talk to any device. Nothing stops it.',
+    '<b>Second problem: switching processes.</b> Once the OS jumps to <code class="k">main()</code>, the OS is off the CPU. If the program loops forever, nothing brings the OS back.',
+    'The rest of the chapter adds just enough limits to fix these two, while keeping the speed.'
+  ],
+  steps:[
+    {c:0,t:'Create entry for process list',x:'The OS records that a new process exists, giving it a place to keep its state.',
+      f:s=>{ s.procs=[proc('A','new')]; s.lit=['mProc']; }},
+    {c:0,t:'Allocate memory for program',x:'Space for the code, the heap and the stack of the new process.',
+      f:s=>{ s.procs=[proc('A','new',null,'code + heap + stack')]; s.lit=['mProc']; }},
+    {c:0,t:'Load program into memory',x:'The executable is read from disk into the memory just allocated.',
+      f:s=>{ s.lit=['mProc']; }},
+    {c:0,t:'Set up stack with argc / argv',x:'The arguments the program expects are placed on its stack, ready for main().',
+      f:s=>{ s.lit=['mProc']; }},
+    {c:0,t:'Clear registers',x:'The new process starts from a clean register state rather than inheriting whatever was there.',
+      f:s=>{ s.ctx='cleared'; s.ctxKind=''; s.lit=['mCpu']; }},
+    {c:0,t:'Execute call main()',x:'The OS jumps into the program. From this instant the OS is no longer running: its code is not on the CPU at all.',
+      f:s=>{ s.pc='main()'; s.ctx='process A'; s.ctxKind='A'; s.procs=[proc('A','running',null,'code + heap + stack')]; s.lit=['mCpu']; }},
+    {c:1,t:'Run main()',op:true,x:'The program runs directly on the CPU, at full speed. It also has full privilege: nothing prevents it from issuing an I/O request or reading another process\u2019s memory. And nothing forces it to ever give the CPU back.',
+      f:s=>{ s.pc='inside main()'; s.modeNote='Full privilege, and the OS is not running.'; s.lit=['mCpu']; }},
+    {c:1,t:'Execute return from main',x:'The program finishes and control comes back to the OS.',
+      f:s=>{ s.pc='return from main'; s.modeNote='There is no user mode. Whatever runs has full privilege.'; s.lit=['mCpu']; }},
+    {c:0,t:'Free memory of process',x:'The OS reclaims the memory the process was using.',
+      f:s=>{ s.pc='\u2014'; s.ctx='\u2014'; s.ctxKind=''; s.procs=[proc('A','finished')]; s.lit=['mProc']; }},
+    {c:0,t:'Remove from process list',x:'The entry is deleted and the process is gone. Fast and simple \u2014 but two big questions are unanswered: how do you stop the program doing whatever it likes, and how do you ever get the CPU back?',
+      f:s=>{ s.procs=[]; s.lit=['mProc']; }}
+  ]
+};
+
+/* =========================================================
+   Scenario 2 - traps and system calls
+   ========================================================= */
+const TRAP = {
+  n:'2', tab:'Traps and system calls', tabNote:'restricted operations',
+  blurb:'The first fix. The CPU gains a <b>mode bit</b>: user code runs restricted, and privileged work happens only in kernel mode. A program that needs something privileged executes a <b>trap</b> instruction, which jumps into the kernel at an address the OS chose at boot time \u2014 not an address the program picks.',
+  cols:[{k:'os',label:'OS (kernel mode)'},{k:'hw',label:'Hardware'},{k:'prog',label:'Program (user mode)'}],
+  panels:{trap:true, timer:false, stack:true, proc:true},
+  init(){
+    const s = baseState();
+    s.mode='kernel';
+    s.modeNote='Booting.';
+    s.pc='boot code';
+    s.ctx='kernel';
+    s.ctxKind='K';
+    s.trap={on:false,hit:null,entries:[TT_SYS,TT_ILL]};
+    s.stacks=[stk('A',[],true)];
+    s.procs=[proc('A','not created')];
+    return s;
+  },
+  key:[
+    'User mode is the restricted one: a program that tries a privileged instruction is stopped by the hardware.',
+    'A system call is a <b>trap</b> instruction. It raises the privilege level <i>and</i> jumps into the kernel in one step.',
+    'The program passes a <b>system-call number</b>, never a kernel address. The addresses live in the trap table, which only the kernel can install, and only at boot.',
+    'The hardware saves the caller\u2019s registers and PC onto that process\u2019s <b>kernel stack</b> on the way in, and <code class="k">return-from-trap</code> pops them back on the way out, so the program resumes as if nothing happened.'
+  ],
+  steps:[
+    {ph:'At boot, in kernel mode',c:0,t:'Initialise trap table',x:'The OS tells the hardware which kernel code to run for each kind of trap. This is itself a privileged instruction: a user program cannot do it.',
+      f:s=>{ s.trap.on=true; s.lit=['mTrap']; }},
+    {c:1,t:'Remember address of syscall handler',op:true,x:'The hardware keeps these addresses until the next reboot. Because the program cannot change them, it can never jump to kernel code of its own choosing.',
+      f:s=>{ s.lit=['mTrap']; }},
+
+    {ph:'Later, running a program',c:0,t:'Create entry for process list',x:'Same start-up work as before.',
+      f:s=>{ s.pc='OS run code'; s.procs=[proc('A','new')]; s.lit=['mProc']; }},
+    {c:0,t:'Allocate memory for program',x:'Room for the code, the heap and the stack of the new process.',
+      f:s=>{ s.procs=[proc('A','new',null,'code + heap + stack')]; s.lit=['mProc']; }},
+    {c:0,t:'Load program into memory',x:'The executable is read from disk into the memory just allocated.',f:s=>{ s.lit=['mProc']; }},
+    {c:0,t:'Set up user stack with argv',x:'This is the stack the program itself will use, separate from the kernel stack below.',f:s=>{ s.lit=['mProc']; }},
+    {c:0,t:'Fill kernel stack with registers and PC',x:'The OS pretends the process was already running and had trapped into the kernel. It writes the starting registers and the address of main() onto the process\u2019s kernel stack, so that a return-from-trap will start it.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers'},{t:'PC \u2192 main()'}],true)]; s.lit=['mStack']; }},
+    {c:0,t:'return-from-trap',op:true,x:'A single instruction that ends a trap. The OS uses it here to enter the program for the first time.',
+      f:s=>{ s.lit=['mStack','mCpu']; }},
+    {c:1,t:'Restore registers from kernel stack',op:true,x:'The hardware pops what the OS placed there.',
+      f:s=>{ s.stacks=[stk('A',[],true)]; s.ctx='process A'; s.ctxKind='A'; s.lit=['mCpu','mStack']; }},
+    {c:1,t:'Move to user mode',op:true,x:'The mode bit flips. From now on, privileged instructions will fail.',
+      f:s=>{ s.mode='user'; s.modeNote='Restricted. No direct I/O, no touching other memory.'; s.lit=['mCpu']; }},
+    {c:1,t:'Jump to main()',op:true,x:'The PC comes from the kernel stack, where the OS put it a moment ago.',
+      f:s=>{ s.pc='main()'; s.procs=[proc('A','running',null,'code + heap + stack')]; s.lit=['mCpu']; }},
+    {c:2,t:'Run main()',x:'Full speed on the real CPU, exactly as in direct execution \u2014 but restricted.',
+      f:s=>{ s.pc='inside main()'; s.lit=['mCpu']; }},
+    {c:2,t:'Call a system call, for example open()',x:'The program cannot open the file itself; that needs privilege. So it puts the system-call number in a register and traps.',
+      f:s=>{ s.pc='open() wrapper'; s.ctx='process A + syscall no.'; s.lit=['mCpu']; }},
+    {c:2,t:'trap into OS',trap:true,op:true,x:'The trap instruction is the doorway. The program does not say where to land \u2014 the hardware already knows.',
+      f:s=>{ s.trap.hit='syscall'; s.lit=['mTrap']; }},
+    {c:1,t:'Save registers and PC to kernel stack',trap:true,op:true,x:'The hardware does this by itself, onto the kernel stack of this process, so the program can be resumed later at the instruction after the trap.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers(A)'},{t:'PC after trap'}],true)]; s.trap.hit='syscall'; s.lit=['mStack']; }},
+    {c:1,t:'Move to kernel mode',trap:true,op:true,x:'Privilege is raised and jumping into the kernel happen together, as one action. That is what makes a trap safe.',
+      f:s=>{ s.mode='kernel'; s.modeNote='Full privilege.'; s.trap.hit='syscall'; s.lit=['mCpu']; }},
+    {c:1,t:'Jump to trap handler',trap:true,op:true,x:'To the address installed at boot, and to no other.',
+      f:s=>{ s.pc='0x1e2c (handler)'; s.ctx='kernel'; s.ctxKind='K'; s.trap.hit='syscall'; s.lit=['mTrap','mCpu']; }},
+    {c:0,t:'Handle trap: check the system-call number',x:'The kernel looks at the number the program passed and checks it is valid. A bad number is refused rather than followed.',
+      f:s=>{ s.trap.hit='syscall'; s.lit=['mCpu']; }},
+    {c:0,t:'Do the work of the system call',x:'Now, in kernel mode, the privileged work actually happens: the file is opened.',
+      f:s=>{ s.pc='sys_open()'; s.lit=['mCpu']; }},
+    {c:0,t:'return-from-trap',op:true,x:'The kernel is finished and hands the CPU back to the program.',
+      f:s=>{ s.trap.hit=null; s.lit=['mStack']; }},
+    {c:1,t:'Restore registers and PC from kernel stack',op:true,x:'Popped from the same place the hardware pushed them.',
+      f:s=>{ s.stacks=[stk('A',[],true)]; s.ctx='process A'; s.ctxKind='A'; s.lit=['mStack','mCpu']; }},
+    {c:1,t:'Move to user mode',op:true,x:'Back to restricted execution.',
+      f:s=>{ s.mode='user'; s.modeNote='Restricted. No direct I/O, no touching other memory.'; s.lit=['mCpu']; }},
+    {c:1,t:'Jump to the instruction after the trap',op:true,x:'The program carries on as if the call were an ordinary function call. It never sees the kernel.',
+      f:s=>{ s.pc='after open()'; s.lit=['mCpu']; }},
+    {c:2,t:'Carry on, then return from main',x:'The wrapper for exit() traps once more so the OS can clean up.',
+      f:s=>{ s.pc='return from main'; s.lit=['mCpu']; }},
+    {c:0,t:'Free memory, remove from process list',x:'The process is gone. Restricted operations are now solved. What is still missing: nothing here ever takes the CPU away from a program that does not ask to give it up.',
+      f:s=>{ s.mode='kernel'; s.pc='OS cleanup'; s.ctx='kernel'; s.ctxKind='K'; s.procs=[]; s.stacks=[stk('A',[],false)]; s.lit=['mProc']; }}
+  ]
+};
+
+/* =========================================================
+   Scenario 3 - cooperative
+   ========================================================= */
+const COOP = {
+  n:'3', tab:'Cooperative switching', tabNote:'the program yields',
+  blurb:'Now the second problem: getting the CPU back. The cooperative answer is to <b>trust the program</b>. The OS regains control only when a process makes a system call, does something illegal, or calls <code class="k">yield()</code> to give the CPU up on purpose.',
+  cols:[{k:'os',label:'OS (kernel mode)'},{k:'hw',label:'Hardware'},{k:'prog',label:'Program (user mode)'}],
+  panels:{trap:true, timer:false, stack:true, proc:true},
+  init(){
+    const s = baseState();
+    s.mode='user'; s.modeNote='Restricted. Process A is running.';
+    s.pc='inside A'; s.ctx='process A'; s.ctxKind='A';
+    s.trap={on:true,hit:null,entries:[TT_SYS,TT_ILL]};
+    s.stacks=[stk('A',[],true),stk('B',[],false)];
+    s.procs=[proc('A','running',null,'in memory'),proc('B','ready','registers(B)','in memory')];
+    return s;
+  },
+  key:[
+    'In a cooperative system the OS gets the CPU back only when a process traps: a system call, a divide by zero, or an explicit <code class="k">yield()</code>.',
+    '<code class="k">yield()</code> is a system call that does nothing except hand control to the OS.',
+    'Switching costs <b>two saves and two restores</b>. The hardware saves the registers to the kernel stack on the trap; the OS then saves them again into the process structure, because the process will be off the CPU for a while.',
+    '<b>The flaw:</b> a process stuck in an infinite loop that never traps never gives the CPU back. The OS cannot do anything, because it is not running. The only remedy is to reboot.'
+  ],
+  steps:[
+    {c:2,t:'Process A runs',x:'A is on the CPU in user mode. The OS is not running.',
+      f:s=>{ s.lit=['mCpu']; }},
+    {c:2,t:'A calls yield()',x:'A is being polite: it has nothing urgent to do and hands the CPU back. A system call such as read() or an illegal operation would have the same effect.',
+      f:s=>{ s.pc='yield()'; s.lit=['mCpu']; }},
+    {c:2,t:'trap into OS',trap:true,op:true,x:'yield() is simply a trap with a system-call number. Without a trap of some kind, this next line never happens.',
+      f:s=>{ s.trap.hit='syscall'; s.lit=['mTrap']; }},
+    {c:1,t:'Save registers(A) to kernel stack of A',trap:true,op:true,x:'Save number one, done by the hardware, automatically, every time.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers(A)'},{t:'PC(A)'}],true),stk('B',[],false)]; s.trap.hit='syscall'; s.lit=['mStack']; }},
+    {c:1,t:'Move to kernel mode',trap:true,op:true,x:'Privilege is raised and the jump into the kernel happen together, as one action. That is what makes a trap safe.',
+      f:s=>{ s.mode='kernel'; s.modeNote='Full privilege.'; s.trap.hit='syscall'; s.lit=['mCpu']; }},
+    {c:1,t:'Jump to trap handler',trap:true,op:true,x:'To the address installed at boot, and to no other. The program had no say in it.',
+      f:s=>{ s.pc='0x1e2c (handler)'; s.ctx='kernel'; s.ctxKind='K'; s.trap.hit='syscall'; s.lit=['mTrap','mCpu']; }},
+    {c:0,t:'Handle the trap, decide to run B',x:'The scheduler picks the next process. This decision is Chapter 7\u2019s subject; here we only care that the OS is running and able to make it.',
+      f:s=>{ s.trap.hit=null; s.pc='scheduler'; s.lit=['mProc']; }},
+    {c:0,t:'Call switch(): save registers(A) into the process structure of A',x:'Save number two, done by the OS in software. A is going to be off the CPU for a while, so its context has to live somewhere lasting, not on a stack that will be reused.',
+      f:s=>{ s.procs=[proc('A','ready','registers(A)','in memory'),proc('B','ready','registers(B)','in memory')]; s.lit=['mProc']; }},
+    {c:0,t:'Restore registers(B) from the process structure of B',x:'B\u2019s context, saved the last time B was switched away, comes back into the CPU.',
+      f:s=>{ s.procs=[proc('A','ready','registers(A)','in memory'),proc('B','ready',null,'in memory')]; s.ctx='process B'; s.ctxKind='B'; s.lit=['mProc','mCpu']; }},
+    {c:0,t:'Switch to the kernel stack of B',x:'The stack pointer is moved to B\u2019s kernel stack. This one line is the actual switch: from here the kernel is running as B, not as A.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers(A)'},{t:'PC(A)'}],false),stk('B',[{t:'registers(B)'},{t:'PC(B)'}],true)]; s.lit=['mStack']; }},
+    {c:0,t:'return-from-trap (into B)',op:true,x:'The trap that B took long ago is finally finished.',
+      f:s=>{ s.lit=['mStack']; }},
+    {c:1,t:'Restore registers(B) from the kernel stack of B',op:true,x:'Restore number one, undoing what the hardware saved the last time B was interrupted.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers(A)'},{t:'PC(A)'}],false),stk('B',[],true)]; s.lit=['mStack','mCpu']; }},
+    {c:1,t:'Move to user mode',op:true,x:'Privilege drops again. B will run restricted, like any other program.',
+      f:s=>{ s.mode='user'; s.modeNote='Restricted. Process B is running.'; s.lit=['mCpu']; }},
+    {c:1,t:'Jump to B\u2019s program counter',op:true,x:'Back to the exact instruction B was about to run when it last lost the CPU.',
+      f:s=>{ s.pc='inside B'; s.procs=[proc('A','ready','registers(A)','in memory'),proc('B','running',null,'in memory')]; s.lit=['mCpu']; }},
+    {c:2,t:'Process B runs',x:'The switch is complete. B has no idea it was ever stopped.',
+      f:s=>{ s.lit=['mCpu']; }},
+    {c:2,t:'\u2026and if B never traps?',trap:true,x:'Then this protocol has run out of moves. A process that loops forever without a system call keeps the CPU for good, because the OS is not running and nothing can interrupt it. The only way out is to reboot the machine \u2014 which is why the next protocol does not ask for the program\u2019s cooperation.',
+      f:s=>{ s.pc='while (1) ;'; s.modeNote='Stuck. Nothing can take the CPU back.'; s.lit=['mCpu']; }}
+  ]
+};
+
+/* =========================================================
+   Scenario 4 - timer interrupt
+   ========================================================= */
+const TIMER = {
+  n:'4', tab:'Timer interrupt', tabNote:'the OS takes control',
+  blurb:'The non-cooperative answer, and the one real systems use. At boot the OS starts a <b>timer</b> that raises an interrupt every few milliseconds. The interrupt stops whatever is running and jumps into the kernel, so the OS regains control whether the program cooperates or not.',
+  cols:[{k:'os',label:'OS (kernel mode)'},{k:'hw',label:'Hardware'},{k:'prog',label:'Program (user mode)'}],
+  panels:{trap:true, timer:true, stack:true, proc:true},
+  init(){
+    const s = baseState();
+    s.mode='kernel'; s.modeNote='Booting.';
+    s.pc='boot code'; s.ctx='kernel'; s.ctxKind='K';
+    s.trap={on:false,hit:null,entries:[TT_SYS,TT_TIME,TT_ILL]};
+    s.timer={pct:0,label:'off',fired:false};
+    s.stacks=[stk('A',[],true),stk('B',[],false)];
+    s.procs=[proc('A','ready','registers(A)','in memory'),proc('B','ready','registers(B)','in memory')];
+    return s;
+  },
+  key:[
+    'The timer interrupt gives the OS back the CPU without the program\u2019s consent. This is what makes the OS the one in charge of the machine.',
+    'Starting the timer is privileged, and it is done at boot. A user program can neither stop it nor mask it.',
+    'The hardware must save enough state on an interrupt for the interrupted program to resume correctly \u2014 it was stopped mid-stride, not at a convenient point.',
+    'Deciding <i>whether</i> to switch is policy, and it belongs to the scheduler in Chapter 7. Carrying the switch out is mechanism, and that is the <code class="k">switch()</code> routine here.',
+    'The switch itself is the same as in the cooperative case: two saves, two restores, and a change of kernel stack.'
+  ],
+  steps:[
+    {ph:'At boot, in kernel mode',c:0,t:'Initialise trap table',x:'Two handlers matter now: one for system calls, one for the timer.',
+      f:s=>{ s.trap.on=true; s.lit=['mTrap']; }},
+    {c:1,t:'Remember addresses of the syscall and timer handlers',op:true,x:'The hardware holds on to both until the next reboot.',
+      f:s=>{ s.lit=['mTrap']; }},
+    {c:0,t:'Start the interrupt timer',x:'A privileged instruction, available only in kernel mode. Once started, a user program cannot switch it off.',
+      f:s=>{ s.timer={pct:5,label:'10 ms',fired:false}; s.lit=['mTimer']; }},
+    {c:1,t:'Start the timer, interrupt the CPU in X milliseconds',op:true,x:'From here the hardware counts down on its own, no matter what software is doing.',
+      f:s=>{ s.timer={pct:20,label:'8 ms',fired:false}; s.lit=['mTimer']; }},
+
+    {ph:'A process is running',c:2,t:'Process A runs',x:'A is in user mode on the real CPU. The OS is not running \u2014 but the timer is.',
+      f:s=>{ s.mode='user'; s.modeNote='Restricted. Process A is running.'; s.pc='inside A'; s.ctx='process A'; s.ctxKind='A';
+             s.procs=[proc('A','running',null,'in memory'),proc('B','ready','registers(B)','in memory')];
+             s.timer={pct:55,label:'4 ms',fired:false}; s.lit=['mCpu','mTimer']; }},
+    {c:2,t:'A keeps running, and never calls yield()',x:'It does not matter. Under the cooperative protocol this was fatal; here it changes nothing.',
+      f:s=>{ s.pc='while (1) \u2026'; s.timer={pct:85,label:'1 ms',fired:false}; s.lit=['mTimer']; }},
+    {c:1,t:'Timer interrupt',trap:true,op:true,x:'The countdown reaches zero. The hardware stops A mid-instruction-stream, with no warning and no permission asked.',
+      f:s=>{ s.timer={pct:100,label:'fired',fired:true}; s.trap.hit='timer'; s.lit=['mTimer','mTrap']; }},
+    {c:1,t:'Save registers(A) to the kernel stack of A',trap:true,op:true,x:'Save number one, by the hardware. It has to be thorough: A was interrupted at an arbitrary point and must be able to resume exactly there.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers(A)'},{t:'PC(A)'}],true),stk('B',[],false)]; s.trap.hit='timer'; s.lit=['mStack']; }},
+    {c:1,t:'Move to kernel mode',trap:true,op:true,x:'The hardware raises the privilege level on its way into the handler, exactly as it does for a system call.',
+      f:s=>{ s.mode='kernel'; s.modeNote='Full privilege.'; s.trap.hit='timer'; s.lit=['mCpu']; }},
+    {c:1,t:'Jump to the timer handler',trap:true,op:true,x:'Installed at boot, so the program has no say in where this lands.',
+      f:s=>{ s.pc='0x3a40 (timer handler)'; s.ctx='kernel'; s.ctxKind='K'; s.trap.hit='timer'; s.lit=['mTrap','mCpu']; }},
+
+    {ph:'The OS is back in control',c:0,t:'Handle the trap, decide to switch from A to B',x:'The OS runs again and the scheduler chooses. It could also decide to keep running A and simply return.',
+      f:s=>{ s.trap.hit=null; s.pc='scheduler'; s.timer={pct:10,label:'restarted',fired:false}; s.lit=['mProc','mTimer']; }},
+    {c:0,t:'Call switch(): save registers(A) into the process structure of A',x:'Save number two, by the OS in software. A is leaving the CPU for a while, so its context is copied somewhere lasting.',
+      f:s=>{ s.procs=[proc('A','ready','registers(A)','in memory'),proc('B','ready','registers(B)','in memory')]; s.lit=['mProc']; }},
+    {c:0,t:'Restore registers(B) from the process structure of B',x:'B\u2019s context, saved the last time it was switched away, is loaded back.',
+      f:s=>{ s.procs=[proc('A','ready','registers(A)','in memory'),proc('B','ready',null,'in memory')]; s.ctx='process B'; s.ctxKind='B'; s.lit=['mProc','mCpu']; }},
+    {c:0,t:'Switch to the kernel stack of B',x:'The moment the switch actually happens. The kernel is now running on B\u2019s stack, so the return-from-trap below will return into B.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers(A)'},{t:'PC(A)'}],false),stk('B',[{t:'registers(B)'},{t:'PC(B)'}],true)]; s.lit=['mStack']; }},
+    {c:0,t:'return-from-trap (into B)',op:true,x:'The same instruction as always, but because the kernel stack changed, it returns into a different process than the one that was interrupted.',
+      f:s=>{ s.lit=['mStack']; }},
+    {c:1,t:'Restore registers(B) from the kernel stack of B',op:true,x:'Restore number one, undoing what the hardware saved the last time B was interrupted.',
+      f:s=>{ s.stacks=[stk('A',[{t:'registers(A)'},{t:'PC(A)'}],false),stk('B',[],true)]; s.lit=['mStack','mCpu']; }},
+    {c:1,t:'Move to user mode',op:true,x:'Privilege drops again. B will run restricted, like any other program.',
+      f:s=>{ s.mode='user'; s.modeNote='Restricted. Process B is running.'; s.lit=['mCpu']; }},
+    {c:1,t:'Jump to B\u2019s program counter',op:true,x:'Back to the exact instruction B was about to run when it last lost the CPU.',
+      f:s=>{ s.pc='inside B'; s.procs=[proc('A','ready','registers(A)','in memory'),proc('B','running',null,'in memory')]; s.timer={pct:45,label:'5 ms',fired:false}; s.lit=['mCpu']; }},
+    {c:2,t:'Process B runs, until the timer fires again',x:'And the whole thing repeats, a few hundred times a second. A never agreed to any of it, and never noticed.',
+      f:s=>{ s.timer={pct:80,label:'2 ms',fired:false}; s.lit=['mCpu','mTimer']; }}
+  ]
+};
+
+const SCENARIOS = [DIRECT, TRAP, COOP, TIMER];
+
+/* =========================================================
+   Build states for a scenario
+   ========================================================= */
+function buildStates(sc){
+  const out = [];
+  let cur = sc.init();
+  out.push(JSON.parse(JSON.stringify(cur)));   // state before step 0
+  for(const st of sc.steps){
+    cur = JSON.parse(JSON.stringify(cur));
+    cur.lit = [];
+    if(st.f) st.f(cur);
+    out.push(cur);
+  }
+  return out;
+}
+
+/* =========================================================
+   DOM
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const tabsEl=$('tabs'), blurbEl=$('blurb'), pheadEl=$('phead'), rowsEl=$('rows');
+const exTitle=$('exTitle'), exBody=$('exBody'), stepNo=$('stepNo'), pbar=$('pbar');
+const keyList=$('keyList');
+let sc = SCENARIOS[0], states = [], idx = 0, timer = null;
+
+/* --- tabs --- */
+SCENARIOS.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.className='tab'; b.type='button'; b.setAttribute('role','tab');
+  b.innerHTML = '<span class="n">'+s.n+'</span>'+s.tab;
+  b.title = s.tabNote;
+  b.addEventListener('click',()=>loadScenario(i));
+  tabsEl.appendChild(b);
+});
+
+function loadScenario(i){
+  stop();
+  sc = SCENARIOS[i];
+  [...tabsEl.children].forEach((t,j)=>t.setAttribute('aria-selected', j===i ? 'true':'false'));
+  blurbEl.innerHTML = sc.blurb;
+
+  // column header
+  pheadEl.style.gridTemplateColumns = 'repeat('+sc.cols.length+',minmax(0,1fr))';
+  pheadEl.innerHTML = sc.cols.map(c=>'<div class="c-'+c.k+'">'+c.label+'</div>').join('');
+
+  // rows
+  rowsEl.innerHTML = '';
+  sc.steps.forEach((st,k)=>{
+    if(st.ph){
+      const p=document.createElement('div'); p.className='phase'; p.textContent=st.ph; rowsEl.appendChild(p);
+    }
+    const r=document.createElement('div');
+    r.className='row';
+    r.style.gridTemplateColumns='repeat('+sc.cols.length+',minmax(0,1fr))';
+    const cell=document.createElement('div');
+    const kind=sc.cols[st.c].k;
+    cell.className='cell c-'+kind+(st.trap?' trap':'');
+    cell.style.gridColumn = String(st.c+1);
+    cell.innerHTML = '<span class="ctag">'+sc.cols[st.c].label+'</span><span'+(st.op?' class="op"':'')+'>'+st.t+'</span>';
+    cell.dataset.k = k;
+    cell.addEventListener('click',()=>{ stop(); go(k+1); });
+    r.appendChild(cell);
+    rowsEl.appendChild(r);
+  });
+
+  // panels shown
+  $('mTrap').hidden  = !sc.panels.trap;
+  $('mTimer').hidden = !sc.panels.timer;
+  $('mStack').hidden = !sc.panels.stack;
+  $('mProc').hidden  = !sc.panels.proc;
+
+  // key ideas
+  keyList.innerHTML = sc.key.map(t=>'<li>'+t+'</li>').join('');
+
+  states = buildStates(sc);
+  go(0, true);
+}
+
+/* --- render --- */
+function go(i, instant){
+  idx = Math.max(0, Math.min(states.length-1, i));
+  const s = states[idx];
+  const st = idx>0 ? sc.steps[idx-1] : null;
+  if(instant) document.body.classList.add('instant');
+
+  // CPU
+  const mb=$('modeBadge');
+  mb.className='badge '+(s.mode==='none'?'none':s.mode);
+  mb.textContent = s.mode==='none' ? 'no mode bit' : (s.mode==='user' ? 'user mode' : 'kernel mode');
+  $('modeNote').textContent = s.modeNote||'';
+  $('regPc').textContent = s.pc;
+  const rc=$('regCtx');
+  rc.textContent = s.ctx;
+  rc.className = s.ctxKind ? 'ctx'+s.ctxKind : '';
+
+  // trap table
+  $('trapTable').innerHTML = s.trap.entries.map(e=>{
+    const cls = !s.trap.on ? 'off' : (s.trap.hit===e.k ? 'hit' : '');
+    return '<li class="'+cls+'"><span>'+e.name+'</span><code>'+(s.trap.on?e.addr:'not set')+'</code></li>';
+  }).join('');
+
+  // timer
+  if(s.timer){
+    const bar=$('tbar');
+    bar.className='tbar'+(s.timer.fired?' fired':'');
+    bar.firstElementChild.style.width = s.timer.pct+'%';
+    const ts=$('tstate'); ts.textContent=s.timer.label; ts.className='tstate'+(s.timer.fired?' fired':'');
+  }
+
+  // kernel stacks
+  const sw=$('stacks');
+  sw.className='stacks'+(s.stacks.length<2?' one':'');
+  sw.innerHTML = s.stacks.map(k=>{
+    const body = k.frames.length
+      ? k.frames.map(f=>'<div class="frame'+(f.os?' os':'')+'">'+f.t+'</div>').join('')
+      : '<p class="empty">empty</p>';
+    return '<div class="stk '+k.id+(k.cur?' cur':'')+'"><h4>k-stack('+k.id+')</h4>'+body+'</div>';
+  }).join('');
+
+  // process list
+  $('plist').innerHTML = s.procs.length ? s.procs.map(p=>{
+    const stClass = /running/.test(p.state)?'running':(/ready/.test(p.state)?'ready':(/finished/.test(p.state)?'dead':''));
+    return '<div class="pcb '+p.id+(stClass==='running'?' run':'')+'">'
+      +'<div class="pcb-head"><b>Process '+p.id+'</b><span class="state '+stClass+'">'+p.state+'</span></div>'
+      +'<div class="slot'+(p.saved?' full':'')+'">saved registers: '+(p.saved||'none')+'</div>'
+      +'<p class="pmem">memory: '+p.mem+'</p></div>';
+  }).join('') : '<p class="pmem" style="margin:0">The list is empty.</p>';
+
+  // panel highlight
+  ['mCpu','mTrap','mTimer','mStack','mProc'].forEach(id=>{
+    $(id).classList.toggle('lit', (s.lit||[]).indexOf(id)>=0);
+  });
+
+  // protocol rows
+  [...rowsEl.querySelectorAll('.cell')].forEach(c=>{
+    const k=+c.dataset.k;
+    c.classList.toggle('done', k < idx-1);
+    c.classList.toggle('now', k === idx-1);
+  });
+  if(st){
+    const cur = rowsEl.querySelector('.cell.now');
+    if(cur){
+      const want = cur.offsetTop - rowsEl.clientHeight/2 + cur.offsetHeight/2;
+      const max = rowsEl.scrollHeight - rowsEl.clientHeight;
+      const top = Math.max(0, Math.min(max, want));
+      const smooth = !instant && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      rowsEl.scrollTo({top:top, behavior: smooth?'smooth':'auto'});
+    }
+  }else{
+    rowsEl.scrollTop = 0;
+  }
+
+  // explanation
+  if(st){
+    stepNo.textContent = 'Step '+idx+' of '+sc.steps.length+' \u2014 '+sc.cols[st.c].label;
+    exTitle.textContent = st.t;
+    exBody.innerHTML = st.x || '';
+  }else{
+    stepNo.textContent = 'Before the first step';
+    exTitle.textContent = sc.tab;
+    exBody.innerHTML = 'Press Play, or step through one line at a time. You can also click any line in the table to jump to it.';
+  }
+  pbar.style.width = (idx/sc.steps.length*100)+'%';
+
+  $('btnBack').disabled = idx===0;
+  $('btnNext').disabled = idx===states.length-1;
+  if(idx===states.length-1) stop();
+
+  if(instant) requestAnimationFrame(()=>document.body.classList.remove('instant'));
+}
+
+/* --- playback --- */
+function stop(){
+  if(timer){ clearInterval(timer); timer=null; }
+  $('btnPlay').innerHTML='&#9654; Play';
+}
+function play(){
+  if(timer){ stop(); return; }
+  if(idx===states.length-1) go(0,true);
+  $('btnPlay').innerHTML='&#10073;&#10073; Pause';
+  timer=setInterval(()=>{
+    if(idx>=states.length-1){ stop(); return; }
+    go(idx+1);
+  }, +$('speed').value);
+}
+$('btnPlay').addEventListener('click',play);
+$('btnNext').addEventListener('click',()=>{ stop(); go(idx+1); });
+$('btnBack').addEventListener('click',()=>{ stop(); go(idx-1); });
+$('btnReset').addEventListener('click',()=>{ stop(); go(0,true); });
+$('speed').addEventListener('change',()=>{ if(timer){ stop(); play(); } });
+
+document.addEventListener('keydown',e=>{
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){ stop(); go(idx+1); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ stop(); go(idx-1); e.preventDefault(); }
+  else if(e.key===' '){ play(); e.preventDefault(); }
+  else if(['1','2','3','4'].indexOf(e.key)>=0){ loadScenario(+e.key-1); e.preventDefault(); }
+});
+
+loadScenario(0);
+</script>
+</body>
+</html>
