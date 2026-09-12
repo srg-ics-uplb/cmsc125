@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lottery scheduling</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#c5cfd8;
+  --bad:#c92a2a;
+  --mark:#ffd43b;
+  --c0:#e98b00; --c1:#0b7285; --c2:#5f3dc4; --c3:#c2255c; --c4:#3b5bdb;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important;animation:none !important}
+.page{max-width:1240px;margin:0 auto;padding:32px 28px 48px}
+
+/* header */
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:68ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer}
+button:hover:not(:disabled){background:#fff;box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible,.tab:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+select{padding:5px 6px}
+.play{min-width:104px;font-weight:700}
+
+/* tabs */
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin:0 0 6px;border-bottom:3px solid var(--ink)}
+.tab{border:2px solid var(--ink);border-bottom:none;border-radius:8px 8px 0 0;background:#dde4ea;padding:9px 15px;margin-right:6px;margin-bottom:-3px;font-weight:600;font-size:.95rem;box-shadow:none}
+.tab:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.tab[aria-selected="true"]{background:var(--panel);border-bottom:3px solid var(--panel);font-weight:800}
+.tab .n{font-family:var(--mono);font-size:.8rem;color:var(--ink-soft);display:block;font-weight:600}
+.tab[aria-selected="true"] .n{color:var(--c2)}
+.scen-blurb{margin:14px 0 14px;padding:12px 16px;border-left:5px solid var(--ink);background:rgba(248,250,251,.72);max-width:92ch}
+.scen-blurb p{margin:0}
+
+/* variants */
+.variants{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px}
+.variants .lab{font-size:.88rem;color:var(--ink-soft)}
+.seg{display:flex;border:2px solid var(--ink);border-radius:7px;overflow:hidden;background:#fff}
+.seg button{border:none;border-radius:0;border-right:2px solid var(--ink);background:#dde4ea;font-size:.9rem;font-weight:600;padding:6px 14px}
+.seg button:last-child{border-right:none}
+.seg button:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.seg button[aria-pressed="true"]{background:var(--mark);font-weight:800}
+
+/* layout */
+.main{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:22px;align-items:start}
+.main>*{min-width:0}
+.card{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px}
+.mini{border:2px solid var(--ink);border-radius:8px;background:var(--panel);padding:12px 14px}
+.machine{display:flex;flex-direction:column;gap:14px}
+.mini h3{margin:0 0 9px;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+
+/* ticket line */
+.tl{position:relative;margin-bottom:8px}
+.tlbar{display:flex;height:34px;border:2px solid var(--ink);border-radius:6px;overflow:hidden;background:#fff}
+.tlbar i{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.78rem;font-weight:700;color:#fff;border-right:1.5px solid var(--ink);transition:flex-basis .25s;overflow:hidden;white-space:nowrap}
+.tlbar i:last-child{border-right:none}
+.tlbar i.out{background:repeating-linear-gradient(45deg,#eef2f5,#eef2f5 4px,#dbe3ea 4px,#dbe3ea 8px);color:var(--ink-soft)}
+.needle{position:absolute;top:-7px;bottom:-7px;width:0;border-left:2.5px solid var(--bad);transition:left .25s}
+.needle::before{content:'';position:absolute;left:-5px;top:-2px;border:5px solid transparent;border-top-color:var(--bad)}
+.tlscale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.7rem;color:var(--ink-soft);margin-top:9px}
+.draw{margin:10px 0 0;font-family:var(--mono);font-size:.86rem;background:#fff;border:1.5px solid var(--line);border-radius:5px;padding:5px 8px}
+.draw b{font-weight:700}
+
+/* tally */
+.jt{width:100%;border-collapse:collapse;font-size:.84rem}
+.jt th{text-align:left;font-weight:600;color:var(--ink-soft);font-size:.74rem;padding:0 6px 4px 0}
+.jt td{padding:4px 6px 4px 0;border-top:1px solid var(--line);font-family:var(--mono);font-size:.8rem;vertical-align:middle}
+.jt td:first-child{font-weight:700;font-family:var(--sans)}
+.jt tr.gone td{opacity:.45}
+.dotc{display:inline-block;width:10px;height:10px;border:1.5px solid var(--ink);border-radius:2px;margin-right:6px}
+.sb{display:inline-block;width:48px;height:9px;border:1.5px solid var(--ink);border-radius:3px;background:#fff;overflow:hidden;vertical-align:middle;margin-right:6px}
+.sb i{display:block;height:100%}
+.sb.want i{opacity:.4}
+
+/* currency */
+.cur{font-size:.84rem}
+.cur .u{border:1.5px solid var(--line);border-radius:5px;background:#fff;padding:7px 9px;margin-bottom:8px}
+.cur .u:last-child{margin-bottom:0}
+.cur .uh{display:flex;justify-content:space-between;font-weight:700;font-size:.86rem;margin-bottom:5px}
+.cur .uh span{font-family:var(--mono);font-weight:600;color:var(--ink-soft);font-size:.78rem}
+.cur .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;font-family:var(--mono);font-size:.78rem;padding:2px 0}
+.cur .row b{font-weight:700}
+.arrowto{color:var(--ink-soft)}
+
+/* chart / timeline */
+.chart{border:2px solid var(--ink);border-radius:8px;background:#fff;padding:12px 14px 10px;overflow-x:auto}
+.crow{display:grid;align-items:stretch;margin-bottom:3px}
+.clab{font-family:var(--mono);font-size:.78rem;color:var(--ink-soft);padding-right:8px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap}
+.cell{border:1px solid var(--line);border-right:none;height:26px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.7rem;font-weight:700;color:#fff}
+.crow .cell:last-child{border-right:1px solid var(--line)}
+.cell.future{opacity:.3}
+.cell.now{outline:2.5px solid var(--ink);outline-offset:-1px;z-index:2}
+.cell.nowcol{background:#fff6d6}
+.cell.c0{background:var(--c0);border-color:var(--ink)}
+.cell.c1{background:var(--c1);border-color:var(--ink)}
+.cell.c2{background:var(--c2);border-color:var(--ink)}
+.cell.c3{background:var(--c3);border-color:var(--ink)}
+.cell.c4{background:var(--c4);border-color:var(--ink)}
+.cell.blk{background:repeating-linear-gradient(45deg,#fff,#fff 3px,#b6c2cd 3px,#b6c2cd 6px)}
+.axis{font-family:var(--mono);font-size:.68rem;color:var(--ink-soft);text-align:center;padding-top:3px}
+.chart-note{margin:8px 0 0;font-size:.8rem;color:var(--ink-soft)}
+
+/* explain */
+.explain{margin:0 0 16px;min-height:176px;display:flex;flex-direction:column}
+.explain h3{margin:0 0 6px;font-size:1.15rem;font-weight:700}
+.explain p{margin:0 0 8px;max-width:78ch}
+.explain p:last-of-type{margin-bottom:0}
+.stepno{font-family:var(--mono);font-size:.82rem;color:var(--ink-soft)}
+.pbar{height:8px;border:2px solid var(--ink);border-radius:4px;background:#fff;overflow:hidden;margin-top:auto}
+.pbar i{display:block;height:100%;background:var(--ink);transition:width .25s}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+
+/* code panel */
+.codebox{margin-top:22px}
+.code-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,360px);gap:22px;align-items:start;margin-top:10px}
+.code{margin:0;font-family:var(--mono);font-size:.82rem;line-height:1.65;background:#fff;border:2px solid var(--ink);border-radius:8px;padding:10px 0;overflow-x:auto}
+.code .l{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:0 12px 0 0;white-space:pre}
+.code .l .ln{text-align:right;color:#9aa7b4;font-size:.74rem;user-select:none}
+.code .l.hit{background:var(--mark)}
+.code .l.walk{background:#fff3bf}
+.code .cm{color:#6b7a8c}
+.code .kw{color:#5f3dc4;font-weight:700}
+.nodes{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 12px}
+.node{display:flex;border:2px solid var(--ink);border-radius:5px;overflow:hidden;font-family:var(--mono);font-size:.78rem;opacity:.45}
+.node.seen{opacity:1}
+.node.hit{box-shadow:3px 3px 0 var(--ink)}
+.node b{padding:2px 7px;color:#fff;font-weight:700}
+.node span{padding:2px 7px;background:#fff}
+.nodes .arr{color:var(--ink-soft);font-family:var(--mono);font-size:.8rem}
+.trace{margin:0;padding-left:20px;font-family:var(--mono);font-size:.78rem;line-height:1.55}
+.trace li{margin-bottom:5px}
+.trace li.win{font-weight:700}
+.trace .no{color:var(--ink-soft)}
+.trace .yes{color:var(--bad)}
+.codebox h3{margin:0 0 8px;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+@media (max-width:900px){ .code-grid{grid-template-columns:1fr} }
+
+/* fairness */
+.fair{margin-top:22px}
+.fair-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,300px);gap:22px;align-items:center}
+.fair svg{width:100%;height:auto;display:block}
+.fnum{font-family:var(--mono);font-size:2.4rem;font-weight:700;line-height:1}
+.fnum span{font-size:1rem;color:var(--ink-soft);font-family:var(--sans);font-weight:400}
+
+/* lower */
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:22px;margin-top:22px;align-items:start}
+.key{border-left:5px solid var(--c2)}
+.key h2{font-size:1.1rem}
+.key ul{margin:8px 0 0;padding-left:20px}
+.key li{margin-bottom:6px;max-width:70ch}
+.key li:last-child{margin-bottom:0}
+.side{font-size:.88rem}
+.side p{margin:8px 0 0}
+code.k{font-family:var(--mono);font-size:.86em;background:#e3e9ee;border-radius:3px;padding:0 4px}
+footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:.88rem;color:var(--ink-soft)}
+footer a{color:var(--ink);text-underline-offset:3px}
+
+@media (max-width: 1060px){
+  .main,.lower,.fair-grid{grid-template-columns:1fr}
+}
+@media (max-width: 760px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.8rem}
+  .top{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .chart{padding:10px 8px}
+  .clab{font-size:.7rem;padding-right:4px}
+  .tabs{border-bottom:none;gap:6px}
+  .tab{border-radius:7px;border-bottom:2px solid var(--ink);margin:0 0 2px;padding:7px 12px}
+  .tab[aria-selected="true"]{background:var(--mark);border-bottom:2px solid var(--ink)}
+  .tab .n{display:inline;margin-right:6px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>Lottery scheduling</h1>
+      <p class="intro">Instead of working out who deserves the CPU, hold a raffle for it. Every job holds tickets, a random number is drawn each time slice, and whoever holds the winning ticket runs, following the Scheduling: Proportional Share chapter of OSTEP (Chapter 9). Each column is one 10&nbsp;ms slice.</p>
+    </div>
+    <div class="controls">
+      <button id="btnBack" title="Previous draw">&#9664; Back</button>
+      <button id="btnPlay" class="play">&#9654; Play</button>
+      <button id="btnNext" title="Next draw">Next &#9654;</button>
+      <button id="btnReset">Restart</button>
+      <button id="btnSeed" title="Run the same setup with new random numbers">New draws</button>
+      <select id="speed" aria-label="Animation speed">
+        <option value="1400">Slow</option>
+        <option value="750" selected>Normal</option>
+        <option value="330">Fast</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="Scenario"></div>
+  <div class="scen-blurb"><p id="blurb"></p></div>
+  <div class="variants" id="variants" hidden>
+    <span class="lab" id="varLab"></span>
+    <div class="seg" id="seg"></div>
+  </div>
+
+  <div class="main">
+
+    <section class="machine" aria-label="Lottery state">
+      <div class="mini">
+        <h3 id="tlHead">The ticket line for this draw</h3>
+        <div class="tl">
+          <div class="tlbar" id="tlbar"></div>
+          <div class="needle" id="needle" style="left:0"></div>
+        </div>
+        <div class="tlscale"><span>0</span><span id="tlmax">100</span></div>
+        <p class="draw" id="drawLine">&nbsp;</p>
+      </div>
+
+      <div class="mini" id="curBox" hidden>
+        <h3 id="curHead">Currencies</h3>
+        <div class="cur" id="cur"></div>
+      </div>
+
+      <div class="mini">
+        <h3>Tickets held and CPU won</h3>
+        <table class="jt">
+          <thead><tr><th>job</th><th>tickets</th><th>share</th><th>won</th></tr></thead>
+          <tbody id="tally"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-label="Run">
+      <div class="card explain">
+        <span class="stepno" id="stepNo"></span>
+        <h3 id="exTitle">&nbsp;</h3>
+        <p id="exBody"></p>
+        <div class="pbar"><i id="pbar" style="width:0%"></i></div>
+      </div>
+
+      <div class="chart">
+        <div id="chartRows"></div>
+        <p class="chart-note" id="chartNote">One column per 10 ms slice: the job that held the winning ticket.</p>
+      </div>
+      <p class="kbd-hint">Keys: <kbd>&#8594;</kbd> next, <kbd>&#8592;</kbd> back, <kbd>space</kbd> play or pause, <kbd>1</kbd>&ndash;<kbd>5</kbd> switch scenario.</p>
+    </section>
+  </div>
+
+  <section class="card codebox" id="codeBox" hidden>
+    <h2>The whole implementation</h2>
+    <p style="margin:6px 0 0;max-width:80ch;color:var(--ink-soft)">There is no queue to keep sorted and no history to maintain. Draw a number, then walk the list of jobs adding up tickets until the total passes it.</p>
+    <div class="code-grid">
+      <pre class="code" id="code"></pre>
+      <div>
+        <h3>The list, and the walk for this draw</h3>
+        <div class="nodes" id="nodes"></div>
+        <ol class="trace" id="trace"></ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="card fair" id="fairBox" hidden>
+    <h2>The fairness metric</h2>
+    <p style="margin:6px 0 14px;max-width:80ch;color:var(--ink-soft)">Two jobs with the same number of tickets and the same amount of work should finish together. Unfairness <b>F</b> is the completion time of the first job divided by the completion time of the second, so F&nbsp;=&nbsp;1 is perfectly fair and smaller is worse.</p>
+    <div class="fair-grid">
+      <div id="fairChart"></div>
+      <div>
+        <p class="fnum" id="fNow">&mdash; <span>F for the run above</span></p>
+        <p id="fText" style="margin-top:12px;color:var(--ink-soft)"></p>
+      </div>
+    </div>
+  </section>
+
+  <div class="lower">
+    <section class="card key">
+      <h2>What to take away</h2>
+      <ul id="keyList"></ul>
+    </section>
+    <section class="card side">
+      <h2 id="sideTitle">How a draw works</h2>
+      <div id="sideBody"></div>
+    </section>
+  </div>
+
+  <footer>
+    Based on <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/">Operating Systems: Three Easy Pieces</a> by Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau, Chapter 9.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ============ seeded random ============ */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ============ engine ============ */
+function simulate(cfg, seed){
+  const rnd = mulberry32(seed);
+  const J = cfg.jobs.map((j,i)=>Object.assign({c:i, rem:j.total, wins:0, done:false, blocked:false, tickets:j.tickets}, j));
+  const byId = id => J.find(j=>j.id===id);
+  const frames = [];
+
+  for(let t=0; t<cfg.horizon; t++){
+    const ev = [];
+    if(cfg.before) cfg.before(t, J, ev, byId);
+
+    const live = J.filter(j=>!j.done && !j.blocked && j.tickets>0 && j.rem>0);
+    const total = live.reduce((s,j)=>s+j.tickets,0);
+    const ranges = [];
+    let acc = 0;
+    live.forEach(j=>{ ranges.push({id:j.id, c:j.c, lo:acc, hi:acc+j.tickets-1, n:j.tickets}); acc += j.tickets; });
+
+    if(!total){
+      frames.push({t, win:null, draw:null, total:0, ranges, ev, snap:snap(t)});
+      continue;
+    }
+    const draw = Math.floor(rnd()*total);
+    const r = ranges.find(x => draw>=x.lo && draw<=x.hi);
+    const w = byId(r.id);
+    w.rem--; w.wins++;
+    if(w.rem===0){ w.done = true; ev.push({k:'done', j:w.id, t}); }
+    if(cfg.after) cfg.after(t, J, ev, byId, w);
+    frames.push({t, win:w.id, winC:w.c, draw, total, ranges, ev, snap:snap(t)});
+  }
+  function snap(t){
+    return { total: J.filter(j=>!j.done && !j.blocked && j.rem>0).reduce((s,j)=>s+j.tickets,0),
+      jobs: J.map(j=>({id:j.id, c:j.c, tickets:j.tickets, rem:j.rem, wins:j.wins,
+                       done:j.done, blocked:j.blocked, note:j.note||''})) };
+  }
+  return frames;
+}
+
+/* ============ fairness experiment ============ */
+function unfairness(R, trials, seed){
+  const rnd = mulberry32(seed);
+  let sum = 0;
+  for(let k=0;k<trials;k++){
+    let a=R, b=R, t=0, first=0;
+    while(a>0 || b>0){
+      t++;
+      if(rnd()<0.5){ if(a>0) a--; else b--; } else { if(b>0) b--; else a--; }
+      if(!first && (a===0 || b===0)) first = t;
+    }
+    sum += first/t;
+  }
+  return sum/trials;
+}
+
+/* ============ scenarios ============ */
+const SC = [
+{
+  n:'1', tab:'Basic tickets',
+  blurb:'Three jobs hold 100, 50 and 250 tickets, so the ticket line runs from 0 to 399. Each slice the scheduler picks a number in that range and whoever holds it runs. Nobody is guaranteed anything in a single draw \u2014 the shares only appear over time.',
+  cfg:()=>({horizon:30, jobs:[
+    {id:'A', tickets:100, total:999},
+    {id:'B', tickets:50,  total:999},
+    {id:'C', tickets:250, total:999}]}),
+  key:[
+    'Tickets represent a share of a resource. Holding 50 of the 400 tickets means you should get about an eighth of the CPU.',
+    'The scheduler keeps no history and does no bookkeeping \u2014 one random number and a walk down the ticket list is the whole algorithm.',
+    'Because it is random, short runs are lumpy: the loser can win several draws in a row. The shares only come out right as the run gets longer.',
+    'Adding or removing a job means adding or removing tickets. There is no global state to rebuild, which is what makes this so easy to implement.'
+  ],
+  code:true,
+  side:'<p>Add up the tickets of every runnable job. Pick a random number from 0 up to that total, then walk the list adding each job\u2019s tickets until the running sum passes the number. That job wins.</p><p>The winner runs for one time slice, and then a fresh number is drawn.</p>'
+},
+{
+  n:'2', tab:'Ticket currency',
+  blurb:'Users A and B have 100 global tickets each. Inside their own allocation they can print whatever currency they like: A splits 1000 A\u2011bucks between two jobs, B gives all 200 B\u2011bucks to one job. The scheduler converts each job\u2019s local amount into global tickets before the draw.',
+  cfg:()=>({horizon:30, jobs:[
+    {id:'A1', tickets:50, total:999, user:'User A', local:500, cur:'A-bucks'},
+    {id:'A2', tickets:50, total:999, user:'User A', local:500, cur:'A-bucks'},
+    {id:'B1', tickets:100, total:999, user:'User B', local:200, cur:'B-bucks'}]}),
+  currency:[
+    {user:'User A', global:100, cur:'A-bucks', jobs:[['A1',500],['A2',500]]},
+    {user:'User B', global:100, cur:'B-bucks', jobs:[['B1',200]]}
+  ],
+  key:[
+    'A currency lets a user divide their own allocation among their own jobs without affecting anyone else.',
+    'A1 and A2 hold 500 A-bucks each, which sounds like a lot next to B1\u2019s 200 B-bucks. It is not: what matters is the fraction of the user\u2019s own currency, converted into global tickets.',
+    'User A\u2019s 100 global tickets are split 50/50, while user B\u2019s 100 go entirely to B1. So B1 gets half the CPU and each of A\u2019s jobs gets a quarter.',
+    'A user can start ten more jobs and only dilute their own share. Everyone else is untouched, which is exactly the isolation you want.'
+  ],
+  side:'<p>The conversion is a proportion: a job\u2019s local amount divided by the total of that user\u2019s currency, multiplied by the user\u2019s global tickets.</p><p>A1 holds 500 of A\u2019s 1000 A-bucks, so it gets half of A\u2019s 100 global tickets.</p>'
+},
+{
+  n:'3', tab:'Ticket transfer',
+  blurb:'C sends a request to a file server S and then has nothing to do until the reply comes back. S holds 50 tickets against D and E&rsquo;s 100 each, so it is slow, and C waits. With a transfer, C hands its tickets to S for the duration of the request and takes them back afterwards.',
+  cfg:(v)=>({horizon:40,
+    transfer: v===1,
+    jobs:[
+      {id:'C', tickets:100, total:14},
+      {id:'S', tickets:50,  total:999},
+      {id:'D', tickets:100, total:999},
+      {id:'E', tickets:100, total:999}],
+    before(t, J, ev, by){
+      const C=by('C'), S=by('S');
+      if(t===0){
+        C.blocked = true; S.serving = 4;
+        if(this.transfer){ C.lent = C.tickets; S.tickets += C.lent; C.tickets = 0;
+          ev.push({k:'lend', n:C.lent}); }
+        ev.push({k:'request'});
+      }
+    },
+    after(t, J, ev, by, w){
+      const C=by('C'), S=by('S');
+      if(w.id==='S' && S.serving>0){
+        S.serving--;
+        if(S.serving===0){
+          C.blocked=false;
+          if(C.lent){ S.tickets -= C.lent; C.tickets = C.lent; C.lent=0; ev.push({k:'return'}); }
+          S.done = true; S.note = 'idle';
+          ev.push({k:'reply', t});
+        }
+      }
+    }}),
+  varLab:'Ticket transfer:',
+  variants:[{label:'Off \u2014 the server runs on its own 50 tickets'},{label:'On \u2014 the client lends its 100 tickets'}],
+  key:[
+    '<b>The problem:</b> a client that is blocked waiting for a server is not using its tickets, while the work it is waiting for is being done by a job with almost none.',
+    '<b>Ticket transfer:</b> the client temporarily hands its tickets to the server, so the server is scheduled at the client\u2019s priority while it works on the client\u2019s behalf.',
+    'The tickets go back when the reply is sent, so a busy server does not permanently accumulate other people\u2019s share.',
+    'Compare when the reply arrives in the two versions. The work is identical; only who holds the tickets has changed.'
+  ],
+  side:'<p>Tickets are not attached to a job forever. Any job can pass some or all of them to another for a while.</p><p>This is the client-server case, but the same mechanism covers any situation where one job is stuck waiting on another.</p>'
+},
+{
+  n:'4', tab:'Ticket inflation',
+  blurb:'Among jobs that trust each other, a job that suddenly needs more CPU can simply raise its own ticket count instead of asking anyone. A starts level with B and C, inflates during a burst of work, then deflates back.',
+  cfg:(v)=>({horizon:36,
+    inflate: v===1,
+    jobs:[
+      {id:'A', tickets:100, total:999},
+      {id:'B', tickets:100, total:999},
+      {id:'C', tickets:100, total:999}],
+    before(t, J, ev, by){
+      if(!this.inflate) return;
+      const A=by('A');
+      if(t===12){ A.tickets=600; A.note='inflated'; ev.push({k:'inflate', n:600}); }
+      if(t===26){ A.tickets=100; A.note=''; ev.push({k:'deflate'}); }
+    }}),
+  varLab:'Ticket inflation:',
+  variants:[{label:'Off \u2014 everyone keeps 100'},{label:'On \u2014 A inflates during its burst'}],
+  key:[
+    'Inflation lets a job raise or lower its own ticket count without talking to the scheduler or to anyone else.',
+    'It only makes sense in a group of <b>mutually trusting</b> processes. Any greedy job could otherwise grab the whole machine by printing tickets.',
+    'The useful case is a job that knows it needs more CPU for a while \u2014 it inflates for the burst and deflates afterwards, and no message passing is needed to rebalance.',
+    'Between competing users, this is exactly what currencies prevent: a user can inflate inside their own currency all they like without changing anyone else\u2019s share.'
+  ],
+  side:'<p>Watch the ticket line stretch when A inflates: A\u2019s segment grows and everyone else\u2019s slice of the same line shrinks, even though B and C still hold 100 tickets each.</p><p>Their ticket counts did not change. Their share of the total did.</p>'
+},
+{
+  n:'5', tab:'How fair is it?',
+  blurb:'Two jobs, same tickets, same amount of work. If the lottery were perfectly fair they would finish at the same moment. They do not, because the draws are random \u2014 and the shorter the jobs, the worse it gets.',
+  cfg:(v)=>({horizon: v===1 ? 100 : 20, fair:true, jobs:[
+    {id:'A', tickets:100, total: v===1 ? 50 : 10},
+    {id:'B', tickets:100, total: v===1 ? 50 : 10}]}),
+  varLab:'Job length:',
+  variants:[{label:'Two 100 ms jobs'},{label:'Two 500 ms jobs'}],
+  key:[
+    'Unfairness F is the first job\u2019s completion time divided by the second\u2019s. F = 1 means they finished together.',
+    'With two very short jobs, one can easily win most of the draws, finish far ahead, and leave F near 0.5.',
+    'As the jobs get longer the run averages out and F climbs towards 1. Randomness gets fair only in the long run.',
+    'This is the real cost of lottery scheduling: it is beautifully simple, but on short jobs the shares it delivers can be nowhere near the shares you asked for.',
+    'Stride scheduling, later in the same chapter, fixes exactly this by making the choice deterministic.'
+  ],
+  side:'<p>The chart is the experiment from the chapter: for each job length, run the lottery many times and average F over the trials.</p><p>Press <b>New draws</b> to re-run the example above with different random numbers and watch F jump around.</p>'
+}
+];
+
+/* ============ DOM ============ */
+const $ = id => document.getElementById(id);
+const tabsEl=$('tabs'), blurbEl=$('blurb'), segEl=$('seg'), varsEl=$('variants');
+const chartRows=$('chartRows'), tally=$('tally'), tlbar=$('tlbar'), needle=$('needle');
+const exTitle=$('exTitle'), exBody=$('exBody'), stepNo=$('stepNo'), pbar=$('pbar'), keyList=$('keyList');
+
+let sc=SC[0], vi=0, cfg=null, frames=[], idx=0, player=null, seed=20250912;
+
+SC.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.className='tab'; b.type='button'; b.setAttribute('role','tab');
+  b.innerHTML='<span class="n">'+s.n+'</span>'+s.tab;
+  b.addEventListener('click',()=>loadScenario(i));
+  tabsEl.appendChild(b);
+});
+
+function loadScenario(i, keepVariant){
+  stop();
+  sc=SC[i];
+  if(!keepVariant) vi=0;
+  [...tabsEl.children].forEach((t,j)=>t.setAttribute('aria-selected', j===i?'true':'false'));
+  blurbEl.innerHTML = sc.blurb;
+
+  varsEl.hidden = !sc.variants;
+  if(sc.variants){
+    $('varLab').textContent = sc.varLab;
+    segEl.innerHTML='';
+    sc.variants.forEach((v,k)=>{
+      const b=document.createElement('button');
+      b.type='button'; b.textContent=v.label;
+      b.setAttribute('aria-pressed', k===vi?'true':'false');
+      b.addEventListener('click',()=>{ vi=k; loadScenario(i,true); });
+      segEl.appendChild(b);
+    });
+  }
+
+  cfg = sc.cfg(vi);
+  frames = simulate(cfg, seed);
+  keyList.innerHTML = sc.key.map(t=>'<li>'+t+'</li>').join('');
+  $('sideBody').innerHTML = sc.side;
+
+  $('curBox').hidden = !sc.currency;
+  if(sc.currency) drawCurrency();
+
+  $('codeBox').hidden = !sc.code;
+  $('fairBox').hidden = !cfg.fair;
+  if(cfg.fair) drawFairChart();
+
+  buildChart();
+  go(0, true);
+}
+
+function drawCurrency(){
+  $('cur').innerHTML = sc.currency.map(u=>{
+    const tot = u.jobs.reduce((s,j)=>s+j[1],0);
+    return '<div class="u"><div class="uh">'+u.user+'<span>'+u.global+' global tickets</span></div>'
+      + u.jobs.map(j=>{
+          const g = Math.round(j[1]/tot*u.global);
+          return '<div class="row"><span><b>'+j[0]+'</b> &middot; '+j[1]+' '+u.cur+'</span>'
+               + '<span class="arrowto">&#8594; '+g+' tickets</span></div>';
+        }).join('')
+      + '</div>';
+  }).join('');
+}
+
+/* ---------- chart ---------- */
+function buildChart(){
+  const H = cfg.horizon;
+  const narrow = window.innerWidth < 760;
+  const cols = narrow ? '54px repeat('+H+',15px)' : '62px repeat('+H+',minmax(9px,1fr))';
+  const wide = narrow ? 'max-content' : 'auto';
+  chartRows.innerHTML='';
+
+  const r=document.createElement('div');
+  r.className='crow'; r.style.gridTemplateColumns=cols; r.style.width=wide;
+  r.innerHTML='<div class="clab">winner</div>';
+  for(let t=0;t<H;t++){
+    const c=document.createElement('div');
+    c.className='cell'; c.dataset.t=t;
+    c.addEventListener('click',()=>{ stop(); go(t+1); });
+    r.appendChild(c);
+  }
+  chartRows.appendChild(r);
+
+  const ax=document.createElement('div');
+  ax.className='crow'; ax.style.gridTemplateColumns=cols; ax.style.width=wide;
+  ax.innerHTML='<div class="clab"></div>';
+  for(let t=0;t<H;t++){
+    const d=document.createElement('div'); d.className='axis';
+    if(t%5===0) d.textContent = t*10;
+    ax.appendChild(d);
+  }
+  chartRows.appendChild(ax);
+}
+
+/* ---------- the code panel ---------- */
+const CODE = [
+  ['cm',"// counter: used to track if we've found the winner yet"],
+  ['','int counter = 0;'],
+  ['',''],
+  ['cm','// winner: use some call to a random number generator to'],
+  ['cm','//         get a value, between 0 and the total # of tickets'],
+  ['','int winner = getrandom(0, totaltickets);'],
+  ['',''],
+  ['cm','// current: use this to walk through the list of jobs'],
+  ['','node_t *current = head;'],
+  ['',''],
+  ['cm','// loop until the sum of ticket values is > the winner'],
+  ['','while (current) {'],
+  ['','    counter = counter + current->tickets;'],
+  ['','    if (counter > winner)'],
+  ['','        break; // found the winner'],
+  ['','    current = current->next;'],
+  ['','}'],
+  ['cm',"// 'current' is the winner: schedule it..."]
+];
+const KW = /\b(int|while|if|break|NULL|node_t)\b/g;
+const CMT = /(\/\/.*)$/;
+
+function drawCode(fr){
+  const hitLines = fr ? [12,13,14] : [];
+  $('code').innerHTML = CODE.map((l,i)=>{
+    let txt = l[1].replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    txt = l[0]==='cm' ? '<span class="cm">'+txt+'</span>'
+                      : txt.replace(KW,'<span class="kw">$1</span>')
+                           .replace(CMT,'<span class="cm">$1</span>');
+    const cls = 'l' + (hitLines.indexOf(i)>=0 ? ' walk':'') + (fr && i===14 ? ' hit':'');
+    return '<div class="'+cls+'"><span class="ln">'+(i+1)+'</span><span>'+txt+'</span></div>';
+  }).join('');
+
+  const ranges = fr ? fr.ranges : startRanges();
+  const stopAt = fr ? ranges.findIndex(r=>r.id===fr.win) : -1;
+  $('nodes').innerHTML = 'head &#8594; ' + ranges.map((r,i)=>{
+    const cls = 'node' + (stopAt<0 || i<=stopAt ? ' seen':'') + (i===stopAt ? ' hit':'');
+    return '<span class="'+cls+'"><b style="background:var(--c'+r.c+')">'+r.id+'</b><span>'+r.n+'</span></span>';
+  }).join('<span class="arr">&#8594;</span>') + '<span class="arr">&#8594; NULL</span>';
+
+  if(!fr){
+    $('trace').innerHTML = '<li class="no">Take a step to see a draw walked through the list.</li>';
+    return;
+  }
+  let seen=0, out=[];
+  for(let i=0;i<ranges.length;i++){
+    const r=ranges[i]; seen += r.n;
+    const win = seen > fr.draw;
+    out.push('<li'+(win?' class="win"':'')+'>current = '+r.id+': counter = '+(seen-r.n)+' + '+r.n+' = '+seen+', '
+      + seen+' &gt; '+fr.draw+'? <span class="'+(win?'yes':'no')+'">'+(win?'yes &#8594; break, '+r.id+' wins':'no &#8594; current = current-&gt;next')+'</span></li>');
+    if(win) break;
+  }
+  $('trace').innerHTML = '<li>totaltickets = '+fr.total+', winner = '+fr.draw+', counter = 0</li>' + out.join('');
+}
+
+/* ---------- fairness chart ---------- */
+function drawFairChart(){
+  const xs=[]; for(let r=1;r<=10;r++) xs.push(r);
+  [12,15,20,25,30,40,50,65,80,100].forEach(r=>xs.push(r));
+  const pts = xs.map(r=>({r, f: unfairness(r, 120, 991+r)}));
+  const W=560,H=230,L=52,B=40,T=14,R=14;
+  const px = r => L + (Math.log(r)/Math.log(100))*(W-L-R);
+  const py = f => T + (1-(f-0.4)/0.65)*(H-T-B);
+  let g='';
+  [0.5,0.6,0.7,0.8,0.9,1.0].forEach(f=>{
+    g+='<line x1="'+L+'" y1="'+py(f).toFixed(1)+'" x2="'+(W-R)+'" y2="'+py(f).toFixed(1)+'" stroke="#dae2e8" stroke-width="1"/>'
+     + '<text x="'+(L-8)+'" y="'+(py(f)+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="#4d596b" font-family="ui-monospace,Menlo,monospace">'+f.toFixed(1)+'</text>';
+  });
+  [1,2,5,10,20,50,100].forEach(r=>{
+    g+='<text x="'+px(r).toFixed(1)+'" y="'+(H-B+16)+'" text-anchor="middle" font-size="10" fill="#4d596b" font-family="ui-monospace,Menlo,monospace">'+(r*10)+'</text>';
+  });
+  g+='<polyline fill="none" stroke="#5f3dc4" stroke-width="2" points="'
+    + pts.map(p=>px(p.r).toFixed(1)+','+py(p.f).toFixed(1)).join(' ')+'"/>';
+  pts.forEach(p=>{ g+='<circle cx="'+px(p.r).toFixed(1)+'" cy="'+py(p.f).toFixed(1)+'" r="3" fill="#5f3dc4" stroke="#172033" stroke-width="1"/>'; });
+  g+='<line x1="'+L+'" y1="'+py(1).toFixed(1)+'" x2="'+(W-R)+'" y2="'+py(1).toFixed(1)+'" stroke="#c92a2a" stroke-width="1.5" stroke-dasharray="4 3"/>';
+  g+='<text x="'+(W-R)+'" y="'+(py(1)-6).toFixed(1)+'" text-anchor="end" font-size="10" fill="#c92a2a">perfectly fair</text>';
+  g+='<line x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'" stroke="#172033" stroke-width="1.5"/>';
+  g+='<line x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'" stroke="#172033" stroke-width="1.5"/>';
+  g+='<text x="'+((W+L)/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="11" fill="#4d596b">job length (ms, log scale)</text>';
+  g+='<text transform="translate(14,'+((H-B+T)/2)+') rotate(-90)" text-anchor="middle" font-size="11" fill="#4d596b">average unfairness F</text>';
+  $('fairChart').innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Average unfairness against job length">'+g+'</svg>';
+}
+
+/* ---------- narration ---------- */
+function narrate(fr){
+  const ev = fr.ev, out=[];
+  ev.forEach(e=>{
+    if(e.k==='request') out.push('C sends its request to the server and blocks; it holds tickets but has nothing to run.');
+    if(e.k==='lend') out.push('C lends all '+e.n+' of its tickets to S for as long as the request takes, so S now holds 150 against D and E\u2019s 100 each.');
+    if(e.k==='return') out.push('The reply is sent, so S gives the borrowed tickets back and goes idle.');
+    if(e.k==='reply') out.push('The reply reaches C at '+(e.t*10+10)+' ms, and C can run again.');
+    if(e.k==='inflate') out.push('A inflates its own tickets to '+e.n+'. Nobody else changed, but A\u2019s share of the line is now most of it.');
+    if(e.k==='deflate') out.push('A\u2019s burst is over, so it deflates back to 100 and the three jobs are level again.');
+    if(e.k==='done') out.push('That was '+e.j+'\u2019s last slice: it finishes at '+(e.t*10+10)+' ms.');
+  });
+  let title, body;
+  if(fr.win){
+    const r = fr.ranges.find(x=>x.id===fr.win);
+    title = 'Ticket '+fr.draw+' wins \u2014 '+fr.win+' runs';
+    body = fr.win+' holds tickets '+r.lo+' to '+r.hi+' of the '+fr.total+' in play, so the draw lands on it.';
+    if(out.length) body += ' ' + out.join(' ');
+  } else {
+    title = 'No draw';
+    body = out.length ? out.join(' ') : 'No job is runnable, so there is nothing to draw for.';
+  }
+  return {title, body};
+}
+
+/* ---------- render ---------- */
+function go(i, instant){
+  idx = Math.max(0, Math.min(frames.length, i));
+  if(instant) document.body.classList.add('instant');
+  const fr = idx>0 ? frames[idx-1] : null;
+  const view = fr || {ranges:startRanges(), total:startTotal(), draw:null, snap:{jobs:startJobs()}};
+
+  // ticket line
+  const tot = view.total || 1;
+  tlbar.innerHTML = view.ranges.length
+    ? view.ranges.map(r=>'<i class="" style="flex:0 0 '+(r.n/tot*100)+'%;background:var(--c'+r.c+')">'+(r.n/tot>0.10?r.id:'')+'</i>').join('')
+    : '<i class="out" style="flex:1 1 100%">nothing runnable</i>';
+  $('tlmax').textContent = view.total;
+  if(fr && fr.draw!==null){
+    needle.style.left = ((fr.draw+0.5)/tot*100)+'%';
+    needle.hidden = false;
+    const r = fr.ranges.find(x=>x.id===fr.win);
+    $('drawLine').innerHTML = 'draw: <b>'+fr.draw+'</b> of 0\u2013'+(fr.total-1)+' &nbsp;&#8594;&nbsp; <b>'+fr.win+'</b> ('+r.lo+'\u2013'+r.hi+')';
+  } else {
+    needle.hidden = true;
+    $('drawLine').innerHTML = '&nbsp;';
+  }
+
+  // tally
+  const done = idx;
+  tally.innerHTML = view.snap.jobs.map(j=>{
+    const share = view.ranges.length ? (view.ranges.find(r=>r.id===j.id)?.n || 0)/tot : 0;
+    const got = done ? j.wins/done : 0;
+    const state = j.done ? ' class="gone"' : '';
+    const extra = j.blocked ? ' blocked' : (j.note ? ' '+j.note : '');
+    return '<tr'+state+'><td><span class="dotc" style="background:var(--c'+j.c+')"></span>'+j.id+extra+'</td>'
+      + '<td>'+j.tickets+'</td>'
+      + '<td><span class="sb want"><i style="width:'+(share*100).toFixed(0)+'%;background:var(--c'+j.c+')"></i></span>'+(share*100).toFixed(0)+'%</td>'
+      + '<td><span class="sb"><i style="width:'+(got*100).toFixed(0)+'%;background:var(--c'+j.c+')"></i></span>'+(got*100).toFixed(0)+'%</td></tr>';
+  }).join('');
+
+  // chart
+  [...chartRows.querySelectorAll('.cell')].forEach(c=>{
+    const t=+c.dataset.t, f=frames[t];
+    let cls='cell';
+    if(f && f.win) cls += ' c'+f.winC;
+    if(t > idx-1) cls += ' future';
+    if(t === idx-1) cls += (f && f.win) ? ' now' : ' nowcol';
+    c.className = cls;
+    c.textContent = f && f.win ? f.win : '';
+  });
+
+  if(sc.code) drawCode(fr);
+
+  // fairness readout
+  if(cfg.fair){
+    const fin = {};
+    frames.forEach(f=>f.ev.forEach(e=>{ if(e.k==='done') fin[e.j]=e.t*10+10; }));
+    const ts = Object.values(fin).sort((a,b)=>a-b);
+    if(ts.length===2){
+      const F = ts[0]/ts[1];
+      $('fNow').innerHTML = F.toFixed(2)+' <span>F for the run above</span>';
+      $('fText').textContent = 'The first job finished at '+ts[0]+' ms and the second at '+ts[1]+' ms.'
+        + (F>0.9 ? ' Close to fair, this time.' : ' A long way from 1 \u2014 one job got far more of the draws than its share.');
+    } else {
+      $('fNow').innerHTML = '&mdash; <span>F for the run above</span>';
+      $('fText').textContent = 'Both jobs have to finish before F can be worked out.';
+    }
+  }
+
+  // explanation
+  if(fr){
+    const n = narrate(fr);
+    stepNo.textContent = 't = '+(fr.t*10)+' ms \u2014 draw '+idx+' of '+frames.length;
+    exTitle.textContent = n.title;
+    exBody.textContent = n.body;
+  } else {
+    stepNo.textContent = 'Before the first draw';
+    exTitle.textContent = sc.tab;
+    exBody.textContent = 'Press Play, or step one draw at a time. You can also click any square in the chart to jump there.';
+  }
+  pbar.style.width = (idx/frames.length*100)+'%';
+  $('btnBack').disabled = idx===0;
+  $('btnNext').disabled = idx===frames.length;
+  if(idx===frames.length) stop();
+  if(instant) requestAnimationFrame(()=>document.body.classList.remove('instant'));
+}
+
+function startJobs(){ return cfg.jobs.map((j,i)=>({id:j.id, c:i, tickets:j.tickets, rem:j.total, wins:0, done:false, blocked:false, note:''})); }
+function startRanges(){
+  let acc=0;
+  return cfg.jobs.map((j,i)=>{ const r={id:j.id,c:i,lo:acc,hi:acc+j.tickets-1,n:j.tickets}; acc+=j.tickets; return r; });
+}
+function startTotal(){ return cfg.jobs.reduce((s,j)=>s+j.tickets,0); }
+
+/* ---------- playback ---------- */
+function stop(){ if(player){ clearInterval(player); player=null; } $('btnPlay').innerHTML='&#9654; Play'; }
+function play(){
+  if(player){ stop(); return; }
+  if(idx===frames.length) go(0,true);
+  $('btnPlay').innerHTML='&#10073;&#10073; Pause';
+  player=setInterval(()=>{ if(idx>=frames.length){ stop(); return; } go(idx+1); }, +$('speed').value);
+}
+$('btnPlay').addEventListener('click',play);
+$('btnNext').addEventListener('click',()=>{ stop(); go(idx+1); });
+$('btnBack').addEventListener('click',()=>{ stop(); go(idx-1); });
+$('btnReset').addEventListener('click',()=>{ stop(); go(0,true); });
+$('btnSeed').addEventListener('click',()=>{
+  seed = (Math.random()*1e9)|0;
+  loadScenario(SC.indexOf(sc), true);
+});
+$('speed').addEventListener('change',()=>{ if(player){ stop(); play(); } });
+document.addEventListener('keydown',e=>{
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){ stop(); go(idx+1); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ stop(); go(idx-1); e.preventDefault(); }
+  else if(e.key===' '){ play(); e.preventDefault(); }
+  else if(['1','2','3','4','5'].indexOf(e.key)>=0){ loadScenario(+e.key-1); e.preventDefault(); }
+});
+
+loadScenario(0);
+</script>
+</body>
+</html>
