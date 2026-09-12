@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The multi-level feedback queue</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#c5cfd8;
+  --bad:#c92a2a;
+  --mark:#ffd43b;
+  --A:#e98b00; --A-tint:#fdebc8;
+  --B:#0b7285; --B-tint:#cfe9ee;
+  --C:#5f3dc4; --C-tint:#e5ddfa;
+  --G:#c2255c; --G-tint:#f8d6e2;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important;animation:none !important}
+.page{max-width:1240px;margin:0 auto;padding:32px 28px 48px}
+
+/* ---------- Header ---------- */
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:68ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer}
+button:hover:not(:disabled){background:#fff;box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible,.tab:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+select{padding:5px 6px}
+.play{min-width:104px;font-weight:700}
+
+/* ---------- Tabs ---------- */
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin:0 0 6px;border-bottom:3px solid var(--ink)}
+.tab{border:2px solid var(--ink);border-bottom:none;border-radius:8px 8px 0 0;background:#dde4ea;padding:9px 15px;margin-right:6px;margin-bottom:-3px;font-weight:600;font-size:.95rem;box-shadow:none}
+.tab:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.tab[aria-selected="true"]{background:var(--panel);border-bottom:3px solid var(--panel);font-weight:800}
+.tab .n{font-family:var(--mono);font-size:.8rem;color:var(--ink-soft);display:block;font-weight:600}
+.tab[aria-selected="true"] .n{color:var(--C)}
+.scen-blurb{margin:14px 0 14px;padding:12px 16px;border-left:5px solid var(--ink);background:rgba(248,250,251,.72);max-width:92ch}
+.scen-blurb p{margin:0}
+
+/* ---------- Variant switch ---------- */
+.variants{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px}
+.variants .lab{font-size:.88rem;color:var(--ink-soft)}
+.seg{display:flex;border:2px solid var(--ink);border-radius:7px;overflow:hidden;background:#fff}
+.seg button{border:none;border-radius:0;border-right:2px solid var(--ink);background:#dde4ea;font-size:.9rem;font-weight:600;padding:6px 14px}
+.seg button:last-child{border-right:none}
+.seg button:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.seg button[aria-pressed="true"]{background:var(--mark);font-weight:800}
+
+/* ---------- Layout ---------- */
+.main{display:grid;grid-template-columns:minmax(0,330px) minmax(0,1fr);gap:22px;align-items:start}
+.main>*{min-width:0}
+.card{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px}
+.mini{border:2px solid var(--ink);border-radius:8px;background:var(--panel);padding:12px 14px}
+.machine{display:flex;flex-direction:column;gap:14px}
+.mini h3{margin:0 0 9px;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+
+/* ---------- Ready queues ---------- */
+.qrow{display:grid;grid-template-columns:92px minmax(0,1fr);gap:9px;align-items:center;margin-bottom:7px}
+.qrow:last-child{margin-bottom:0}
+.qlab{font-family:var(--mono);font-size:.76rem;line-height:1.2;white-space:nowrap}
+.qlab b{display:block;font-size:.92rem}
+.qbox{display:flex;gap:5px;align-items:center;min-height:30px;border:1.5px solid var(--line);border-radius:5px;background:#fff;padding:3px 5px;overflow:hidden}
+.qbox.top{border:2px solid var(--ink)}
+.chip{font-family:var(--mono);font-size:.82rem;font-weight:700;color:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:1px 8px;flex:none}
+.chip.j-A{background:var(--A)} .chip.j-B{background:var(--B)}
+.chip.j-C{background:var(--C)} .chip.j-G{background:var(--G)}
+.chip.run{box-shadow:0 0 0 3px var(--mark),0 0 0 4.5px var(--ink)}
+.qbox .none{font-size:.76rem;color:var(--ink-soft);font-style:italic}
+.qarrow{text-align:center;font-size:.7rem;color:var(--ink-soft);margin:-2px 0 3px 101px}
+
+/* ---------- Job table ---------- */
+.jt{width:100%;border-collapse:collapse;font-size:.84rem}
+.jt th{text-align:left;font-weight:600;color:var(--ink-soft);font-size:.76rem;padding:0 6px 4px 0}
+.jt td{padding:3px 6px 3px 0;border-top:1px solid var(--line);font-family:var(--mono);font-size:.8rem}
+.jt td:first-child{font-weight:700}
+.jt .st{font-family:var(--sans);font-size:.78rem}
+.jt tr.gone td{opacity:.45}
+.dotc{display:inline-block;width:9px;height:9px;border:1.5px solid var(--ink);border-radius:2px;margin-right:5px;vertical-align:baseline}
+
+/* ---------- Chart ---------- */
+.chart{border:2px solid var(--ink);border-radius:8px;background:#fff;padding:12px 14px 10px;overflow-x:auto}
+.crow{display:grid;align-items:stretch;margin-bottom:3px}
+.clab{font-family:var(--mono);font-size:.78rem;color:var(--ink-soft);padding-right:8px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap}
+.cell{border:1px solid var(--line);border-right:none;height:26px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.72rem;font-weight:700;color:#fff}
+.crow .cell:last-child{border-right:1px solid var(--line)}
+.cell.future{opacity:.3}
+.cell.j-A{background:var(--A);border-color:var(--ink)}
+.cell.j-B{background:var(--B);border-color:var(--ink)}
+.cell.j-C{background:var(--C);border-color:var(--ink)}
+.cell.j-G{background:var(--G);border-color:var(--ink)}
+.cell.now{outline:2.5px solid var(--ink);outline-offset:-1px;z-index:2}
+.cell.nowcol{background:#fff6d6}
+.cell.nowcol.j-A,.cell.nowcol.j-B,.cell.nowcol.j-C,.cell.nowcol.j-G{background-blend-mode:normal}
+.cell.boost{border-left:2px dashed var(--bad)}
+.axis{font-family:var(--mono);font-size:.68rem;color:var(--ink-soft);text-align:center;padding-top:3px}
+.strip{margin-top:9px;padding-top:8px;border-top:1px solid var(--line)}
+.srow{display:grid;align-items:stretch;margin-bottom:2px}
+.scell{height:15px;border-right:1px solid rgba(255,255,255,.55)}
+.scell.wait{background:#cbd5de}
+.scell.io{background:repeating-linear-gradient(45deg,#fff,#fff 3px,#b6c2cd 3px,#b6c2cd 6px);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.scell.run.j-A{background:var(--A)} .scell.run.j-B{background:var(--B)}
+.scell.run.j-C{background:var(--C)} .scell.run.j-G{background:var(--G)}
+.scell.future{opacity:.3}
+.chart-note{margin:8px 0 0;font-size:.8rem;color:var(--ink-soft)}
+
+/* ---------- Explain ---------- */
+.explain{margin:0 0 16px;min-height:176px;display:flex;flex-direction:column}
+.explain h3{margin:0 0 6px;font-size:1.15rem;font-weight:700}
+.explain p{margin:0 0 8px;max-width:78ch}
+.explain p:last-of-type{margin-bottom:0}
+.stepno{font-family:var(--mono);font-size:.82rem;color:var(--ink-soft)}
+.pbar{height:8px;border:2px solid var(--ink);border-radius:4px;background:#fff;overflow:hidden;margin-top:auto}
+.pbar i{display:block;height:100%;background:var(--ink);transition:width .25s}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+
+/* ---------- Lower ---------- */
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:22px;margin-top:22px;align-items:start}
+.key{border-left:5px solid var(--C)}
+.key h2{font-size:1.1rem}
+.key ul{margin:8px 0 0;padding-left:20px}
+.key li{margin-bottom:6px;max-width:70ch}
+.key li:last-child{margin-bottom:0}
+.rules{font-size:.88rem}
+.rules ol{margin:8px 0 0;padding-left:20px}
+.rules li{margin-bottom:7px}
+.rules li:last-child{margin-bottom:0}
+.rules li.off{opacity:.45}
+.rules li.changed{background:var(--mark);border-radius:4px;padding:2px 5px;margin-left:-5px}
+code.k{font-family:var(--mono);font-size:.86em;background:#e3e9ee;border-radius:3px;padding:0 4px}
+footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:.88rem;color:var(--ink-soft)}
+footer a{color:var(--ink);text-underline-offset:3px}
+
+@media (max-width: 1060px){
+  .main,.lower{grid-template-columns:1fr}
+}
+@media (max-width: 760px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.8rem}
+  .top{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .chart{padding:10px 8px}
+  .clab{font-size:.7rem;padding-right:4px}
+  .tabs{border-bottom:none;gap:6px}
+  .tab{border-radius:7px;border-bottom:2px solid var(--ink);margin:0 0 2px;padding:7px 12px}
+  .tab[aria-selected="true"]{background:var(--mark);border-bottom:2px solid var(--ink)}
+  .tab .n{display:inline;margin-right:6px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>The multi-level feedback queue</h1>
+      <p class="intro">MLFQ learns what a job is like by watching it run, then schedules it accordingly, following the Scheduling: The Multi-Level Feedback Queue chapter of OSTEP (Chapter 8). Each column below is 10&nbsp;ms. Step through a run and watch jobs move between the ready queues.</p>
+    </div>
+    <div class="controls">
+      <button id="btnBack" title="Previous tick">&#9664; Back</button>
+      <button id="btnPlay" class="play">&#9654; Play</button>
+      <button id="btnNext" title="Next tick">Next &#9654;</button>
+      <button id="btnReset">Restart</button>
+      <select id="speed" aria-label="Animation speed">
+        <option value="1400">Slow</option>
+        <option value="800" selected>Normal</option>
+        <option value="380">Fast</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="Scenario"></div>
+  <div class="scen-blurb"><p id="blurb"></p></div>
+  <div class="variants" id="variants" hidden>
+    <span class="lab" id="varLab"></span>
+    <div class="seg" id="seg"></div>
+  </div>
+
+  <div class="main">
+
+    <section class="machine" aria-label="Scheduler state">
+      <div class="mini">
+        <h3>Ready queues</h3>
+        <div id="queues"></div>
+        <p class="qarrow">lower priority, longer time slice &#8595;</p>
+      </div>
+      <div class="mini">
+        <h3>Jobs</h3>
+        <table class="jt">
+          <thead><tr><th>job</th><th>queue</th><th>CPU left</th><th>state</th></tr></thead>
+          <tbody id="jobTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-label="Run">
+      <div class="card explain">
+        <span class="stepno" id="stepNo"></span>
+        <h3 id="exTitle">&nbsp;</h3>
+        <p id="exBody"></p>
+        <div class="pbar"><i id="pbar" style="width:0%"></i></div>
+      </div>
+
+      <div class="chart">
+        <div id="chartRows"></div>
+        <div class="strip" id="strip"></div>
+        <p class="chart-note">Top: which queue is running, and which job. Bottom: one row per job &mdash; solid while it runs, grey while it waits in a queue, hatched while it is blocked on I/O.</p>
+      </div>
+      <p class="kbd-hint">Keys: <kbd>&#8594;</kbd> next, <kbd>&#8592;</kbd> back, <kbd>space</kbd> play or pause, <kbd>1</kbd>&ndash;<kbd>5</kbd> switch scenario.</p>
+    </section>
+  </div>
+
+  <div class="lower">
+    <section class="card key">
+      <h2>What to take away</h2>
+      <ul id="keyList"></ul>
+    </section>
+    <section class="card rules">
+      <h2>The rules of MLFQ</h2>
+      <ol id="ruleList"></ol>
+    </section>
+  </div>
+
+  <footer>
+    Based on <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/">Operating Systems: Three Easy Pieces</a> by Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau, Chapter 8.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   Simulator
+   ========================================================= */
+function simulate(cfg){
+  const S = cfg.slices, N = S.length;
+  const J = {};
+  cfg.jobs.forEach(j => J[j.id] = Object.assign({rem:j.total, lvl:null, q:0, allot:0,
+    done:false, blockUntil:-1, ran:0}, j));
+  const queues = Array.from({length:N}, ()=>[]);
+  const frames = [];
+
+  const lower = j => { const was=j.lvl; j.lvl=Math.min(j.lvl+1,N-1); j.q=0; j.allot=0; return was!==j.lvl; };
+  const isIo = j => j.kind==='io' || (j.kind==='switch' && (j.total-j.rem) >= j.change);
+  const wantsYield = (j,lvl) => {
+    if(j.kind==='game') return j.q >= Math.max(1, S[lvl]-1);
+    if(isIo(j)) return j.ran >= j.run;
+    return false;
+  };
+  const snapshot = t => ({
+    queues: queues.map(q=>q.slice()),
+    jobs: cfg.jobs.map(js=>{ const j=J[js.id];
+      return {id:j.id, rem:j.rem, lvl:j.lvl, q:j.q, allot:j.allot, done:j.done,
+              arrived: t>=j.arrival, blocked: j.blockUntil > t, io: isIo(j)}; })
+  });
+
+  for(let t=0; t<cfg.horizon; t++){
+    const ev = [];
+    cfg.jobs.forEach(js=>{ const j=J[js.id];
+      if(j.arrival===t){ j.lvl=0; j.q=0; j.allot=0; queues[0].push(j.id); ev.push({k:'arrive', j:j.id}); } });
+    cfg.jobs.forEach(js=>{ const j=J[js.id];
+      if(j.blockUntil===t && !j.done){ queues[j.lvl].push(j.id); j.blockUntil=-1; ev.push({k:'unblock', j:j.id, lvl:j.lvl}); } });
+
+    if(cfg.boost && t>0 && t % cfg.boost === 0){
+      const ready=[];
+      for(let l=0;l<N;l++){ ready.push(...queues[l]); queues[l]=[]; }
+      let moved=false;
+      cfg.jobs.forEach(js=>{ const j=J[js.id];
+        if(!j.done && j.lvl!==null){ if(j.lvl!==0) moved=true; j.lvl=0; j.q=0; j.allot=0; } });
+      queues[0]=ready;
+      if(ready.length || cfg.jobs.some(js=>J[js.id].blockUntil>t)) ev.push({k:'boost', moved});
+    }
+
+    let lvl=-1;
+    for(let l=0;l<N;l++) if(queues[l].length){ lvl=l; break; }
+    if(lvl<0){ frames.push({t, lvl:null, job:null, ev, snap:snapshot(t)}); continue; }
+
+    const j = J[queues[lvl][0]];
+    const fresh = j.q===0;
+    j.rem--; j.q++; j.allot++; j.ran++;
+    ev.push({k:'run', j:j.id, lvl, fresh});
+
+    if(j.rem===0){
+      j.done=true; queues[lvl].shift(); j.lvl=null;
+      ev.push({k:'done', j:j.id});
+    } else {
+      const y = wantsYield(j,lvl);
+      const sliceOver = j.q >= S[lvl];
+      const allotOver = j.allot >= S[lvl];
+      if(y){
+        queues[lvl].shift();
+        j.blockUntil = t+1+j.io; j.ran=0; j.q=0;
+        if(cfg.newRule){
+          if(allotOver && lower(j)) ev.push({k:'demote', j:j.id, to:j.lvl, why:'allot'});
+          ev.push({k:'block', j:j.id, lvl:j.lvl, newRule:true});
+        } else {
+          j.allot=0;
+          ev.push({k:'block', j:j.id, lvl:j.lvl, keep:true});
+        }
+      } else if(sliceOver){
+        queues[lvl].shift(); j.q=0;
+        if(!cfg.newRule || allotOver){
+          if(lower(j)) ev.push({k:'demote', j:j.id, to:j.lvl, why: cfg.newRule?'allot':'slice'});
+          else ev.push({k:'rr', j:j.id, lvl:j.lvl});
+        } else ev.push({k:'rr', j:j.id, lvl:j.lvl});
+        queues[j.lvl].push(j.id);
+      }
+    }
+    frames.push({t, lvl, job:j.id, ev, snap:snapshot(t)});
+  }
+  return frames;
+}
+
+/* =========================================================
+   Scenarios
+   ========================================================= */
+const SL = [2,4,8];                       // ticks of 10 ms, top queue first
+const QN = l => 'Q' + (SL.length-1-l);
+const MS = t => (t*10) + ' ms';
+
+const SC = [
+{
+  n:'1', tab:'The ready queues',
+  blurb:'MLFQ keeps a queue for each priority level. <b>Rule 1:</b> the job in the highest non-empty queue runs. <b>Rule 2:</b> jobs in the same queue take turns, round robin. Two long-running jobs here, so watch them sink from Q2 to Q0 and then share the bottom queue.',
+  cfg:{slices:SL, horizon:36, jobs:[
+    {id:'A',kind:'cpu',arrival:0,total:24},
+    {id:'B',kind:'cpu',arrival:10,total:10}]},
+  key:[
+    'There is one queue per priority level. A job\u2019s place in the queues, not a number the user picks, is its priority.',
+    'MLFQ never asks how long a job will run. It watches how the job behaves and adjusts.',
+    'A new job starts at the top, so it is assumed to be short until it proves otherwise (Rule 3).',
+    'Each time a job uses a full slice it drops one level, and the slice gets longer as it drops \u2014 so a long job is interrupted less often further down.',
+    'At the bottom queue there is nowhere left to fall, so the jobs there simply take turns.'
+  ]
+},
+{
+  n:'2', tab:'A long job and an interactive one',
+  blurb:'<b>Rule 3:</b> a job enters at the highest priority. <b>Rule 4:</b> use a whole time slice and you drop a level; give up the CPU before the slice is over and you stay. B here does a little work and then waits for I/O, over and over, so it keeps its high priority and gets the CPU quickly each time.',
+  cfg:{slices:SL, horizon:38, jobs:[
+    {id:'A',kind:'cpu',arrival:0,total:26},
+    {id:'B',kind:'io',arrival:10,total:8,run:1,io:1}]},
+  key:[
+    'An interactive job is one that runs briefly and then waits. Because it never uses a whole slice, it stays near the top and is scheduled quickly when it wakes up.',
+    'This is how MLFQ gets good response time without ever being told which jobs are interactive.',
+    'The long job is not ignored: it soaks up whatever the CPU is not spending on B, which is how MLFQ also gets decent turnaround time.',
+    'Nobody specified any of this. The scheduler worked it out from behaviour alone \u2014 that is the "feedback" in the name.'
+  ]
+},
+{
+  n:'3', tab:'Starvation',
+  blurb:'Two interactive jobs arrive and between them they keep the top queue busy. The long job A is stuck at the bottom and gets no CPU at all. <b>Rule 5</b> fixes it: every so often, move every job back to the top queue.',
+  cfg:{slices:SL, horizon:40, jobs:[
+    {id:'A',kind:'cpu',arrival:0,total:22},
+    {id:'B',kind:'io',arrival:6,total:10,run:1,io:1},
+    {id:'C',kind:'io',arrival:7,total:10,run:1,io:1}]},
+  varLab:'Rule 5, the priority boost:',
+  variants:[{label:'Off', cfg:{}}, {label:'Boost every 100 ms', cfg:{boost:10}}],
+  key:[
+    '<b>The problem:</b> with enough interactive jobs around, a long-running job at the bottom queue may never run again. It starves.',
+    '<b>Rule 5:</b> after some period S, move every job back to the topmost queue.',
+    'The boost guarantees progress \u2014 no job can be ignored forever \u2014 and it costs the interactive jobs very little, since they climb back to the top almost immediately anyway.',
+    'Choosing S is the awkward part. Too high and long jobs still starve; too low and interactive jobs lose their advantage. OSTEP calls this kind of constant "voo-doo": there is no principled way to pick it.'
+  ]
+},
+{
+  n:'4', tab:'Changing behaviour',
+  blurb:'A starts out CPU-bound and sinks to the bottom, then changes character and becomes interactive \u2014 while B, a long job, arrives and takes over the upper queues. Without a boost, A is judged on what it used to be. With a boost, the scheduler gets a fresh look at it.',
+  cfg:{slices:SL, horizon:40, jobs:[
+    {id:'A',kind:'switch',arrival:0,total:20,change:8,run:1,io:1},
+    {id:'B',kind:'cpu',arrival:12,total:18}]},
+  varLab:'Rule 5, the priority boost:',
+  variants:[{label:'Off', cfg:{}}, {label:'Boost every 100 ms', cfg:{boost:10}}],
+  key:[
+    '<b>The problem:</b> a program is not one thing forever. A compute phase can be followed by a phase of waiting for the user, and by then the job is sitting at the bottom queue with a long slice and a long wait.',
+    'Rules 1 to 4 only ever push priority down, so a job can never recover on its own.',
+    'The priority boost solves this case too: the job is put back at the top and is re-judged on what it does now rather than what it did earlier.',
+    'Watch where A finishes in each version. Same job, same work, very different response time.'
+  ]
+},
+{
+  n:'5', tab:'Gaming the scheduler',
+  blurb:'G knows the rules and abuses them: it runs almost a whole slice, then issues a pointless I/O just before the slice ends. Under the original Rule 4 that counts as giving up the CPU, so G keeps top priority forever. The fix is to stop resetting the count: measure the <b>total</b> time a job uses at a level.',
+  cfg:{slices:SL, horizon:36, jobs:[
+    {id:'A',kind:'cpu',arrival:0,total:20},
+    {id:'G',kind:'game',arrival:0,total:14,io:1}]},
+  varLab:'Rule 4:',
+  variants:[
+    {label:'Original: giving up the CPU keeps your level', cfg:{}},
+    {label:'Better: count the total allotment', cfg:{newRule:true}}],
+  key:[
+    '<b>The problem:</b> a job that yields just before its slice expires is treated as interactive, and gets close to a whole slice of CPU every time while never dropping a level.',
+    '<b>The fix:</b> give each level a time <i>allotment</i>, and count all the CPU time a job uses there, however many times it gives up the CPU in between. Once the allotment is gone, down it goes.',
+    'With better accounting, G is demoted at the same rate as an honest job that just runs, and gaming buys it nothing.',
+    'Notice that the honest interactive job in scenario 2 is unaffected: it uses far less than its allotment, so it still stays at the top.'
+  ]
+}
+];
+
+/* =========================================================
+   DOM
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const tabsEl=$('tabs'), blurbEl=$('blurb'), segEl=$('seg'), varsEl=$('variants');
+const chartRows=$('chartRows'), stripEl=$('strip'), queuesEl=$('queues'), jobTable=$('jobTable');
+const exTitle=$('exTitle'), exBody=$('exBody'), stepNo=$('stepNo'), pbar=$('pbar'), keyList=$('keyList');
+
+let sc=SC[0], vi=0, cfg=null, frames=[], idx=0, player=null;
+
+SC.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.className='tab'; b.type='button'; b.setAttribute('role','tab');
+  b.innerHTML='<span class="n">'+s.n+'</span>'+s.tab;
+  b.addEventListener('click',()=>loadScenario(i));
+  tabsEl.appendChild(b);
+});
+
+function loadScenario(i, keepVariant){
+  stop();
+  sc=SC[i];
+  if(!keepVariant) vi=0;
+  [...tabsEl.children].forEach((t,j)=>t.setAttribute('aria-selected', j===i?'true':'false'));
+  blurbEl.innerHTML = sc.blurb;
+
+  varsEl.hidden = !sc.variants;
+  if(sc.variants){
+    $('varLab').textContent = sc.varLab;
+    segEl.innerHTML='';
+    sc.variants.forEach((v,k)=>{
+      const b=document.createElement('button');
+      b.type='button'; b.textContent=v.label;
+      b.setAttribute('aria-pressed', k===vi?'true':'false');
+      b.addEventListener('click',()=>{ vi=k; loadScenario(i,true); });
+      segEl.appendChild(b);
+    });
+  }
+
+  cfg = Object.assign({}, sc.cfg, sc.variants ? sc.variants[vi].cfg : {});
+  frames = simulate(cfg);
+  keyList.innerHTML = sc.key.map(t=>'<li>'+t+'</li>').join('');
+  buildChart();
+  buildRules();
+  go(0, true);
+}
+
+/* ---------- chart skeleton ---------- */
+function buildChart(){
+  const H = cfg.horizon, N = cfg.slices.length;
+  const narrow = window.innerWidth < 760;
+  const cols = narrow ? '54px repeat('+H+',15px)' : '68px repeat('+H+',minmax(9px,1fr))';
+  const wide = narrow ? 'max-content' : 'auto';
+  chartRows.innerHTML='';
+  for(let l=0;l<N;l++){
+    const r=document.createElement('div');
+    r.className='crow'; r.style.gridTemplateColumns=cols; r.style.width=wide;
+    r.innerHTML='<div class="clab">'+QN(l)+' &middot; '+(cfg.slices[l]*10)+'ms</div>';
+    for(let t=0;t<H;t++){
+      const c=document.createElement('div');
+      c.className='cell'; c.dataset.t=t; c.dataset.l=l;
+      if(cfg.boost && t>0 && t%cfg.boost===0) c.classList.add('boost');
+      c.addEventListener('click',()=>{ stop(); go(t+1); });
+      r.appendChild(c);
+    }
+    chartRows.appendChild(r);
+  }
+  const ax=document.createElement('div');
+  ax.className='crow'; ax.style.gridTemplateColumns=cols; ax.style.width=wide;
+  ax.innerHTML='<div class="clab"></div>';
+  for(let t=0;t<H;t++){
+    const d=document.createElement('div');
+    d.className='axis';
+    if(t%5===0) d.textContent = t*10;
+    ax.appendChild(d);
+  }
+  chartRows.appendChild(ax);
+
+  stripEl.innerHTML='';
+  cfg.jobs.forEach(j=>{
+    const r=document.createElement('div');
+    r.className='srow'; r.style.gridTemplateColumns=cols; r.style.width=wide;
+    r.innerHTML='<div class="clab">job '+j.id+'</div>';
+    for(let t=0;t<H;t++){
+      const c=document.createElement('div');
+      c.className='scell'; c.dataset.t=t; c.dataset.j=j.id;
+      r.appendChild(c);
+    }
+    stripEl.appendChild(r);
+  });
+}
+
+function buildRules(){
+  const better = !!cfg.newRule, boosted = !!cfg.boost;
+  const R=[
+    'If A is at a higher priority than B, A runs.',
+    'If A and B are at the same priority, they run round robin, sharing the CPU.',
+    'A job entering the system is placed at the highest priority.',
+    better
+      ? 'Once a job uses up its time allotment at a level, its priority is reduced, however many times it gave up the CPU in between.'
+      : 'If a job uses up its time slice, its priority is reduced. If it gives up the CPU before the slice is over, it stays at the same level.',
+    'After some time period S, move every job in the system to the topmost queue.'
+  ];
+  $('ruleList').innerHTML = R.map((t,i)=>{
+    let cls='';
+    if(i===4 && !boosted) cls='off';
+    if(i===3 && better) cls='changed';
+    if(i===4 && boosted) cls='changed';
+    return '<li'+(cls?' class="'+cls+'"':'')+'>'+t+'</li>';
+  }).join('');
+}
+
+/* ---------- narration ---------- */
+function sentence(e, fr){
+  const q = l => QN(l);
+  switch(e.k){
+    case 'arrive': return 'Job '+e.j+' arrives and goes straight into Q'+(cfg.slices.length-1)+', the top queue (Rule 3).';
+    case 'unblock': return e.j+'\u2019s I/O finishes, so it rejoins '+q(e.lvl)+'.';
+    case 'boost': return e.moved
+        ? 'Priority boost: every job moves back to the top queue (Rule 5).'
+        : 'Priority boost, though everything is already at the top (Rule 5).';
+    case 'demote': return e.why==='allot'
+        ? e.j+' has now used its whole allotment at '+q(e.to-1)+', so it drops to '+q(e.to)+' \u2014 giving up the CPU no longer wipes the count.'
+        : e.j+' used a whole time slice, so its priority drops to '+q(e.to)+' (Rule 4).';
+    case 'rr': return e.j+' used a whole slice and goes to the back of '+q(e.lvl)+'. There is no lower queue, so the jobs here just take turns (Rule 2).';
+    case 'block': return e.keep
+        ? e.j+' gives up the CPU for I/O before its slice is over, so it keeps its place at '+q(e.lvl)+' (Rule 4).'
+        : e.j+' blocks for I/O, but the time it just used still counts against its allotment.';
+    case 'done': return e.j+' has no CPU time left and finishes.';
+  }
+  return '';
+}
+
+function narrate(fr){
+  const run = fr.ev.find(e=>e.k==='run');
+  const rest = fr.ev.filter(e=>e.k!=='run').map(e=>sentence(e,fr)).filter(Boolean);
+  let title, body;
+  if(run){
+    title = 'Job '+run.j+' runs at '+QN(run.lvl);
+    if(!rest.length){
+      const j = fr.snap.jobs.find(x=>x.id===run.j);
+      body = run.fresh
+        ? run.j+' is the first job in the highest queue that has anything in it, so it gets the CPU (Rule 1).'
+        : run.j+' is part way through its '+(cfg.slices[run.lvl]*10)+' ms slice at '+QN(run.lvl)+'.';
+    } else body = rest.join(' ');
+  } else {
+    title = 'The CPU is idle';
+    body = rest.length ? rest.join(' ') : 'Every job is either finished or waiting for I/O, so there is nothing to run.';
+  }
+  return {title, body};
+}
+
+/* ---------- render ---------- */
+function go(i, instant){
+  idx = Math.max(0, Math.min(frames.length, i));
+  if(instant) document.body.classList.add('instant');
+  const fr = idx>0 ? frames[idx-1] : null;
+  const snap = fr ? fr.snap : initialSnap();
+
+  // chart
+  [...chartRows.querySelectorAll('.cell')].forEach(c=>{
+    const t=+c.dataset.t, l=+c.dataset.l, f=frames[t];
+    const on = f && f.lvl===l;
+    c.className = 'cell'
+      + (cfg.boost && t>0 && t%cfg.boost===0 ? ' boost':'')
+      + (on ? ' j-'+f.job : '')
+      + (t > idx-1 ? ' future':'')
+      + (t === idx-1 ? (on ? ' now' : ' nowcol') : '');
+    c.textContent = on ? f.job : '';
+  });
+  [...stripEl.querySelectorAll('.scell')].forEach(c=>{
+    const t=+c.dataset.t, id=c.dataset.j, f=frames[t];
+    let cls='scell';
+    if(f){
+      const js = f.snap.jobs.find(x=>x.id===id);
+      if(f.job===id) cls+=' run j-'+id;
+      else if(js && js.blocked) cls+=' io';
+      else if(js && js.arrived && !js.done) cls+=' wait';
+    }
+    if(t > idx-1) cls+=' future';
+    c.className=cls;
+  });
+
+  // queues
+  const N=cfg.slices.length;
+  queuesEl.innerHTML = snap.queues.map((q,l)=>{
+    const chips = q.length
+      ? q.map((id,k)=>'<span class="chip j-'+id+(fr && fr.lvl===l && k===0 ? ' run':'')+'">'+id+'</span>').join('')
+      : '<span class="none">empty</span>';
+    return '<div class="qrow"><span class="qlab"><b>'+QN(l)+'</b>'+(cfg.slices[l]*10)+' ms slice</span>'
+      +'<span class="qbox'+(l===0?' top':'')+'">'+chips+'</span></div>';
+  }).join('');
+
+  // job table
+  jobTable.innerHTML = snap.jobs.map(j=>{
+    let state='waiting to arrive';
+    if(j.done) state='finished';
+    else if(!j.arrived) state='not yet arrived';
+    else if(j.blocked) state='blocked on I/O';
+    else if(fr && fr.job===j.id) state='running';
+    else state='ready';
+    return '<tr'+(j.done?' class="gone"':'')+'><td><span class="dotc" style="background:var(--'+j.id+')"></span>'+j.id+'</td>'
+      +'<td>'+(j.lvl===null?'\u2014':QN(j.lvl))+'</td><td>'+(j.rem*10)+' ms</td>'
+      +'<td class="st">'+state+'</td></tr>';
+  }).join('');
+
+  // explanation
+  if(fr){
+    const n = narrate(fr);
+    stepNo.textContent = 't = '+MS(fr.t)+' \u2014 tick '+(idx)+' of '+frames.length;
+    exTitle.textContent = n.title;
+    exBody.textContent = n.body;
+  }else{
+    stepNo.textContent = 'Before the first tick';
+    exTitle.textContent = sc.tab;
+    exBody.textContent = 'Press Play, or step one 10 ms tick at a time. You can also click any square in the chart to jump there.';
+  }
+  pbar.style.width = (idx/frames.length*100)+'%';
+  $('btnBack').disabled = idx===0;
+  $('btnNext').disabled = idx===frames.length;
+  if(idx===frames.length) stop();
+  if(instant) requestAnimationFrame(()=>document.body.classList.remove('instant'));
+}
+
+function initialSnap(){
+  return {
+    queues: cfg.slices.map(()=>[]),
+    jobs: cfg.jobs.map(j=>({id:j.id, rem:j.total, lvl:null, done:false, arrived:j.arrival===0 ? false:false, blocked:false}))
+  };
+}
+
+/* ---------- playback ---------- */
+function stop(){ if(player){ clearInterval(player); player=null; } $('btnPlay').innerHTML='&#9654; Play'; }
+function play(){
+  if(player){ stop(); return; }
+  if(idx===frames.length) go(0,true);
+  $('btnPlay').innerHTML='&#10073;&#10073; Pause';
+  player=setInterval(()=>{ if(idx>=frames.length){ stop(); return; } go(idx+1); }, +$('speed').value);
+}
+$('btnPlay').addEventListener('click',play);
+$('btnNext').addEventListener('click',()=>{ stop(); go(idx+1); });
+$('btnBack').addEventListener('click',()=>{ stop(); go(idx-1); });
+$('btnReset').addEventListener('click',()=>{ stop(); go(0,true); });
+$('speed').addEventListener('change',()=>{ if(player){ stop(); play(); } });
+document.addEventListener('keydown',e=>{
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){ stop(); go(idx+1); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ stop(); go(idx-1); e.preventDefault(); }
+  else if(e.key===' '){ play(); e.preventDefault(); }
+  else if(['1','2','3','4','5'].indexOf(e.key)>=0){ loadScenario(+e.key-1); e.preventDefault(); }
+});
+
+loadScenario(0);
+</script>
+</body>
+</html>
