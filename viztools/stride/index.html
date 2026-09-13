@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stride scheduling</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#c5cfd8;
+  --bad:#c92a2a;
+  --mark:#ffd43b;
+  --c0:#c2255c; --c1:#5c940d; --c2:#1971c2; --c3:#e98b00; --c4:#5f3dc4;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important;animation:none !important}
+.page{max-width:1240px;margin:0 auto;padding:32px 28px 48px}
+
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:68ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer}
+button:hover:not(:disabled){background:#fff;box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible,.tab:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+select{padding:5px 6px}
+.play{min-width:104px;font-weight:700}
+
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin:0 0 6px;border-bottom:3px solid var(--ink)}
+.tab{border:2px solid var(--ink);border-bottom:none;border-radius:8px 8px 0 0;background:#dde4ea;padding:9px 15px;margin-right:6px;margin-bottom:-3px;font-weight:600;font-size:.95rem;box-shadow:none}
+.tab:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.tab[aria-selected="true"]{background:var(--panel);border-bottom:3px solid var(--panel);font-weight:800}
+.tab .n{font-family:var(--mono);font-size:.8rem;color:var(--ink-soft);display:block;font-weight:600}
+.tab[aria-selected="true"] .n{color:var(--c2)}
+.scen-blurb{margin:14px 0 14px;padding:12px 16px;border-left:5px solid var(--ink);background:rgba(248,250,251,.72);max-width:92ch}
+.scen-blurb p{margin:0}
+
+.variants{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px}
+.variants .lab{font-size:.88rem;color:var(--ink-soft)}
+.seg{display:flex;border:2px solid var(--ink);border-radius:7px;overflow:hidden;background:#fff}
+.seg button{border:none;border-radius:0;border-right:2px solid var(--ink);background:#dde4ea;font-size:.9rem;font-weight:600;padding:6px 14px}
+.seg button:last-child{border-right:none}
+.seg button:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.seg button[aria-pressed="true"]{background:var(--mark);font-weight:800}
+
+.main{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:22px;align-items:start}
+.main>*{min-width:0}
+.card{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px}
+.mini{border:2px solid var(--ink);border-radius:8px;background:var(--panel);padding:12px 14px}
+.machine{display:flex;flex-direction:column;gap:14px}
+.mini h3{margin:0 0 9px;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+
+/* jobs table */
+.jt{width:100%;border-collapse:collapse;font-size:.84rem}
+.jt th{text-align:left;font-weight:600;color:var(--ink-soft);font-size:.74rem;padding:0 6px 4px 0}
+.jt td{padding:4px 6px 4px 0;border-top:1px solid var(--line);font-family:var(--mono);font-size:.82rem}
+.jt td:first-child{font-weight:700;font-family:var(--sans)}
+.jt tr.absent td{opacity:.4}
+.jt tr.min td{background:var(--mark)}
+.dotc{display:inline-block;width:10px;height:10px;border:1.5px solid var(--ink);border-radius:2px;margin-right:6px}
+.formula{margin:9px 0 0;font-family:var(--mono);font-size:.76rem;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:7px}
+
+/* pass line */
+.pl{position:relative;height:74px;margin-top:4px}
+.plaxis{position:absolute;left:0;right:0;bottom:22px;height:0;border-top:2px solid var(--ink)}
+.pltick{position:absolute;bottom:8px;transform:translateX(-50%);font-family:var(--mono);font-size:.68rem;color:var(--ink-soft)}
+.pltick::before{content:'';position:absolute;left:50%;bottom:14px;width:1px;height:6px;background:var(--line)}
+.pin{position:absolute;bottom:22px;transform:translateX(-50%);transition:left .3s;text-align:center}
+.pin b{display:block;font-family:var(--mono);font-size:.74rem;font-weight:700;color:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:0 6px;margin-bottom:2px}
+.pin i{display:block;width:2px;height:12px;background:var(--ink);margin:0 auto}
+.pin.lo b{box-shadow:0 0 0 3px var(--mark),0 0 0 4.5px var(--ink)}
+.pin.r1{bottom:52px}
+.pin.r1 i{height:42px}
+.hop{position:absolute;bottom:34px;height:0;border-top:2px dashed var(--bad);transition:left .3s,width .3s}
+.hop::after{content:'';position:absolute;right:-1px;top:-4px;border:4px solid transparent;border-left-color:var(--bad)}
+
+/* pass table */
+.ptwrap{border:2px solid var(--ink);border-radius:8px;background:#fff;overflow:hidden}
+.pthead,.ptrow{display:grid;align-items:center}
+.pthead{background:#eef2f5;border-bottom:2px solid var(--ink);font-size:.8rem;font-weight:700}
+.pthead div,.ptrow div{padding:5px 10px;text-align:center;border-right:1px solid var(--line)}
+.pthead div:last-child,.ptrow div:last-child{border-right:none}
+.pthead .sub{display:block;font-weight:600;font-size:.72rem;color:var(--ink-soft);font-family:var(--mono)}
+.ptrows{max-height:330px;overflow:auto;position:relative;overflow-anchor:none}
+.ptrow{border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.84rem;opacity:.45}
+.ptrow.done{opacity:1}
+.ptrow.now{opacity:1;background:var(--mark);font-weight:700}
+.ptrow .lowest{position:relative}
+.ptrow.done .lowest::after,.ptrow.now .lowest::after{content:'';position:absolute;inset:2px 6px;border:2px solid var(--ink);border-radius:4px}
+.ptrow .who b{display:inline-block;color:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:0 8px;font-size:.8rem}
+.ptrow .na{color:var(--line)}
+
+/* strip */
+.chart{border:2px solid var(--ink);border-radius:8px;background:#fff;padding:12px 14px 10px;overflow-x:auto;margin-top:14px}
+.crow{display:grid;align-items:stretch;margin-bottom:3px}
+.clab{font-family:var(--mono);font-size:.78rem;color:var(--ink-soft);padding-right:8px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap}
+.cell{border:1px solid var(--line);border-right:none;height:24px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.7rem;font-weight:700;color:#fff}
+.crow .cell:last-child{border-right:1px solid var(--line)}
+.cell.future{opacity:.3}
+.cell.now{outline:2.5px solid var(--ink);outline-offset:-1px;z-index:2}
+.cell.c0{background:var(--c0)} .cell.c1{background:var(--c1)} .cell.c2{background:var(--c2)}
+.cell.c3{background:var(--c3)} .cell.c4{background:var(--c4)}
+.cell.c0,.cell.c1,.cell.c2,.cell.c3,.cell.c4{border-color:var(--ink)}
+.axis{font-family:var(--mono);font-size:.68rem;color:var(--ink-soft);text-align:center;padding-top:3px}
+.chart-note{margin:8px 0 0;font-size:.8rem;color:var(--ink-soft)}
+
+/* code */
+.codebox{margin-top:22px}
+.code-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:22px;align-items:start;margin-top:10px}
+.code{margin:0;font-family:var(--mono);font-size:.82rem;line-height:1.7;background:#fff;border:2px solid var(--ink);border-radius:8px;padding:10px 0;overflow-x:auto}
+.code .l{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:0 12px 0 0;white-space:pre}
+.code .l .ln{text-align:right;color:#9aa7b4;font-size:.74rem;user-select:none}
+.code .l.hit{background:var(--mark)}
+.code .cm{color:#1c7ed6}
+.trace{margin:0;padding-left:20px;font-family:var(--mono);font-size:.78rem;line-height:1.6}
+.trace li{margin-bottom:6px}
+.trace li.win{font-weight:700}
+.codebox h3{margin:0 0 8px;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+
+/* compare */
+.cmp{margin-top:22px}
+.cmp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,300px);gap:22px;align-items:center;margin-top:12px}
+.cmp svg{width:100%;height:auto;display:block}
+.legend2{display:flex;gap:16px;font-size:.82rem;margin-top:6px}
+.legend2 span{display:flex;align-items:center;gap:6px}
+.legend2 i{width:16px;height:3px;display:block}
+
+/* explain */
+.explain{margin:0 0 16px;min-height:166px;display:flex;flex-direction:column}
+.explain h3{margin:0 0 6px;font-size:1.15rem;font-weight:700}
+.explain p{margin:0 0 8px;max-width:78ch}
+.explain p:last-of-type{margin-bottom:0}
+.stepno{font-family:var(--mono);font-size:.82rem;color:var(--ink-soft)}
+.pbar{height:8px;border:2px solid var(--ink);border-radius:4px;background:#fff;overflow:hidden;margin-top:auto}
+.pbar i{display:block;height:100%;background:var(--ink);transition:width .25s}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:22px;margin-top:22px;align-items:start}
+.key{border-left:5px solid var(--c2)}
+.key h2{font-size:1.1rem}
+.key ul{margin:8px 0 0;padding-left:20px}
+.key li{margin-bottom:6px;max-width:70ch}
+.key li:last-child{margin-bottom:0}
+.side{font-size:.88rem}
+.side p{margin:8px 0 0}
+code.k{font-family:var(--mono);font-size:.86em;background:#e3e9ee;border-radius:3px;padding:0 4px}
+footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:.88rem;color:var(--ink-soft)}
+footer a{color:var(--ink);text-underline-offset:3px}
+
+@media (max-width: 1060px){
+  .main,.lower,.cmp-grid,.code-grid{grid-template-columns:1fr}
+}
+@media (max-width: 760px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.8rem}
+  .top{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .chart{padding:10px 8px}
+  .clab{font-size:.7rem;padding-right:4px}
+  .tabs{border-bottom:none;gap:6px}
+  .tab{border-radius:7px;border-bottom:2px solid var(--ink);margin:0 0 2px;padding:7px 12px}
+  .tab[aria-selected="true"]{background:var(--mark);border-bottom:2px solid var(--ink)}
+  .tab .n{display:inline;margin-right:6px}
+  .pthead div,.ptrow div{padding:5px 4px;font-size:.78rem}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>Stride scheduling</h1>
+      <p class="intro">Proportional share without any randomness. Each job gets a stride, inversely proportional to its tickets, and a running total called its pass value. Whoever has the lowest pass runs next and then advances by its stride, following the Scheduling: Proportional Share chapter of OSTEP (Chapter 9).</p>
+    </div>
+    <div class="controls">
+      <button id="btnBack" title="Previous decision">&#9664; Back</button>
+      <button id="btnPlay" class="play">&#9654; Play</button>
+      <button id="btnNext" title="Next decision">Next &#9654;</button>
+      <button id="btnReset">Restart</button>
+      <select id="speed" aria-label="Animation speed">
+        <option value="1600">Slow</option>
+        <option value="900" selected>Normal</option>
+        <option value="400">Fast</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="Scenario"></div>
+  <div class="scen-blurb"><p id="blurb"></p></div>
+  <div class="variants" id="variants" hidden>
+    <span class="lab" id="varLab"></span>
+    <div class="seg" id="seg"></div>
+  </div>
+
+  <div class="main">
+
+    <section class="machine" aria-label="Scheduler state">
+      <div class="mini">
+        <h3>Tickets, strides and pass values</h3>
+        <table class="jt">
+          <thead><tr><th>job</th><th>tickets</th><th>stride</th><th>pass</th><th>ran</th></tr></thead>
+          <tbody id="jobTable"></tbody>
+        </table>
+        <p class="formula">stride = 10000 / tickets</p>
+      </div>
+
+      <div class="mini">
+        <h3>Pass values on a line &mdash; lowest runs next</h3>
+        <div class="pl" id="passLine"></div>
+      </div>
+    </section>
+
+    <section aria-label="Run">
+      <div class="card explain">
+        <span class="stepno" id="stepNo"></span>
+        <h3 id="exTitle">&nbsp;</h3>
+        <p id="exBody"></p>
+        <div class="pbar"><i id="pbar" style="width:0%"></i></div>
+      </div>
+
+      <div class="ptwrap" id="ptwrap">
+        <div class="pthead" id="pthead"></div>
+        <div class="ptrows" id="ptrows"></div>
+      </div>
+
+      <div class="chart" id="chartBox">
+        <div id="chartRows"></div>
+        <p class="chart-note" id="chartNote">One column per time slice: the job that had the lowest pass value.</p>
+      </div>
+      <p class="kbd-hint">Keys: <kbd>&#8594;</kbd> next, <kbd>&#8592;</kbd> back, <kbd>space</kbd> play or pause, <kbd>1</kbd>&ndash;<kbd>3</kbd> switch scenario.</p>
+    </section>
+  </div>
+
+  <section class="card codebox" id="codeBox" hidden>
+    <h2>The whole scheduler</h2>
+    <p style="margin:6px 0 0;max-width:80ch;color:var(--ink-soft)">Four lines, run once per time slice. No random numbers, and no recalculating anything globally.</p>
+    <div class="code-grid">
+      <pre class="code" id="code"></pre>
+      <div>
+        <h3>This decision</h3>
+        <ol class="trace" id="trace"></ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="card cmp" id="cmpBox" hidden>
+    <h2>How far off the requested shares are they?</h2>
+    <p style="margin:6px 0 0;max-width:80ch;color:var(--ink-soft)">Both schedulers are given the same three jobs. The chart tracks how far each one&rsquo;s delivered CPU shares are from the shares the tickets asked for, adding up the error across all three jobs after every slice.</p>
+    <div class="cmp-grid">
+      <div>
+        <div id="cmpChart"></div>
+        <div class="legend2">
+          <span><i style="background:#1971c2"></i> stride</span>
+          <span><i style="background:#c2255c"></i> lottery</span>
+        </div>
+      </div>
+      <div id="cmpText" style="color:var(--ink-soft)"></div>
+    </div>
+  </section>
+
+  <div class="lower">
+    <section class="card key">
+      <h2>What to take away</h2>
+      <ul id="keyList"></ul>
+    </section>
+    <section class="card side">
+      <h2 id="sideTitle">How a decision works</h2>
+      <div id="sideBody"></div>
+    </section>
+  </div>
+
+  <footer>
+    Based on <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/">Operating Systems: Three Easy Pieces</a> by Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau, Chapter 9.
+  </footer>
+</div>
+
+<script>
+"use strict";
+const BIG = 10000;
+
+/* ---------- seeded random, for the lottery comparison ---------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- stride engine ---------- */
+function simulate(cfg){
+  const J = cfg.jobs.map((j,i)=>({id:j.id, c:i, tickets:j.tickets, arrive:j.arrive||0,
+                                  stride: BIG/j.tickets, pass:0, runs:0,
+                                  here: (j.arrive||0)===0}));
+  const frames = [];
+  for(let t=0;t<cfg.horizon;t++){
+    const ev = [];
+    J.forEach(j=>{
+      if(!j.here && j.arrive===t){
+        j.here = true;
+        const live = J.filter(x=>x.here && x!==j);
+        j.pass = (cfg.newPass==='min' && live.length) ? Math.min(...live.map(x=>x.pass)) : 0;
+        ev.push({k:'arrive', j:j.id, pass:j.pass, how:cfg.newPass});
+      }
+    });
+    const live = J.filter(j=>j.here);
+    const min = Math.min(...live.map(j=>j.pass));
+    const w = live.find(j=>j.pass===min);
+    const tie = live.filter(j=>j.pass===min).length > 1;
+    const before = J.map(j=>({id:j.id, c:j.c, here:j.here, pass:j.pass, low:j.here && j.pass===min}));
+    w.pass += w.stride; w.runs++;
+    frames.push({t, ev, before, win:w.id, winC:w.c, min, tie, stride:w.stride, newPass:w.pass,
+      after: J.map(j=>({id:j.id, c:j.c, here:j.here, pass:j.pass, runs:j.runs, tickets:j.tickets, stride:j.stride}))});
+  }
+  return frames;
+}
+
+/* ---------- lottery, for comparison ---------- */
+function lottery(cfg, seed){
+  const rnd = mulberry32(seed);
+  const total = cfg.jobs.reduce((s,j)=>s+j.tickets,0);
+  const out = [];
+  for(let t=0;t<cfg.horizon;t++){
+    const d = Math.floor(rnd()*total);
+    let acc=0, win=0;
+    for(let i=0;i<cfg.jobs.length;i++){ acc += cfg.jobs[i].tickets; if(d<acc){ win=i; break; } }
+    out.push(win);
+  }
+  return out;
+}
+
+/* ---------- scenarios ---------- */
+const SC = [
+{
+  n:'1', tab:'Stride and pass',
+  blurb:'Three jobs with 100, 50 and 250 tickets. Dividing a large number by the tickets gives each one a stride: 100, 200 and 40. Every slice the job with the lowest pass value runs, then adds its stride. A job with more tickets has a smaller stride, so it creeps forward slowly and comes up again sooner.',
+  cfg:()=>({horizon:24, jobs:[{id:'A',tickets:100},{id:'B',tickets:50},{id:'C',tickets:250}]}),
+  code:true,
+  key:[
+    'The stride is inversely proportional to the tickets, so it is the cost of one time slice for that job.',
+    'The pass value is how far a job has gone. Running the lowest pass is just running whoever has had the least so far, weighted by what they paid for.',
+    'At the start all pass values are 0, so the first choice is an arbitrary tie-break. After that the order follows entirely from the numbers.',
+    'Every 200 units of pass, A has run twice, B once and C five times \u2014 exactly 100:50:250. No randomness, no averaging out over time.',
+    'Compare this with lottery scheduling, where the same shares only appear after a long run.'
+  ],
+  side:'<p>Pick the job with the lowest pass value, run it for one time slice, then add its stride to its pass value and put it back.</p><p>Ties are broken however you like; the effect on the shares is negligible.</p>'
+},
+{
+  n:'2', tab:'Stride against lottery',
+  blurb:'The same three jobs, scheduled both ways. Lottery only gets the shares right on average, and a short run can be well off. Stride hits the exact proportion at the end of every cycle, and never drifts far from it in between.',
+  cfg:()=>({horizon:40, jobs:[{id:'A',tickets:100},{id:'B',tickets:50},{id:'C',tickets:250}]}),
+  compare:true,
+  key:[
+    'Stride is deterministic: given the tickets, the whole schedule is decided in advance.',
+    'The error falls to zero at the end of every cycle of 8 slices, where A has run 2, B 1 and C 5.',
+    'Lottery has no such guarantee. It is right on average, but any particular stretch can be lopsided, and nothing corrects it afterwards.',
+    'So why would anyone use lottery? Because stride has to keep a pass value for every job, and lottery keeps no per-job state at all \u2014 which matters when jobs come and go.'
+  ],
+  side:'<p>The error is the total distance between the CPU share each job has actually received and the share its tickets asked for, summed over the three jobs.</p><p>Zero means the delivered shares are exactly right at that moment.</p>'
+},
+{
+  n:'3', tab:'A new job arrives',
+  blurb:'Here is the catch. A and B have been running a while, so their pass values are well above zero. A new job D arrives with a pass value of 0, and by the rules it has the lowest pass \u2014 so it runs, and runs, and runs, until it has caught up with everyone else.',
+  cfg:(v)=>({horizon:24, newPass: v===1 ? 'min' : 'zero',
+    jobs:[{id:'A',tickets:100},{id:'B',tickets:100},{id:'D',tickets:100,arrive:8}]}),
+  varLab:'When D arrives, set its pass value to:',
+  variants:[{label:'0'},{label:'the current minimum'}],
+  key:[
+    '<b>The problem:</b> stride carries global state. A new job\u2019s pass value has to be set relative to everyone else\u2019s, or it monopolises the CPU while it catches up.',
+    'Setting the new job\u2019s pass to the current minimum fixes this particular case, and is what a real implementation does.',
+    'Lottery scheduling has no equivalent problem: a job joining simply brings its tickets, and the next draw is already correct.',
+    'This is the trade-off the chapter draws out. Stride gives exact shares but needs per-job state; lottery gives approximate shares and needs almost none.'
+  ],
+  side:'<p>Watch D\u2019s pin on the pass line. With a pass of 0 it starts far to the left of the others and has to hop all the way across before anyone else gets a turn.</p>'
+}
+];
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const tabsEl=$('tabs'), blurbEl=$('blurb'), segEl=$('seg'), varsEl=$('variants');
+const jobTable=$('jobTable'), passLine=$('passLine'), ptrows=$('ptrows'), chartRows=$('chartRows');
+const exTitle=$('exTitle'), exBody=$('exBody'), stepNo=$('stepNo'), pbar=$('pbar'), keyList=$('keyList');
+
+let sc=SC[0], vi=0, cfg=null, frames=[], lot=[], idx=0, player=null;
+
+SC.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.className='tab'; b.type='button'; b.setAttribute('role','tab');
+  b.innerHTML='<span class="n">'+s.n+'</span>'+s.tab;
+  b.addEventListener('click',()=>loadScenario(i));
+  tabsEl.appendChild(b);
+});
+
+function loadScenario(i, keepVariant){
+  stop();
+  sc=SC[i];
+  if(!keepVariant) vi=0;
+  [...tabsEl.children].forEach((t,j)=>t.setAttribute('aria-selected', j===i?'true':'false'));
+  blurbEl.innerHTML = sc.blurb;
+
+  varsEl.hidden = !sc.variants;
+  if(sc.variants){
+    $('varLab').textContent = sc.varLab;
+    segEl.innerHTML='';
+    sc.variants.forEach((v,k)=>{
+      const b=document.createElement('button');
+      b.type='button'; b.textContent=v.label;
+      b.setAttribute('aria-pressed', k===vi?'true':'false');
+      b.addEventListener('click',()=>{ vi=k; loadScenario(i,true); });
+      segEl.appendChild(b);
+    });
+  }
+
+  cfg = sc.cfg(vi);
+  frames = simulate(cfg);
+  lot = sc.compare ? lottery(cfg, 4242) : [];
+  keyList.innerHTML = sc.key.map(t=>'<li>'+t+'</li>').join('');
+  $('sideBody').innerHTML = sc.side;
+  $('codeBox').hidden = !sc.code;
+  $('cmpBox').hidden = !sc.compare;
+  $('ptwrap').hidden = !!sc.compare;
+
+  buildTable();
+  buildChart();
+  if(sc.compare) drawCmpChart();
+  go(0, true);
+}
+
+/* ---------- pass table ---------- */
+function buildTable(){
+  const n = cfg.jobs.length;
+  const cols = 'repeat('+n+',minmax(0,1fr)) minmax(0,1.1fr)';
+  $('pthead').style.gridTemplateColumns = cols;
+  $('pthead').innerHTML = cfg.jobs.map((j,i)=>
+    '<div>Pass(<span style="color:var(--c'+i+')">'+j.id+'</span>)<span class="sub">stride = '+(BIG/j.tickets)+'</span></div>').join('')
+    + '<div>Who runs?</div>';
+  ptrows.innerHTML = frames.map((f,k)=>{
+    const cells = f.before.map(p=>
+      '<div class="'+(p.low?'lowest':'')+'">'+(p.here ? p.pass : '<span class="na">&mdash;</span>')+'</div>').join('');
+    return '<div class="ptrow" data-k="'+k+'" style="grid-template-columns:'+cols+'">'
+      + cells + '<div class="who"><b style="background:var(--c'+f.winC+')">'+f.win+'</b></div></div>';
+  }).join('');
+  [...ptrows.children].forEach(r=>r.addEventListener('click',()=>{ stop(); go(+r.dataset.k+1); }));
+}
+
+/* ---------- winner strip ---------- */
+function buildChart(){
+  const H = cfg.horizon;
+  const narrow = window.innerWidth < 760;
+  const cols = narrow ? '58px repeat('+H+',16px)' : '68px repeat('+H+',minmax(10px,1fr))';
+  const wide = narrow ? 'max-content' : 'auto';
+  chartRows.innerHTML='';
+  const rows = sc.compare ? [['stride',0],['lottery',1]] : [['ran',0]];
+  rows.forEach(([lab,kind])=>{
+    const r=document.createElement('div');
+    r.className='crow'; r.style.gridTemplateColumns=cols; r.style.width=wide;
+    r.innerHTML='<div class="clab">'+lab+'</div>';
+    for(let t=0;t<H;t++){
+      const c=document.createElement('div');
+      c.className='cell'; c.dataset.t=t; c.dataset.kind=kind;
+      c.addEventListener('click',()=>{ stop(); go(t+1); });
+      r.appendChild(c);
+    }
+    chartRows.appendChild(r);
+  });
+  const ax=document.createElement('div');
+  ax.className='crow'; ax.style.gridTemplateColumns=cols; ax.style.width=wide;
+  ax.innerHTML='<div class="clab"></div>';
+  for(let t=0;t<H;t++){
+    const d=document.createElement('div'); d.className='axis';
+    if(t%5===0) d.textContent=t;
+    ax.appendChild(d);
+  }
+  chartRows.appendChild(ax);
+  $('chartNote').textContent = sc.compare
+    ? 'The same jobs under both schedulers, one column per time slice.'
+    : 'One column per time slice: the job that had the lowest pass value.';
+}
+
+/* ---------- comparison chart ---------- */
+function errorSeries(pick){
+  const total = cfg.jobs.reduce((s,j)=>s+j.tickets,0);
+  const want = cfg.jobs.map(j=>j.tickets/total);
+  const runs = cfg.jobs.map(()=>0);
+  const out=[];
+  for(let t=0;t<cfg.horizon;t++){
+    runs[pick(t)]++;
+    let e=0;
+    for(let i=0;i<runs.length;i++) e += Math.abs(runs[i]/(t+1) - want[i]);
+    out.push(e);
+  }
+  return out;
+}
+function drawCmpChart(){
+  const s1 = errorSeries(t=>frames[t].winC);
+  const s2 = errorSeries(t=>lot[t]);
+  const W=560,H=210,L=46,B=34,T=12,R=12;
+  const H2 = cfg.horizon;
+  const px = t => L + (t/(H2-1))*(W-L-R);
+  const maxY = Math.max(0.5, ...s1, ...s2);
+  const py = v => T + (1-v/maxY)*(H-T-B);
+  let g='';
+  const step = maxY<=0.6 ? 0.1 : (maxY<=1.3 ? 0.25 : 0.5);
+  const ticks=[]; for(let v=0; v<=maxY+1e-9; v+=step) ticks.push(v);
+  ticks.forEach(v=>{
+    g+='<line x1="'+L+'" y1="'+py(v).toFixed(1)+'" x2="'+(W-R)+'" y2="'+py(v).toFixed(1)+'" stroke="#dae2e8"/>'
+     + '<text x="'+(L-7)+'" y="'+(py(v)+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="#4d596b" font-family="ui-monospace,Menlo,monospace">'+v.toFixed(2)+'</text>';
+  });
+  for(let t=0;t<H2;t+=5)
+    g+='<text x="'+px(t).toFixed(1)+'" y="'+(H-B+15)+'" text-anchor="middle" font-size="10" fill="#4d596b" font-family="ui-monospace,Menlo,monospace">'+t+'</text>';
+  const line = (s,col) => '<polyline fill="none" stroke="'+col+'" stroke-width="2" points="'
+    + s.map((v,t)=>px(t).toFixed(1)+','+py(v).toFixed(1)).join(' ')+'"/>';
+  g += line(s2,'#c2255c') + line(s1,'#1971c2');
+  g += '<line id="cmpNow" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'" stroke="#172033" stroke-width="1.5" stroke-dasharray="3 3"/>';
+  g += '<line x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'" stroke="#172033" stroke-width="1.5"/>';
+  g += '<line x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'" stroke="#172033" stroke-width="1.5"/>';
+  g += '<text x="'+((W+L)/2)+'" y="'+(H-3)+'" text-anchor="middle" font-size="11" fill="#4d596b">time slices</text>';
+  g += '<text transform="translate(12,'+((H-B+T)/2)+') rotate(-90)" text-anchor="middle" font-size="11" fill="#4d596b">total share error</text>';
+  $('cmpChart').innerHTML='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Share error over time for stride and lottery">'+g+'</svg>';
+  window._cmp = {s1, s2, px};
+}
+
+/* ---------- code panel ---------- */
+const CODE = [
+  ['current = remove_min(queue);','// pick client with minimum pass'],
+  ['schedule(current);','// use resource for quantum'],
+  ['current->pass += current->stride;','// compute next pass using stride'],
+  ['insert(queue, current);','// put back into the queue']
+];
+function drawCode(fr){
+  $('code').innerHTML = CODE.map((l,i)=>{
+    const pad = l[0] + ' '.repeat(Math.max(2, 36-l[0].length));
+    return '<div class="l'+(fr && i===2 ?' hit':'')+'"><span class="ln">'+(i+1)+'</span>'
+      + '<span>'+pad.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'<span class="cm">'+l[1]+'</span></span></div>';
+  }).join('');
+  if(!fr){
+    $('trace').innerHTML = '<li>Take a step to follow one decision through.</li>';
+    return;
+  }
+  const names = fr.before.filter(p=>p.here).map(p=>p.id+' = '+p.pass).join(', ');
+  $('trace').innerHTML =
+      '<li>queue: '+names+'</li>'
+    + '<li>remove_min &#8594; <b>'+fr.win+'</b> (pass '+fr.min+')'+(fr.tie?' &mdash; tied, broken by queue order':'')+'</li>'
+    + '<li>schedule('+fr.win+') for one time slice</li>'
+    + '<li class="win">'+fr.win+'-&gt;pass = '+fr.min+' + '+fr.stride+' = '+fr.newPass+'</li>'
+    + '<li>insert('+fr.win+') back into the queue</li>';
+}
+
+/* ---------- render ---------- */
+function go(i, instant){
+  idx = Math.max(0, Math.min(frames.length, i));
+  if(instant) document.body.classList.add('instant');
+  const fr = idx>0 ? frames[idx-1] : null;
+  const state = fr ? fr.after : startState();
+  const shown = fr ? fr.before : startState().map(j=>({id:j.id,c:j.c,here:j.here,pass:j.pass,low:j.here&&j.pass===0}));
+
+  // job table
+  jobTable.innerHTML = state.map((j,i2)=>{
+    const low = shown.find(p=>p.id===j.id);
+    const cls = (!j.here ? ' class="absent"' : (low && low.low ? ' class="min"' : ''));
+    return '<tr'+cls+'><td><span class="dotc" style="background:var(--c'+j.c+')"></span>'+j.id+'</td>'
+      + '<td>'+j.tickets+'</td><td>'+j.stride+'</td>'
+      + '<td>'+(j.here ? j.pass : '\u2014')+'</td><td>'+(j.runs||0)+'</td></tr>';
+  }).join('');
+
+  // pass line
+  drawPassLine(fr, state, shown);
+
+  // pass table
+  [...ptrows.children].forEach(r=>{
+    const k=+r.dataset.k;
+    r.className='ptrow'+(k<idx-1?' done':'')+(k===idx-1?' now':'');
+  });
+  if(fr){
+    const cur = ptrows.querySelector('.ptrow.now');
+    if(cur){
+      const want = cur.offsetTop - ptrows.clientHeight/2 + cur.offsetHeight/2;
+      const max = ptrows.scrollHeight - ptrows.clientHeight;
+      ptrows.scrollTo({top:Math.max(0,Math.min(max,want)),
+        behavior:(instant||matchMedia('(prefers-reduced-motion: reduce)').matches)?'auto':'smooth'});
+    }
+  } else ptrows.scrollTop = 0;
+
+  // strip
+  [...chartRows.querySelectorAll('.cell')].forEach(c=>{
+    const t=+c.dataset.t, kind=+c.dataset.kind;
+    const w = kind===0 ? (frames[t] && frames[t].winC) : lot[t];
+    const id = kind===0 ? (frames[t] && frames[t].win) : cfg.jobs[lot[t]].id;
+    let cls='cell c'+w;
+    if(t>idx-1) cls+=' future';
+    if(t===idx-1) cls+=' now';
+    c.className=cls; c.textContent=id;
+  });
+
+  // comparison readout
+  if(sc.compare && window._cmp){
+    const n = Math.max(1, idx);
+    const l = ptLine(n-1);
+    const el = document.getElementById('cmpNow');
+    if(el){ el.setAttribute('x1', l); el.setAttribute('x2', l); }
+    const e1 = window._cmp.s1[n-1], e2 = window._cmp.s2[n-1];
+    $('cmpText').innerHTML = '<p style="margin:0 0 10px"><b style="color:#1971c2">stride</b> is off by '
+      + (e1*100).toFixed(1)+' percentage points after '+n+' slices.</p>'
+      + '<p style="margin:0"><b style="color:#c2255c">lottery</b> is off by '+(e2*100).toFixed(1)+'.</p>';
+  }
+
+  // explanation
+  if(fr){
+    stepNo.textContent = 'decision '+idx+' of '+frames.length;
+    exTitle.textContent = 'Job '+fr.win+' runs';
+    let body = fr.win+' has the lowest pass value at '+fr.min
+      + ', so it runs, then advances by its stride of '+fr.stride+' to '+fr.newPass+'.';
+    if(fr.tie) body = 'Every pass value is '+fr.min+', so the tie is broken arbitrarily: '+fr.win
+      + ' runs and advances by its stride of '+fr.stride+' to '+fr.newPass+'.';
+    fr.ev.forEach(e=>{
+      if(e.k==='arrive') body += ' ' + (e.how==='min'
+        ? e.j+' has just arrived and is given the current minimum pass value, '+e.pass+', so it joins as an equal.'
+        : e.j+' has just arrived with a pass value of 0 \u2014 far below everyone else, so it will now run until it catches up.');
+    });
+    exBody.textContent = body;
+  } else {
+    stepNo.textContent = 'Before the first decision';
+    exTitle.textContent = sc.tab;
+    exBody.textContent = 'Press Play, or step one decision at a time. You can also click any row of the table to jump to it.';
+  }
+  if(sc.code) drawCode(fr);
+
+  pbar.style.width = (idx/frames.length*100)+'%';
+  $('btnBack').disabled = idx===0;
+  $('btnNext').disabled = idx===frames.length;
+  if(idx===frames.length) stop();
+  if(instant) requestAnimationFrame(()=>document.body.classList.remove('instant'));
+}
+function ptLine(t){
+  const W=560,L=46,R=12;
+  return (L + (t/(cfg.horizon-1))*(W-L-R)).toFixed(1);
+}
+function startState(){
+  return cfg.jobs.map((j,i)=>({id:j.id, c:i, tickets:j.tickets, stride:BIG/j.tickets,
+                               pass:0, runs:0, here:(j.arrive||0)===0}));
+}
+
+function drawPassLine(fr, state, shown){
+  const vals = (fr ? fr.before : shown).filter(p=>p.here).map(p=>p.pass);
+  const maxPass = Math.max(100, ...state.filter(j=>j.here).map(j=>j.pass));
+  const top = Math.ceil(maxPass/100)*100;
+  const pos = v => 6 + (v/top)*88;   // percent
+  let h = '<div class="plaxis"></div>';
+  for(let v=0; v<=top; v+=top/4)
+    h += '<div class="pltick" style="left:'+pos(v)+'%">'+v+'</div>';
+  if(fr){
+    const a = pos(fr.min), b = pos(fr.newPass);
+    h += '<div class="hop" style="left:'+a+'%;width:'+(b-a)+'%"></div>';
+  }
+  const seen = {};
+  (fr ? fr.before : shown).filter(p=>p.here).forEach(p=>{
+    const key = p.pass;
+    const row = seen[key] ? 1 : 0; seen[key] = true;
+    h += '<div class="pin'+(p.low?' lo':'')+(row?' r1':'')+'" style="left:'+pos(p.pass)+'%">'
+       + '<b style="background:var(--c'+p.c+')">'+p.id+'</b><i></i></div>';
+  });
+  passLine.innerHTML = h;
+}
+
+/* ---------- playback ---------- */
+function stop(){ if(player){ clearInterval(player); player=null; } $('btnPlay').innerHTML='&#9654; Play'; }
+function play(){
+  if(player){ stop(); return; }
+  if(idx===frames.length) go(0,true);
+  $('btnPlay').innerHTML='&#10073;&#10073; Pause';
+  player=setInterval(()=>{ if(idx>=frames.length){ stop(); return; } go(idx+1); }, +$('speed').value);
+}
+$('btnPlay').addEventListener('click',play);
+$('btnNext').addEventListener('click',()=>{ stop(); go(idx+1); });
+$('btnBack').addEventListener('click',()=>{ stop(); go(idx-1); });
+$('btnReset').addEventListener('click',()=>{ stop(); go(0,true); });
+$('speed').addEventListener('change',()=>{ if(player){ stop(); play(); } });
+document.addEventListener('keydown',e=>{
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){ stop(); go(idx+1); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ stop(); go(idx-1); e.preventDefault(); }
+  else if(e.key===' '){ play(); e.preventDefault(); }
+  else if(['1','2','3'].indexOf(e.key)>=0){ loadScenario(+e.key-1); e.preventDefault(); }
+});
+
+loadScenario(0);
+</script>
+</body>
+</html>
