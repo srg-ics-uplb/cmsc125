@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TLBs: faster translations</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#c5cfd8;
+  --bad:#c92a2a;
+  --good:#2b8a3e;
+  --mark:#ffd43b;
+  --c0:#c2255c; --c1:#5c940d; --c2:#1971c2; --c3:#e98b00; --c4:#5f3dc4;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important;animation:none !important}
+.page{max-width:1240px;margin:0 auto;padding:32px 28px 48px}
+
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:70ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer}
+button:hover:not(:disabled){background:#fff;box-shadow:2px 2px 0 var(--ink);transform:translate(-1px,-1px)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible,.tab:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+select{padding:5px 6px}
+.play{min-width:104px;font-weight:700}
+
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin:0 0 6px;border-bottom:3px solid var(--ink)}
+.tab{border:2px solid var(--ink);border-bottom:none;border-radius:8px 8px 0 0;background:#dde4ea;padding:9px 15px;margin-right:6px;margin-bottom:-3px;font-weight:600;font-size:.95rem;box-shadow:none}
+.tab:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.tab[aria-selected="true"]{background:var(--panel);border-bottom:3px solid var(--panel);font-weight:800}
+.tab .n{font-family:var(--mono);font-size:.8rem;color:var(--ink-soft);display:block;font-weight:600}
+.tab[aria-selected="true"] .n{color:var(--c2)}
+.scen-blurb{margin:14px 0 14px;padding:12px 16px;border-left:5px solid var(--ink);background:rgba(248,250,251,.72);max-width:94ch}
+.scen-blurb p{margin:0}
+
+.variants{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px}
+.variants .lab{font-size:.88rem;color:var(--ink-soft)}
+.seg{display:flex;border:2px solid var(--ink);border-radius:7px;overflow:hidden;background:#fff}
+.seg button{border:none;border-radius:0;border-right:2px solid var(--ink);background:#dde4ea;font-size:.9rem;font-weight:600;padding:6px 14px}
+.seg button:last-child{border-right:none}
+.seg button:hover:not(:disabled){transform:none;box-shadow:none;background:#eaeff3}
+.seg button[aria-pressed="true"]{background:var(--mark);font-weight:800}
+
+.card{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px}
+.mini{border:2px solid var(--ink);border-radius:8px;background:var(--panel);padding:12px 14px}
+.mini h3{margin:0 0 9px;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+
+.explain{margin:0 0 16px;min-height:112px;display:flex;flex-direction:column}
+.explain h3{margin:0 0 6px;font-size:1.15rem;font-weight:700}
+.explain p{margin:0 0 8px;max-width:82ch}
+.explain p:last-of-type{margin-bottom:0}
+.stepno{font-family:var(--mono);font-size:.82rem;color:var(--ink-soft)}
+.pbar{height:8px;border:2px solid var(--ink);border-radius:4px;background:#fff;overflow:hidden;margin-top:auto}
+.pbar i{display:block;height:100%;background:var(--ink);transition:width .25s}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+
+/* scenario 1: page table + code + result */
+.s1grid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:20px;align-items:start}
+.pgtable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.76rem}
+.pgtable td{border:1px solid var(--line);height:22px;text-align:center;position:relative}
+.pgtable td.vlab{border:none;text-align:right;padding-right:8px;font-weight:700;white-space:nowrap;width:1%}
+.pgtable td.occ{background:#dde4ea;font-weight:700}
+.pgtable td.now{outline:3px solid var(--ink);outline-offset:-3px;background:var(--mark)}
+.pgtable thead td{border:none;color:var(--ink-soft);font-size:.7rem;padding-bottom:2px}
+.assume{background:#fff6d8;font-size:.84rem;max-width:none}
+.assume b{display:block;margin-bottom:2px}
+.code{margin:14px 0 0;font-family:var(--mono);font-size:.82rem;line-height:1.7;background:#fff;border:2px solid var(--ink);border-radius:8px;padding:10px 0;overflow-x:auto}
+.code .l{display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;padding:0 12px 0 0;white-space:pre}
+.code .l .ln{text-align:right;color:#9aa7b4;font-size:.74rem;user-select:none}
+.code .l.hit{background:var(--mark)}
+.code .cm{color:#1c7ed6}
+.result{background:#ffd8a8;margin-top:14px;text-align:left;font-size:.86rem}
+.result b.hit{color:var(--good)}
+.result b.miss{color:var(--bad)}
+.result .rate{font-size:1.1rem;font-weight:800;margin-top:6px;display:block}
+.tlbT{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.8rem}
+.tlbT th{text-align:left;font-weight:600;color:var(--ink-soft);font-size:.72rem;padding:0 6px 3px 0}
+.tlbT td{border-top:1px solid var(--line);padding:4px 6px 4px 0}
+.tlbT tr.slotnow td{background:var(--mark);font-weight:700}
+.tlbT .na{color:var(--line)}
+
+/* strip, shared */
+.chart{border:2px solid var(--ink);border-radius:8px;background:#fff;padding:12px 14px 10px;overflow-x:auto;margin-top:14px}
+.crow{display:grid;align-items:stretch;margin-bottom:3px}
+.clab{font-family:var(--mono);font-size:.78rem;color:var(--ink-soft);padding-right:8px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap}
+.cell{border:1px solid var(--line);border-right:none;height:24px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.68rem;font-weight:700;color:#fff}
+.crow .cell:last-child{border-right:1px solid var(--line)}
+.cell.future{opacity:.3}
+.cell.now{outline:2.5px solid var(--ink);outline-offset:-1px;z-index:2}
+.cell.hit{background:var(--good);border-color:var(--ink)}
+.cell.miss{background:var(--bad);border-color:var(--ink)}
+.axis{font-family:var(--mono);font-size:.68rem;color:var(--ink-soft);text-align:center;padding-top:3px}
+.chart-note{margin:8px 0 0;font-size:.8rem;color:var(--ink-soft)}
+
+/* scenario 2: flow */
+.flow{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.flowbox{border:2px solid var(--ink);border-radius:8px;background:var(--panel);padding:10px 14px;opacity:.4;transition:opacity .2s,background .2s}
+.flowbox.done{opacity:.85}
+.flowbox.now{opacity:1;background:var(--mark)}
+.flowbox .tag{display:inline-block;font-size:.68rem;font-weight:800;padding:1px 8px;border-radius:10px;border:1.5px solid var(--ink);margin-bottom:5px}
+.flowbox .tag.hw{background:#a5d8ff}
+.flowbox .tag.os{background:#ffd8a8}
+.flowbox .tag.cpu{background:#e3e9ee}
+.flowbox h4{margin:0 0 4px;font-size:.94rem}
+.flowbox p{margin:0;font-size:.83rem;color:var(--ink-soft)}
+
+/* scenario 3 & 4: side by side compare */
+.cmp2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+.cmp2 h3{margin:0 0 8px;font-size:.88rem}
+.slotrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.slot{border:2px solid var(--ink);border-radius:6px;padding:4px 9px;font-family:var(--mono);font-size:.76rem;background:#fff;min-width:58px;text-align:center}
+.slot.empty{opacity:.35}
+.slot.new{background:var(--mark);font-weight:700}
+.readout{margin-top:12px;font-size:.86rem}
+.readout b{font-weight:800}
+
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:22px;margin-top:22px;align-items:start}
+.key{border-left:5px solid var(--c2)}
+.key h2{font-size:1.1rem}
+.key ul{margin:8px 0 0;padding-left:20px}
+.key li{margin-bottom:6px;max-width:74ch}
+.key li:last-child{margin-bottom:0}
+.side{font-size:.88rem}
+.side p{margin:8px 0 0}
+code.k{font-family:var(--mono);font-size:.86em;background:#e3e9ee;border-radius:3px;padding:0 4px}
+footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:.88rem;color:var(--ink-soft)}
+footer a{color:var(--ink);text-underline-offset:3px}
+
+@media (max-width: 1060px){
+  .s1grid,.cmp2{grid-template-columns:1fr}
+  .lower{grid-template-columns:1fr}
+}
+@media (max-width: 760px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.8rem}
+  .top{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .chart{padding:10px 8px}
+  .clab{font-size:.7rem;padding-right:4px}
+  .tabs{border-bottom:none;gap:6px}
+  .tab{border-radius:7px;border-bottom:2px solid var(--ink);margin:0 0 2px;padding:7px 12px}
+  .tab[aria-selected="true"]{background:var(--mark);border-bottom:2px solid var(--ink)}
+  .tab .n{display:inline;margin-right:6px}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>TLBs: faster translations</h1>
+      <p class="intro">A page table lookup means an extra memory reference for every address, so hardware caches recent virtual&#8209;to&#8209;physical translations in a small, fully-associative cache called the <b>translation-lookaside buffer</b>. Follows the Paging: Faster Translations (TLBs) chapter of OSTEP (Chapter 19).</p>
+    </div>
+    <div class="controls">
+      <button id="btnBack" title="Previous step">&#9664; Back</button>
+      <button id="btnPlay" class="play">&#9654; Play</button>
+      <button id="btnNext" title="Next step">Next &#9654;</button>
+      <button id="btnReset">Restart</button>
+      <select id="speed" aria-label="Animation speed">
+        <option value="1600">Slow</option>
+        <option value="1000" selected>Normal</option>
+        <option value="500">Fast</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="Scenario"></div>
+  <div class="scen-blurb"><p id="blurb"></p></div>
+  <div class="variants" id="variants" hidden>
+    <span class="lab" id="varLab"></span>
+    <div class="seg" id="seg"></div>
+  </div>
+
+  <div class="card explain">
+    <span class="stepno" id="stepNo"></span>
+    <h3 id="exTitle">&nbsp;</h3>
+    <p id="exBody"></p>
+    <div class="pbar"><i id="pbar" style="width:0%"></i></div>
+  </div>
+
+  <div id="stage">
+
+    <!-- Scenario 1: locality and hit rate -->
+    <section id="sec0" class="scenario-body">
+      <div class="s1grid">
+        <div class="pgwrap">
+          <table class="pgtable" id="s1_pgtable"></table>
+        </div>
+        <div>
+          <div class="card assume" id="s1_assume"></div>
+          <pre class="code" id="s1_code"></pre>
+          <div class="card result" id="s1_result"></div>
+        </div>
+      </div>
+      <div class="mini" style="margin-top:14px">
+        <h3 id="s1_tlbTitle">TLB contents</h3>
+        <table class="tlbT" id="s1_tlb"><thead><tr><th>slot</th><th>VPN</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="chart" id="s1_chartBox">
+        <div id="s1_chartRows"></div>
+        <p class="chart-note">One column per array access: green is a TLB hit, red is a miss.</p>
+      </div>
+    </section>
+
+    <!-- Scenario 2: who handles a miss -->
+    <section id="sec1" class="scenario-body" hidden>
+      <div class="flow" id="s2_flow"></div>
+    </section>
+
+    <!-- Scenario 3: context switches and ASIDs -->
+    <section id="sec2" class="scenario-body" hidden>
+      <div class="cmp2">
+        <div class="mini">
+          <h3>Flush the TLB on every switch</h3>
+          <div class="slotrow" id="s3_slots_flush"></div>
+        </div>
+        <div class="mini">
+          <h3>Tag entries with an ASID</h3>
+          <div class="slotrow" id="s3_slots_asid"></div>
+        </div>
+      </div>
+      <div class="chart" id="s3_chartBox">
+        <div id="s3_chartRows"></div>
+        <p class="chart-note">One column per process switch. Same sequence of runs, two different TLB policies.</p>
+      </div>
+      <div class="readout" id="s3_readout"></div>
+    </section>
+
+    <!-- Scenario 4: replacement policy and TLB reach -->
+    <section id="sec3" class="scenario-body" hidden>
+      <div class="cmp2">
+        <div class="mini">
+          <h3>LRU replacement</h3>
+          <div class="slotrow" id="s4_slots_lru"></div>
+        </div>
+        <div class="mini">
+          <h3>Random replacement</h3>
+          <div class="slotrow" id="s4_slots_rand"></div>
+        </div>
+      </div>
+      <div class="chart" id="s4_chartBox">
+        <div id="s4_chartRows"></div>
+        <p class="chart-note">A loop that cycles through 6 pages, over and over, with only 4 TLB entries to hold them &mdash; the working set does not fit in the TLB&rsquo;s reach.</p>
+      </div>
+      <div class="readout" id="s4_readout"></div>
+    </section>
+
+  </div>
+
+  <p class="kbd-hint">Keys: <kbd>&#8594;</kbd> next, <kbd>&#8592;</kbd> back, <kbd>space</kbd> play or pause, <kbd>1</kbd>&ndash;<kbd>4</kbd> switch scenario.</p>
+
+  <div class="lower">
+    <section class="card key">
+      <h2>What to take away</h2>
+      <ul id="keyList"></ul>
+    </section>
+    <section class="card side">
+      <h2 id="sideTitle">Notes</h2>
+      <div id="sideBody"></div>
+    </section>
+  </div>
+
+  <footer>
+    Based on <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/">Operating Systems: Three Easy Pieces</a> by Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau, Chapter 19.
+  </footer>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ---------- seeded random, for the replacement-policy comparison ---------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+/* =========================================================================
+   Scenario 1 — locality and hit rate
+   ========================================================================= */
+const PAGE = 16, VPNS = 16;
+
+function s1Cfg(vi){ return { variant: vi===0 ? 'seq' : 'stride' }; }
+
+function s1Simulate(cfg){
+  const N = 10;
+  const elemSize = cfg.variant==='seq' ? 4 : 16;
+  const base = cfg.variant==='seq' ? 100 : 96;
+  const items = [];
+  for(let i=0;i<N;i++){
+    const va = base + i*elemSize;
+    items.push({ i, va, vpn: Math.floor(va/PAGE), off: va % PAGE });
+  }
+  const cap = 2;
+  let entries = [];
+  const frames = [];
+  items.forEach(it=>{
+    const hit = entries.includes(it.vpn);
+    entries = hit ? [it.vpn, ...entries.filter(v=>v!==it.vpn)] : [it.vpn, ...entries].slice(0,cap);
+    frames.push({ ...it, hit, tlb: [...entries], cap });
+  });
+  return frames;
+}
+
+function s1BuildStatic(cfg, frames){
+  // page table
+  const tbl = $('s1_pgtable');
+  if(cfg.variant==='seq'){
+    let h = '<thead><tr><td></td><td>00</td><td>04</td><td>08</td><td>12</td></tr></thead><tbody>';
+    for(let vpn=0; vpn<VPNS; vpn++){
+      h += '<tr><td class="vlab">VPN&nbsp;'+String(vpn).padStart(2,'0')+'</td>';
+      for(let off=0; off<PAGE; off+=4){
+        const it = frames.find(f=>f.vpn===vpn && f.off===off);
+        h += '<td id="pgc-'+vpn+'-'+off+'"'+(it?' class="occ"':'')+'>'+(it?'a['+it.i+']':'')+'</td>';
+      }
+      h += '</tr>';
+    }
+    h += '</tbody>';
+    tbl.innerHTML = h;
+  } else {
+    let h = '<thead><tr><td></td><td colspan="1">whole page</td></tr></thead><tbody>';
+    for(let vpn=0; vpn<VPNS; vpn++){
+      const it = frames.find(f=>f.vpn===vpn);
+      h += '<tr><td class="vlab">VPN&nbsp;'+String(vpn).padStart(2,'0')+'</td>'
+         + '<td id="pgc-'+vpn+'-0"'+(it?' class="occ"':'')+'>'+(it?'a['+it.i+']':'')+'</td></tr>';
+    }
+    h += '</tbody>';
+    tbl.innerHTML = h;
+  }
+
+  $('s1_assume').innerHTML = cfg.variant==='seq'
+    ? '<b>Assumptions</b>8-bit virtual address space, 16-byte pages (4-bit VPN, 4-bit offset). <code class="k">int a[10]</code> is loaded starting at virtual address 100 (0b01100100), so three consecutive elements share a page.'
+    : '<b>Assumptions</b>Same 8-bit space and 16-byte pages. Now each array element is padded to a full 16-byte page (imagine a large struct), starting at virtual address 96 &mdash; so <b>every</b> element lands on a page of its own.';
+
+  const codeLines = cfg.variant==='seq'
+    ? [['int sum = 0;',''],['for (i=0; i&lt;10; i++) {',''],['&nbsp;&nbsp;sum += a[i];','// one memory reference per element'],['}','']]
+    : [['int sum = 0;',''],['for (i=0; i&lt;10; i++) {',''],['&nbsp;&nbsp;sum += a[i].val;','// a[i] is its own 16-byte page'],['}','']];
+  $('s1_code').innerHTML = codeLines.map((l,k)=>
+    '<div class="l" id="s1cl-'+k+'"><span class="ln">'+(k+1)+'</span><span>'+l[0]+' <span class="cm">'+l[1]+'</span></span></div>'
+  ).join('');
+
+  $('s1_tlbTitle').textContent = 'TLB contents (' + frames[0].cap + ' entries, LRU)';
+}
+
+function s1RenderFrame(fr, idx, frames, cfg){
+  // clear "now" highlight on page table
+  document.querySelectorAll('#s1_pgtable td.now').forEach(td=>td.classList.remove('now'));
+  document.querySelectorAll('#s1_code .l.hit').forEach(l=>l.classList.remove('hit'));
+
+  if(fr){
+    const cell = $('pgc-'+fr.vpn+'-'+fr.off);
+    if(cell) cell.classList.add('now');
+    $('s1cl-2').classList.add('hit');
+  }
+
+  // TLB table
+  const cap = frames[0].cap;
+  const tlb = fr ? fr.tlb : [];
+  let rows = '';
+  for(let s=0;s<cap;s++){
+    const v = tlb[s];
+    rows += '<tr class="'+(fr && s===0 ? 'slotnow':'')+'"><td>'+(s+1)+'</td><td>'+(v!==undefined ? 'VPN '+v : '<span class="na">&mdash;</span>')+'</td></tr>';
+  }
+  $('s1_tlb').querySelector('tbody').innerHTML = rows;
+
+  // result box: progressive hit/miss list
+  const done = frames.slice(0, idx);
+  const seq = done.map((f,k)=>{
+    const cls = f.hit ? 'hit' : 'miss';
+    const label = f.hit ? 'hit' : 'miss';
+    const bold = k===idx-1 ? 'style="text-decoration:underline"' : '';
+    return '<b class="'+cls+'" '+bold+'>'+label+'</b>';
+  }).join(', ');
+  const misses = done.filter(f=>!f.hit).length, hits = done.length - misses;
+  const rate = done.length ? Math.round(hits/done.length*100) : 0;
+  const headline = cfg.variant==='seq'
+    ? 'The TLB improves performance due to <span style="color:var(--bad)">spatial locality</span>'
+    : 'Without spatial locality, the TLB barely helps at all';
+  $('s1_result').innerHTML = '<b style="font-size:1.02rem">'+headline+'</b>'
+    + '<p style="margin:8px 0 0">'+(seq || '&mdash;')+'</p>'
+    + (done.length ? '<span class="rate">'+misses+' misses and '+hits+' hits &mdash; TLB hit rate is '+rate+'%</span>' : '');
+
+  // strip
+  document.querySelectorAll('#s1_chartRows .cell').forEach(c=>{
+    const t = +c.dataset.t;
+    const f = frames[t];
+    let cls = 'cell '+(f.hit?'hit':'miss');
+    if(t>idx-1) cls+=' future';
+    if(t===idx-1) cls+=' now';
+    c.className = cls;
+    c.textContent = 'a'+f.i;
+  });
+
+  if(!fr) return { title:'Before the first access', body:'Press Play, or step through one array access at a time.' };
+
+  const title = 'Access a['+fr.i+']';
+  const body = 'Virtual address '+fr.va+' &#8594; VPN '+fr.vpn+', offset '+fr.off+'. '
+    + (fr.hit
+        ? 'VPN '+fr.vpn+' is already in the TLB, so translation costs one extra register read instead of a memory reference &mdash; a <b>hit</b>.'
+        : 'VPN '+fr.vpn+' is not in the TLB, so hardware (or the OS) must walk the page table in memory, then install the mapping &mdash; a <b>miss</b>.');
+  return { title, body };
+}
+
+function s1Build(){
+  const frames = s1BuildFrames;
+  s1BuildStatic(s1BuildCfg, frames);
+  const H = frames.length;
+  const rows = $('s1_chartRows');
+  rows.innerHTML = '';
+  const cols = 'repeat('+H+',minmax(20px,1fr))';
+  const r = document.createElement('div');
+  r.className = 'crow'; r.style.gridTemplateColumns = cols;
+  for(let t=0;t<H;t++){
+    const c = document.createElement('div');
+    c.className = 'cell'; c.dataset.t = t;
+    c.addEventListener('click', ()=>{ stop(); go(t+1); });
+    r.appendChild(c);
+  }
+  rows.appendChild(r);
+  return frames;
+}
+
+let s1BuildCfg = null, s1BuildFrames = null;
+
+/* =========================================================================
+   Scenario 2 — who handles a TLB miss
+   ========================================================================= */
+const S2_HW = [
+  { tag:'cpu', title:'The CPU generates a virtual address', body:'The instruction needs to read or write memory, so the address goes to the MMU for translation.' },
+  { tag:'hw', title:'The TLB is checked in hardware &mdash; it misses', body:'No entry for this VPN. On hardware-managed TLBs (x86 is the classic example), the CPU does not trap to the OS at all.' },
+  { tag:'hw', title:'A hardware page-table walker looks up the page table', body:'A dedicated circuit follows the page-table base register and walks the (fixed-format) page table entirely in hardware.' },
+  { tag:'hw', title:'The walker finds the PTE and extracts the PFN', body:'If the entry is invalid, the hardware raises a page fault instead; here it is valid.' },
+  { tag:'hw', title:'Hardware inserts the new mapping into the TLB', body:'An existing entry may need to be evicted to make room, following whatever replacement policy the hardware implements.' },
+  { tag:'cpu', title:'The instruction retries and now hits', body:'The reference is re-issued; this time the TLB has the mapping, so it completes.' },
+];
+const S2_SW = [
+  { tag:'cpu', title:'The CPU generates a virtual address', body:'The instruction needs to read or write memory, so the address goes to the MMU for translation.' },
+  { tag:'hw', title:'The TLB is checked in hardware &mdash; it misses', body:'No entry for this VPN. On software-managed TLBs (MIPS, SPARC), the hardware’s only job is to notice the miss.' },
+  { tag:'hw', title:'Hardware raises a trap into the OS', body:'The CPU switches to kernel mode and jumps to the TLB-miss handler, just like any other exception.' },
+  { tag:'os', title:'The handler walks the page table itself', body:'Because the OS is doing the lookup, the page table can use <i>any</i> data structure the OS wants &mdash; multi-level, hashed, inverted, whatever fits the workload.' },
+  { tag:'os', title:'The handler installs the mapping with a privileged instruction', body:'The OS explicitly inserts the VPN&#8594;PFN entry into the TLB, evicting one existing entry if it is full.' },
+  { tag:'os', title:'The handler executes return-from-trap', body:'Unlike a system call, this must resume the <b>same</b> instruction that faulted, not the next one &mdash; the instruction never actually completed.' },
+  { tag:'cpu', title:'The instruction retries and now hits', body:'The reference is re-issued; this time the TLB has the mapping, so it completes.' },
+];
+
+function s2Build(vi){
+  const steps = vi===0 ? S2_HW : S2_SW;
+  const flow = $('s2_flow');
+  flow.innerHTML = steps.map((s,k)=>
+    '<div class="flowbox" id="s2fb-'+k+'"><span class="tag '+s.tag+'">'+(s.tag==='hw'?'Hardware':s.tag==='os'?'Operating System':'CPU')+'</span>'
+    + '<h4>'+(k+1)+'. '+s.title+'</h4><p>'+s.body+'</p></div>'
+  ).join('');
+  return steps;
+}
+
+function s2RenderFrame(fr, idx, steps){
+  steps.forEach((s,k)=>{
+    const el = $('s2fb-'+k);
+    el.className = 'flowbox' + (k < idx-1 ? ' done' : '') + (k===idx-1 ? ' now' : '');
+  });
+  if(!fr) return { title:'Before the first step', body:'Press Play, or step through one stage at a time.' };
+  return { title: fr.title.replace(/<[^>]+>/g,''), body: fr.body };
+}
+
+/* =========================================================================
+   Scenario 3 — context switches and ASIDs
+   ========================================================================= */
+const S3_SEQ = ['P1','P2','P1','P2'];
+const S3_MAP = { P1:{ pfn:3, asid:1, color:'var(--c2)' }, P2:{ pfn:9, asid:2, color:'var(--c0)' } };
+
+function s3Simulate(){
+  let flushEntries = [];       // [{vpn,pfn}]
+  let asidEntries  = [];       // [{vpn,pfn,asid}]
+  let prevProc = null;
+  const frames = [];
+  S3_SEQ.forEach(proc=>{
+    const switched = prevProc!==null && prevProc!==proc;
+    const pfn = S3_MAP[proc].pfn, asid = S3_MAP[proc].asid;
+
+    if(switched) flushEntries = [];
+    const fHit = flushEntries.some(e=>e.vpn===10);
+    if(!fHit) flushEntries = [{ vpn:10, pfn }];
+
+    const aHit = asidEntries.some(e=>e.vpn===10 && e.asid===asid);
+    if(!aHit) asidEntries = [...asidEntries.filter(e=>!(e.vpn===10 && e.asid===asid)), { vpn:10, pfn, asid }];
+
+    frames.push({ proc, switched, fHit, aHit, flushSnap:[...flushEntries], asidSnap:[...asidEntries] });
+    prevProc = proc;
+  });
+  return frames;
+}
+
+function s3RenderSlots(containerId, entries, showAsid){
+  const el = $(containerId);
+  if(!entries.length){ el.innerHTML = '<div class="slot empty">empty</div>'; return; }
+  el.innerHTML = entries.map(e=>
+    '<div class="slot">VPN '+e.vpn+' &#8594; PFN '+e.pfn+(showAsid?'<br>ASID '+e.asid:'')+'</div>'
+  ).join('');
+}
+
+function s3Build(){
+  const frames = s3Simulate();
+  const rows = $('s3_chartRows');
+  rows.innerHTML = '';
+  const cols = 'repeat('+frames.length+',minmax(60px,1fr))';
+  ['flush','asid'].forEach(kind=>{
+    const r = document.createElement('div');
+    r.className = 'crow'; r.style.gridTemplateColumns = '90px '+cols;
+    r.innerHTML = '<div class="clab">'+(kind==='flush'?'flush':'ASID')+'</div>';
+    for(let t=0;t<frames.length;t++){
+      const c = document.createElement('div');
+      c.className = 'cell'; c.dataset.t = t; c.dataset.kind = kind;
+      c.addEventListener('click', ()=>{ stop(); go(t+1); });
+      r.appendChild(c);
+    }
+    rows.appendChild(r);
+  });
+  const ax = document.createElement('div');
+  ax.className = 'crow'; ax.style.gridTemplateColumns = '90px '+cols;
+  ax.innerHTML = '<div class="clab"></div>' + frames.map(f=>'<div class="axis">'+f.proc+'</div>').join('');
+  rows.appendChild(ax);
+  return frames;
+}
+
+function s3RenderFrame(fr, idx, frames){
+  document.querySelectorAll('#s3_chartRows .cell').forEach(c=>{
+    const t = +c.dataset.t, kind = c.dataset.kind;
+    const f = frames[t];
+    const hit = kind==='flush' ? f.fHit : f.aHit;
+    let cls = 'cell '+(hit?'hit':'miss');
+    if(t>idx-1) cls+=' future';
+    if(t===idx-1) cls+=' now';
+    c.className = cls;
+    c.textContent = hit ? 'hit' : 'miss';
+  });
+
+  if(!fr){
+    s3RenderSlots('s3_slots_flush', [], false);
+    s3RenderSlots('s3_slots_asid', [], true);
+    $('s3_readout').innerHTML = '';
+    return { title:'Before the first switch', body:'Press Play, or step through one process switch at a time.' };
+  }
+
+  s3RenderSlots('s3_slots_flush', fr.flushSnap, false);
+  s3RenderSlots('s3_slots_asid', fr.asidSnap, true);
+
+  const flushMisses = frames.slice(0,idx).filter(f=>!f.fHit).length;
+  const asidMisses = frames.slice(0,idx).filter(f=>!f.aHit).length;
+  $('s3_readout').innerHTML = 'After '+idx+' run'+(idx>1?'s':'')+': <b style="color:var(--c2)">flush</b> caused '
+    + flushMisses+' miss'+(flushMisses!==1?'es':'')+'; <b style="color:var(--c0)">ASID</b> caused '+asidMisses+' miss'+(asidMisses!==1?'es':'')+'.';
+
+  const title = (fr.switched ? 'Switch to '+fr.proc+', then access VPN 10' : fr.proc+' (still running) accesses VPN 10');
+  const body = 'VPN 10 maps to a different physical frame in each process (P1&#8594;PFN 3, P2&#8594;PFN 9). '
+    + 'Flushing on every switch throws away '+(fr.proc==='P1'?'P1':'P2')+'’s old entry even if it ran moments ago &mdash; correct, but wasteful ('+(fr.fHit?'this happened to hit':'a miss here')+'). '
+    + 'Tagging entries with an ASID lets both processes’ VPN 10 coexist in the TLB, matched only when the ASID also matches ('+(fr.aHit?'a hit here':'a miss here, since it is the first time')+').';
+  return { title, body };
+}
+
+/* =========================================================================
+   Scenario 4 — replacement policy and TLB reach
+   ========================================================================= */
+const S4_PAGES = 6, S4_CAP = 4, S4_LAPS = 2;
+
+function s4Sequence(){
+  const seq = [];
+  for(let lap=0; lap<S4_LAPS; lap++) for(let p=0;p<S4_PAGES;p++) seq.push(p);
+  return seq;
+}
+
+function s4SimulateLRU(seq){
+  let entries = []; // MRU first
+  return seq.map(p=>{
+    const hit = entries.includes(p);
+    entries = hit ? [p, ...entries.filter(v=>v!==p)] : [p, ...entries].slice(0, S4_CAP);
+    return { p, hit, snap:[...entries] };
+  });
+}
+function s4SimulateRandom(seq, seed){
+  const rnd = mulberry32(seed);
+  let entries = [];
+  return seq.map(p=>{
+    const hit = entries.includes(p);
+    if(hit){ /* order doesn't matter for random */ }
+    else if(entries.length < S4_CAP){ entries = [...entries, p]; }
+    else { const victim = Math.floor(rnd()*entries.length); entries = entries.map((v,i)=> i===victim ? p : v); }
+    return { p, hit, snap:[...entries] };
+  });
+}
+
+function s4RenderSlots(containerId, snap){
+  const el = $(containerId);
+  const cells = [];
+  for(let s=0;s<S4_CAP;s++){
+    const v = snap[s];
+    cells.push('<div class="slot'+(v===undefined?' empty':'')+'">'+(v===undefined?'&mdash;':'page '+v)+'</div>');
+  }
+  el.innerHTML = cells.join('');
+}
+
+function s4Build(){
+  const seq = s4Sequence();
+  const lru = s4SimulateLRU(seq);
+  const rnd = s4SimulateRandom(seq, 7);
+  const frames = seq.map((p,t)=>({ p, lru:lru[t], rnd:rnd[t] }));
+
+  const rows = $('s4_chartRows');
+  rows.innerHTML = '';
+  const cols = 'repeat('+frames.length+',minmax(24px,1fr))';
+  ['lru','rand'].forEach(kind=>{
+    const r = document.createElement('div');
+    r.className = 'crow'; r.style.gridTemplateColumns = '54px '+cols;
+    r.innerHTML = '<div class="clab">'+(kind==='lru'?'LRU':'random')+'</div>';
+    for(let t=0;t<frames.length;t++){
+      const c = document.createElement('div');
+      c.className = 'cell'; c.dataset.t = t; c.dataset.kind = kind;
+      c.addEventListener('click', ()=>{ stop(); go(t+1); });
+      r.appendChild(c);
+    }
+    rows.appendChild(r);
+  });
+  const ax = document.createElement('div');
+  ax.className = 'crow'; ax.style.gridTemplateColumns = '54px '+cols;
+  ax.innerHTML = '<div class="clab"></div>' + frames.map(f=>'<div class="axis">'+f.p+'</div>').join('');
+  rows.appendChild(ax);
+  return frames;
+}
+
+function s4RenderFrame(fr, idx, frames){
+  document.querySelectorAll('#s4_chartRows .cell').forEach(c=>{
+    const t = +c.dataset.t, kind = c.dataset.kind;
+    const f = frames[t];
+    const hit = kind==='lru' ? f.lru.hit : f.rnd.hit;
+    let cls = 'cell '+(hit?'hit':'miss');
+    if(t>idx-1) cls+=' future';
+    if(t===idx-1) cls+=' now';
+    c.className = cls;
+    c.textContent = f.p;
+  });
+
+  if(!fr){
+    s4RenderSlots('s4_slots_lru', []);
+    s4RenderSlots('s4_slots_rand', []);
+    $('s4_readout').innerHTML = '';
+    return { title:'Before the first access', body:'Press Play, or step through one page access at a time.' };
+  }
+
+  s4RenderSlots('s4_slots_lru', fr.lru.snap);
+  s4RenderSlots('s4_slots_rand', fr.rnd.snap);
+
+  const done = frames.slice(0, idx);
+  const lruHits = done.filter(f=>f.lru.hit).length;
+  const rndHits = done.filter(f=>f.rnd.hit).length;
+  $('s4_readout').innerHTML = 'After '+idx+' accesses: <b style="color:var(--c2)">LRU</b> hit rate '
+    + Math.round(lruHits/idx*100)+'%; <b style="color:var(--c0)">random</b> hit rate '+Math.round(rndHits/idx*100)+'%.';
+
+  const title = 'Access page '+fr.p;
+  const body = 'The loop revisits 6 pages but the TLB holds only 4. Under LRU, the page needed next is always exactly the one least recently used &mdash; '
+    + (fr.lru.hit ? 'this one happens to still be resident.' : 'so it was just evicted, and this access misses.')
+    + ' Random eviction sometimes keeps the right page by chance &mdash; '
+    + (fr.rnd.hit ? 'it did here.' : 'not this time.');
+  return { title, body };
+}
+
+/* =========================================================================
+   Scenario table
+   ========================================================================= */
+const SC = [
+  {
+    n:'1', tab:'Locality and hit rate', secId:'sec0',
+    blurb:'A loop that sums a 10-element array. Because consecutive elements share a page, once a page’s translation is in the TLB the next few accesses are essentially free. Toggle the layout to see what happens when that assumption breaks.',
+    variants:[{label:'Sequential ints (dense)'},{label:'One element per page (sparse)'}],
+    varLab:'Array layout:',
+    build(vi){ s1BuildCfg = s1Cfg(vi); s1BuildFrames = s1Simulate(s1BuildCfg); return s1Build(); },
+    renderFrame(fr, idx, frames){ return s1RenderFrame(fr, idx, frames, s1BuildCfg); },
+    key(vi){ return vi===0 ? [
+      'Page-table lookups are extra memory references; the TLB turns most of them into a single fast, on-chip lookup.',
+      'A dense array packs several elements per page, so <b>spatial locality</b> means only the first access to a page misses &mdash; the rest hit.',
+      'Here: 3 misses (one per page) and 7 hits out of 10 accesses &mdash; a 70% hit rate, matching the classic OSTEP worked example.',
+      'Loops that revisit the same variables also benefit from <b>temporal locality</b>, for the same reason.'
+    ] : [
+      'Flip the layout so each element occupies a whole page, and locality disappears.',
+      'Every access now touches a brand-new VPN, so every single one misses &mdash; a 0% hit rate no matter how big the TLB is.',
+      'The TLB only helps because real programs reuse pages; it is not magic, it is a bet on locality that usually pays off.',
+      'This is also why traversal order matters for performance (e.g. row-major vs. column-major matrix access).'
+    ]; },
+    side:'<p>Each TLB entry caches one VPN&#8594;PFN mapping (plus valid/protection bits). On a hit, translation costs one lookup in this small, fully-associative cache instead of one or more references to the page table in memory.</p>'
+  },
+  {
+    n:'2', tab:'Who handles a miss', secId:'sec1',
+    blurb:'When the TLB misses, someone has to walk the page table and install the mapping. Architectures split into two camps: hardware does it all invisibly, or hardware traps to the OS and lets software do it.',
+    variants:[{label:'Hardware-managed (e.g. x86)'},{label:'Software-managed (e.g. MIPS)'}],
+    varLab:'TLB miss handling:',
+    build(vi){ return s2Build(vi); },
+    renderFrame(fr, idx, steps){ return s2RenderFrame(fr, idx, steps); },
+    key(vi){ return vi===0 ? [
+      'Hardware-managed TLBs (CISC-style, e.g. x86) have a dedicated page-table walker: the OS is never involved in a miss.',
+      'This keeps miss handling fast, but locks the page-table format into whatever the hardware understands.'
+    ] : [
+      'Software-managed TLBs (RISC-style, e.g. MIPS, SPARC) just trap on a miss and let the OS fill the entry with a privileged instruction.',
+      'The trap must return to the <b>faulting instruction itself</b>, not the next one, since it never completed.',
+      'This gives the OS complete freedom over the page-table data structure, at the cost of a trap on every miss.',
+      'A real danger: the miss handler’s own code and data must never themselves cause a TLB miss, or the CPU loops forever. OSes solve this with a few permanently &ldquo;wired&rdquo; TLB entries, or by keeping the handler in unmapped memory.'
+    ]; },
+    side:'<p>Either way, the sequence ends the same: the faulting instruction is retried, and this time it hits.</p><p>More misses under a software-managed TLB means more traps, so the design trades raw miss-handling speed for flexibility.</p>'
+  },
+  {
+    n:'3', tab:'Context switches and ASIDs', secId:'sec2',
+    blurb:'TLB entries are only meaningful for the address space that installed them. Two processes can both use VPN 10 for completely different pages, so switching processes without care can silently mix up their memory.',
+    build(){ return s3Build(); },
+    renderFrame(fr, idx, frames){ return s3RenderFrame(fr, idx, frames); },
+    key(){ return [
+      'The problem: with no protection, a stale TLB entry from process P1 could let P2 hit and read/write P1’s physical frame &mdash; a correctness bug, not just a slowdown.',
+      'The simple fix is to flush the entire TLB on every context switch. Correct, but every process starts its next slice with a cold TLB.',
+      'The better fix tags each entry with an <b>address-space identifier (ASID)</b>; the hardware only matches an entry when the ASID also matches the currently running process.',
+      'With ASIDs, entries from several processes coexist safely, so a process switched back to can still find its old translations &mdash; no flush needed.',
+      'ASIDs cost extra TLB bits and a limited namespace the OS must manage (recycling IDs as processes come and go).'
+    ]; },
+    side:'<p>Watch the two TLB panels: the flush policy always starts a process’s turn with an empty table, while the ASID policy keeps both processes’ entries around at once.</p>'
+  },
+  {
+    n:'4', tab:'Replacement policy and TLB reach', secId:'sec3',
+    blurb:'A TLB is small: its <b>reach</b> (entries &times; page size) is far smaller than physical memory. When a working set is bigger than the TLB, the replacement policy — and sometimes just bad luck — decides the hit rate.',
+    build(){ return s4Build(); },
+    renderFrame(fr, idx, frames){ return s4RenderFrame(fr, idx, frames); },
+    key(){ return [
+      'TLB reach = number of entries &times; page size. A 4-entry TLB with 16-byte pages reaches only 64 bytes; real TLBs are bigger but so are working sets.',
+      'When a loop’s working set exceeds the TLB’s reach, some misses are unavoidable no matter the policy &mdash; this is a capacity problem, not a policy problem.',
+      'Worse: for a perfectly cyclic access pattern larger than the TLB, LRU is the <i>worst possible</i> policy &mdash; the entry it evicts is always exactly the one needed next, so the hit rate can be 0%.',
+      'Random (or round-robin) replacement has no such pathological case and can do noticeably better here, which is why some real TLBs use it despite LRU sounding smarter.',
+      'One real fix for reach is bigger pages (more bytes covered per entry), traded off against more internal fragmentation &mdash; the same trade-off Chapter 18 raised for page-table size.'
+    ]; },
+    side:'<p>The access pattern here is a 6-page loop repeated twice, with only 4 TLB slots. Compare the two hit-rate readouts as you step through.</p>'
+  },
+];
+
+/* ---------- shared player ---------- */
+const tabsEl=$('tabs'), blurbEl=$('blurb'), segEl=$('seg'), varsEl=$('variants');
+const exTitle=$('exTitle'), exBody=$('exBody'), stepNo=$('stepNo'), pbar=$('pbar'), keyList=$('keyList');
+
+let sc=SC[0], vi=0, frames=[], idx=0, player=null;
+
+SC.forEach((s,i)=>{
+  const b=document.createElement('button');
+  b.className='tab'; b.type='button'; b.setAttribute('role','tab');
+  b.innerHTML='<span class="n">'+s.n+'</span>'+s.tab;
+  b.addEventListener('click',()=>loadScenario(i));
+  tabsEl.appendChild(b);
+});
+
+function loadScenario(i, keepVariant){
+  stop();
+  sc = SC[i];
+  if(!keepVariant) vi = 0;
+  [...tabsEl.children].forEach((t,j)=>t.setAttribute('aria-selected', j===i?'true':'false'));
+  blurbEl.innerHTML = sc.blurb;
+
+  document.querySelectorAll('.scenario-body').forEach(s2=>{ s2.hidden = (s2.id !== sc.secId); });
+
+  varsEl.hidden = !sc.variants;
+  if(sc.variants){
+    $('varLab').textContent = sc.varLab;
+    segEl.innerHTML='';
+    sc.variants.forEach((v,k)=>{
+      const b=document.createElement('button');
+      b.type='button'; b.textContent=v.label;
+      b.setAttribute('aria-pressed', k===vi?'true':'false');
+      b.addEventListener('click',()=>{ vi=k; loadScenario(i,true); });
+      segEl.appendChild(b);
+    });
+  }
+
+  frames = sc.build(vi);
+  const keyItems = typeof sc.key === 'function' ? sc.key(vi) : sc.key;
+  keyList.innerHTML = keyItems.map(t=>'<li>'+t+'</li>').join('');
+  $('sideBody').innerHTML = sc.side;
+
+  go(0, true);
+}
+
+function go(i, instant){
+  idx = Math.max(0, Math.min(frames.length, i));
+  if(instant) document.body.classList.add('instant');
+  const fr = idx>0 ? frames[idx-1] : null;
+
+  const { title, body } = sc.renderFrame(fr, idx, frames);
+  if(fr){
+    stepNo.textContent = 'step '+idx+' of '+frames.length;
+  } else {
+    stepNo.textContent = 'Before the first step';
+  }
+  exTitle.innerHTML = title;
+  exBody.innerHTML = body;
+
+  pbar.style.width = (idx/frames.length*100)+'%';
+  $('btnBack').disabled = idx===0;
+  $('btnNext').disabled = idx===frames.length;
+  if(idx===frames.length) stop();
+  if(instant) requestAnimationFrame(()=>document.body.classList.remove('instant'));
+}
+
+function stop(){ if(player){ clearInterval(player); player=null; } $('btnPlay').innerHTML='&#9654; Play'; }
+function play(){
+  if(player){ stop(); return; }
+  if(idx===frames.length) go(0,true);
+  $('btnPlay').innerHTML='&#10073;&#10073; Pause';
+  player=setInterval(()=>{ if(idx>=frames.length){ stop(); return; } go(idx+1); }, +$('speed').value);
+}
+$('btnPlay').addEventListener('click',play);
+$('btnNext').addEventListener('click',()=>{ stop(); go(idx+1); });
+$('btnBack').addEventListener('click',()=>{ stop(); go(idx-1); });
+$('btnReset').addEventListener('click',()=>{ stop(); go(0,true); });
+$('speed').addEventListener('change',()=>{ if(player){ stop(); play(); } });
+document.addEventListener('keydown',e=>{
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  if(e.key==='ArrowRight'){ stop(); go(idx+1); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'){ stop(); go(idx-1); e.preventDefault(); }
+  else if(e.key===' '){ play(); e.preventDefault(); }
+  else if(['1','2','3','4'].indexOf(e.key)>=0){ loadScenario(+e.key-1); e.preventDefault(); }
+});
+
+loadScenario(0);
+</script>
+</body>
+</html>

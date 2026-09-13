@@ -482,6 +482,48 @@ footer a{color:var(--ink);text-underline-offset:3px}
           </div>
         </a>
       </li>
+      <li>
+        <a class="tool" href="https://srg-ics-uplb.github.io/cmsc125/viztools/tlb/">
+          <svg class="thumb" viewBox="0 0 220 120" aria-hidden="true">
+            <g stroke="#172033" stroke-width="1.5">
+              <rect x="14" y="16" width="70" height="18" fill="#eef2f5"/>
+              <rect x="14" y="34" width="70" height="18" fill="#dde4ea"/>
+              <rect x="14" y="52" width="70" height="18" fill="#eef2f5"/>
+              <rect x="14" y="70" width="70" height="18" fill="#dde4ea"/>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="8" fill="#172033" text-anchor="middle">
+              <text x="49" y="28">VPN 6</text>
+              <text x="49" y="46">VPN 7</text>
+              <text x="49" y="64">VPN 8</text>
+              <text x="49" y="82">VPN 9</text>
+            </g>
+            <path d="M86 43 L120 43" stroke="#172033" stroke-width="2"/><path d="M120 38 L127 43 L120 48 Z" fill="#172033"/>
+            <rect x="128" y="16" width="78" height="72" rx="4" fill="#fff" stroke="#172033" stroke-width="2"/>
+            <text x="167" y="30" font-family="ui-monospace,Menlo,monospace" font-size="8" fill="#4d596b" text-anchor="middle">TLB</text>
+            <g stroke="#172033" stroke-width="1">
+              <rect x="136" y="36" width="62" height="14" fill="#ffd43b"/>
+              <rect x="136" y="52" width="62" height="14" fill="#fff"/>
+              <rect x="136" y="68" width="62" height="14" fill="#fff"/>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="7.5" fill="#172033" text-anchor="middle">
+              <text x="167" y="46">VPN 7&#8594;PFN 3</text>
+              <text x="167" y="62">&mdash;</text>
+              <text x="167" y="78">&mdash;</text>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="8" font-weight="700">
+              <rect x="14" y="96" width="20" height="16" fill="#2b8a3e" stroke="#172033"/><text x="24" y="107.5" fill="#fff" text-anchor="middle">H</text>
+              <rect x="38" y="96" width="20" height="16" fill="#c92a2a" stroke="#172033"/><text x="48" y="107.5" fill="#fff" text-anchor="middle">M</text>
+              <rect x="62" y="96" width="20" height="16" fill="#2b8a3e" stroke="#172033"/><text x="72" y="107.5" fill="#fff" text-anchor="middle">H</text>
+              <rect x="86" y="96" width="20" height="16" fill="#2b8a3e" stroke="#172033"/><text x="96" y="107.5" fill="#fff" text-anchor="middle">H</text>
+            </g>
+          </svg>
+          <div>
+            <p class="tool-title">TLBs: caching address translations</p>
+            <p class="tool-desc">Step through a locality-friendly array loop to see hits pile up, then see who handles a miss, why context switches need ASIDs, and how replacement policy and TLB reach can bite you.</p>
+            <span class="chapter"><b>Chapter 19</b>, Paging: Faster Translations (TLBs)</span>
+          </div>
+        </a>
+      </li>
     </ul>
   </section>
 
