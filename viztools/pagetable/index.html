@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smaller page tables: bigger pages and paged segmentation</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --dark:#26324a;
+  --line:#d3dbe2;
+  --ok:#2b8a3e; --bad:#c92a2a;
+  --mark:#ffd43b;
+  --p0:#c77700; --p0t:#fdebc8; --p0i:#8a4f00;
+  --p1:#0b7285; --p1t:#cdeef1; --p1i:#06606b;
+  --p3:#2b8a3e; --p3t:#d3f0d9; --p3i:#1f6a2f;
+  --sn:#e98b00; --vpn:#fdf3dd; --off:#8fce7a; --mloff:#aed4f2;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.page{max-width:1180px;margin:0 auto;padding:32px 28px 56px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0 0 24px;max-width:76ch;color:var(--ink-soft)}
+h2{font-size:1.25rem;margin:0 0 6px;font-weight:700}
+h3{font-size:1rem;margin:18px 0 6px;font-weight:700}
+.sub{margin:0 0 14px;font-size:.9rem;color:var(--ink-soft)}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+.v1{--g:var(--p0);--gt:var(--p0t);--gi:var(--p0i)}
+.v2{--g:var(--p1);--gt:var(--p1t);--gi:var(--p1i)}
+.v3{--g:var(--p3);--gt:var(--p3t);--gi:var(--p3i)}
+
+/* ---------- Tabs ---------- */
+.tabbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tab{font:inherit;font-size:.98rem;font-weight:700;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:10px 16px;cursor:pointer}
+.tab:hover{background:#fff}
+.tab[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabpanel{display:flex;flex-direction:column;gap:16px}
+
+/* ---------- Controls ---------- */
+.controls-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+.real-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px 12px}
+.real-controls label{display:flex;flex-direction:column;font-size:.84rem;color:var(--ink-soft);gap:3px}
+.real-controls select,.real-controls input{font-size:.92rem;padding:5px 6px;border:2px solid var(--ink);border-radius:5px;background:#fff;color:var(--ink);font-family:var(--sans)}
+.calcbox{margin:12px 0 0;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.65;white-space:pre-wrap}
+.calcbox.err{border-left-color:var(--bad);color:var(--bad)}
+
+/* ---------- Takeaway ---------- */
+.takeaway{margin:0;padding:14px 20px;border-radius:8px;background:var(--mark);border:2px solid var(--ink);font-weight:700;font-size:1.05rem;box-shadow:4px 4px 0 rgba(23,32,51,.15)}
+.takeaway .hl{color:var(--bad)}
+.note{margin:8px 0 0;font-size:.9rem;color:var(--ink-soft)}
+
+/* ---------- Comparison diagram ---------- */
+.cmp-row{display:flex;gap:32px;flex-wrap:wrap;justify-content:center;padding:8px 0 4px}
+.cmp-col{display:flex;flex-direction:column;align-items:center}
+.cmp-title{font-weight:700;font-size:.92rem;margin-bottom:8px;text-align:center}
+.cmp-stack{display:flex;flex-direction:column;width:150px;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.cmp-stack .cell{border-bottom:1px solid var(--line);padding:7px 10px;font-family:var(--mono);font-size:12.5px;text-align:center;background:var(--p0t)}
+.cmp-stack .cell:last-child{border-bottom:0}
+.cmp-stack .cell.dots{background:var(--hatch);color:var(--ink-soft);letter-spacing:2px}
+.cmp-stack.pages .cell{background:#fff}
+.cmp-cap{margin-top:6px;font-family:var(--mono);font-size:.85rem;font-weight:700;color:var(--ink-soft)}
+
+/* ---------- Sparse table ---------- */
+.tablewrap{overflow-x:auto;margin-top:10px}
+table.pt{width:100%;border-collapse:collapse;font-size:.88rem}
+.pt th{text-align:center;font-weight:600;font-size:.78rem;color:var(--ink-soft);border-bottom:2px solid var(--ink);padding:4px 6px;white-space:nowrap}
+.pt th:first-child{text-align:left}
+.pt td{padding:6px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12.5px;text-align:center;white-space:nowrap}
+.pt td:first-child{text-align:left;font-family:var(--sans)}
+.pt tr.valid td{background:#fff}
+.pt tr.valid td:first-child{box-shadow:inset 5px 0 0 var(--ok)}
+.pt tr.gap td{background:repeating-linear-gradient(135deg,#fff 0 6px,#e9ecef 6px 7px);color:var(--ink-soft);font-family:var(--sans);font-style:italic;text-align:center;font-size:.85rem;padding:8px}
+
+/* ---------- Bit strip ---------- */
+.bitstrip{display:flex;border:2px solid var(--ink);border-radius:6px;overflow:hidden;height:52px}
+.bs-seg{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.95rem;border-left:2px solid var(--ink)}
+.bs-seg:first-child{border-left:0}
+.bs-seg.sn{background:var(--sn);color:#fff}
+.bs-seg.vpn{background:var(--vpn)}
+.bs-seg.off{background:var(--off)}
+/* ---------- Per-bit VA diagram (multi-level tab) ---------- */
+.mlbits{margin:14px 0 2px}
+.mlb-row{display:grid;grid-template-columns:repeat(14,minmax(26px,1fr));gap:0}
+.mlb-row.cells{border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.mlb-cell{border-left:1px solid var(--ink);display:flex;align-items:center;justify-content:center;padding:9px 0;font-family:var(--mono);font-weight:700;font-size:1.05rem}
+.mlb-cell:first-child{border-left:0}
+.mlb-cell.pdi{background:var(--p0);color:#fff}
+.mlb-cell.pti{background:var(--p0t)}
+.mlb-cell.off{background:var(--mloff)}
+.mlb-span{position:relative;text-align:center;font-size:.82rem;font-weight:700;color:var(--ink-soft)}
+.brackets-top .mlb-span{align-self:end;padding-bottom:8px;border-bottom:2px solid var(--ink);margin:0 2px 4px}
+.brackets-top .mlb-span::before,.brackets-top .mlb-span::after{content:"";position:absolute;bottom:-2px;width:2px;height:7px;background:var(--ink)}
+.brackets-bottom .mlb-span{padding-top:8px;border-top:2px solid var(--ink);margin:4px 2px 0}
+.brackets-bottom .mlb-span::before,.brackets-bottom .mlb-span::after{content:"";position:absolute;top:-2px;width:2px;height:7px;background:var(--ink)}
+.mlb-span::before{left:0}
+.mlb-span::after{right:0}
+.bits-caption{text-align:center;font-weight:700;font-size:.88rem;margin:6px 0 0}
+.bs-caps{display:flex;margin-top:4px}
+.bs-cap{border-left:2px dashed var(--line);padding-left:6px;font-size:.8rem;color:var(--ink-soft);text-align:left}
+.bs-cap:first-child{border-left:0}
+.bs-cap b{display:block;color:var(--ink);font-family:var(--mono)}
+
+table.sn{border-collapse:collapse;margin-top:12px;font-size:.9rem}
+table.sn th,table.sn td{border:1px solid var(--line);padding:5px 12px;font-family:var(--mono);text-align:left}
+table.sn th{background:#fff;font-family:var(--sans);font-weight:700;font-size:.82rem;color:var(--ink-soft)}
+
+/* ---------- Toy demo ---------- */
+.toy-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:14px}
+.seg-card{border:2px solid var(--line);border-radius:8px;padding:10px 12px;background:#fff}
+.seg-card.active{border-color:var(--ink);box-shadow:3px 3px 0 rgba(23,32,51,.15)}
+.seg-card h4{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:6px}
+.seg-dot{width:12px;height:12px;border-radius:3px;display:inline-block;border:1.5px solid var(--ink)}
+.seg-card p{margin:0 0 8px;font-size:.8rem;color:var(--ink-soft)}
+.seg-none{color:var(--ink-soft);font-size:.85rem;font-style:italic;padding:16px 4px}
+.seg-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.seg-table td{padding:2px 4px;border-bottom:1px solid var(--line);font-family:var(--mono);text-align:center}
+.seg-table td:first-child{text-align:left}
+.seg-table tr.inv td{color:#b6bfc8}
+.seg-table tr.hit td{background:var(--mark)}
+
+.translate-row{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-top:14px}
+#toyVA{font-family:var(--mono);font-size:1rem;width:110px;padding:7px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink)}
+#toyVA[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 2px #ffd6d6}
+button{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover{background:#fff}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover{background:#2c3a57}
+.chip{font-size:.85rem;padding:5px 10px;border-width:1.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips>span{font-size:.85rem;color:var(--ink-soft)}
+
+.toy-result{margin-top:14px;padding:12px 16px;border:2px solid var(--ink);border-radius:8px;background:#fff;font-family:var(--mono);font-size:.95rem;line-height:1.7;white-space:pre-wrap}
+.toy-result.fault{border-color:var(--bad);background:#fff0f0;color:var(--bad)}
+.toy-result .split{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.toy-bit{padding:3px 9px;border-radius:5px;border:2px solid var(--ink);font-weight:700}
+.toy-bit.sn{background:var(--sn);color:#fff}
+.toy-bit.vpn{background:var(--vpn)}
+.toy-bit.off{background:var(--off)}
+
+@media (max-width: 900px){
+  .controls-row{grid-template-columns:1fr}
+  .toy-grid{grid-template-columns:1fr}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 40px}
+  h1{font-size:1.7rem}
+  .cmp-row{gap:16px}
+  .cmp-stack{width:130px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Smaller page tables</h1>
+    <p class="intro">Chapter 18's linear page table has one entry for every page in the address space, whether or not it's used. This tool follows Chapter 20, Paging: Smaller Tables, through four ways to shrink it: bigger pages, combining paging with segmentation, and multi-level page tables.</p>
+  </header>
+
+  <nav class="tabbar" role="tablist" aria-label="Choose an approach">
+    <button class="tab" role="tab" id="tabbtn-linear" aria-selected="true" aria-controls="panel-linear" data-tab="linear">1 · Linear page tables</button>
+    <button class="tab" role="tab" id="tabbtn-bigger" aria-selected="false" aria-controls="panel-bigger" data-tab="bigger">2 · Bigger pages</button>
+    <button class="tab" role="tab" id="tabbtn-hybrid" aria-selected="false" aria-controls="panel-hybrid" data-tab="hybrid">3 · Paged segmentation</button>
+    <button class="tab" role="tab" id="tabbtn-multilevel" aria-selected="false" aria-controls="panel-multilevel" data-tab="multilevel">4 · Multi-level paging</button>
+  </nav>
+
+  <!-- ================= TAB 1: LINEAR ================= -->
+  <section class="tabpanel" id="panel-linear" role="tabpanel" aria-labelledby="tabbtn-linear">
+    <div class="controls-row">
+      <section class="panel">
+        <h2>One page table per process</h2>
+        <p class="sub">We usually have one linear page table for every process in the system. Assume a 32-bit address space with 4KB pages and a 4-byte page-table entry.</p>
+        <div class="real-controls">
+          <label>Address space <select id="lAddr"></select></label>
+          <label>Page size <select id="lPage"></select></label>
+          <label>PTE size <select id="lPte"></select></label>
+        </div>
+        <pre class="calcbox" id="lCalc"></pre>
+      </section>
+      <section class="panel">
+        <h2>Page Table of Process A</h2>
+        <p class="sub">One entry per page in the whole address space, no matter how much of it the process is using.</p>
+        <div class="cmp-row">
+          <div class="cmp-col">
+            <div class="cmp-title">Page Table of<br>Process A</div>
+            <div class="cmp-stack">
+              <div class="cell">entry</div><div class="cell">entry</div><div class="cell">entry</div>
+              <div class="cell dots">⋮</div><div class="cell">entry</div>
+            </div>
+            <div class="cmp-cap" id="lPteCap"></div>
+          </div>
+          <div class="cmp-col">
+            <div class="cmp-title">Physical Memory</div>
+            <div class="cmp-stack pages">
+              <div class="cell">Page 0</div><div class="cell">Page 1</div><div class="cell">Page 2</div>
+              <div class="cell dots">⋮</div><div class="cell">Page n</div>
+            </div>
+            <div class="cmp-cap" id="lPageCap"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <p class="takeaway">Page tables are <span class="hl">too big</span> and thus consume too much memory.</p>
+  </section>
+
+  <!-- ================= TAB 2: BIGGER PAGES ================= -->
+  <section class="tabpanel" id="panel-bigger" role="tabpanel" aria-labelledby="tabbtn-bigger" hidden>
+    <div class="controls-row">
+      <section class="panel">
+        <h2>Shrink the table with bigger pages</h2>
+        <p class="sub">Page tables are too big and consume too much memory — so try 16KB pages instead of 4KB.</p>
+        <div class="real-controls">
+          <label>Address space <select id="bAddr"></select></label>
+          <label>Page size <select id="bPage"></select></label>
+          <label>PTE size <select id="bPte"></select></label>
+        </div>
+        <pre class="calcbox" id="bCalc"></pre>
+        <p class="note" id="bCompare"></p>
+      </section>
+      <section class="panel">
+        <h2>Same idea, fewer entries</h2>
+        <p class="sub">Bigger pages mean fewer virtual pages, so the page table has fewer rows.</p>
+        <div class="cmp-row">
+          <div class="cmp-col">
+            <div class="cmp-title">Page Table of<br>Process A</div>
+            <div class="cmp-stack">
+              <div class="cell">entry</div><div class="cell">entry</div>
+              <div class="cell dots">⋮</div><div class="cell">entry</div>
+            </div>
+            <div class="cmp-cap" id="bPteCap"></div>
+          </div>
+          <div class="cmp-col">
+            <div class="cmp-title">Physical Memory</div>
+            <div class="cmp-stack pages">
+              <div class="cell">Page 0</div><div class="cell">Page 1</div>
+              <div class="cell dots">⋮</div><div class="cell">Page n</div>
+            </div>
+            <div class="cmp-cap" id="bPageCap"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <p class="takeaway">Big pages lead to <span class="hl">internal fragmentation</span>: a page holding a little bit of data still burns a whole page's worth of physical memory.</p>
+
+    <section class="panel">
+      <h2>Most of the table is unused</h2>
+      <p class="sub">However many bits it has, a flat page table still needs one entry for every page in the address space — including the huge gap between the heap and the stack that a process never touches. Full of invalid entries, most of the table is wasted whether pages are 4KB or 16KB.</p>
+      <div class="tablewrap">
+        <table class="pt" id="sparseTable">
+          <thead><tr><th>Page</th><th>PFN</th><th>valid</th><th>prot</th><th>present</th><th>dirty</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="sub" id="sparseNote" style="margin-top:8px"></p>
+    </section>
+  </section>
+
+  <!-- ================= TAB 3: HYBRID ================= -->
+  <section class="tabpanel" id="panel-hybrid" role="tabpanel" aria-labelledby="tabbtn-hybrid" hidden>
+    <section class="panel">
+      <h2>Simple example of a hybrid approach</h2>
+      <p class="sub">Each process has <b>three</b> page tables, one for each segment. While the process runs, the base register for each segment holds the physical address of a linear page table for just that segment — so an entirely unused segment needs no table at all.</p>
+      <h3>32-bit virtual address, 4KB pages</h3>
+      <div class="bitstrip">
+        <div class="bs-seg sn" style="flex:2">SN</div>
+        <div class="bs-seg vpn" style="flex:18">VPN</div>
+        <div class="bs-seg off" style="flex:12">Offset</div>
+      </div>
+      <div class="bs-caps">
+        <div class="bs-cap" style="flex:2">bits 31–30<b>2 bits</b></div>
+        <div class="bs-cap" style="flex:18">bits 29–12<b>18 bits</b></div>
+        <div class="bs-cap" style="flex:12">bits 11–0<b>12 bits</b></div>
+      </div>
+      <table class="sn">
+        <thead><tr><th>SN value</th><th>Content</th></tr></thead>
+        <tbody>
+          <tr><td>00</td><td>unused segment</td></tr>
+          <tr><td>01</td><td>code</td></tr>
+          <tr><td>10</td><td>heap</td></tr>
+          <tr><td>11</td><td>stack</td></tr>
+        </tbody>
+      </table>
+      <pre class="calcbox">flat table (Chapter 18)   = 2^32 / 2^12 × 4 B = 4 MB
+each segment's own table = 2^18 × 4 B = 1 MB, at most
+segment 00 (unused)      = 0 B — nothing to allocate</pre>
+      <p class="note">A used segment's table is still sized to that whole segment, so a small heap still reserves a full 1MB table. Paged segmentation only pays off when several segments genuinely go unused — it doesn't fix sparseness inside one big segment. Multi-level page tables fix that, later in this chapter.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Try a small hybrid address space</h2>
+      <p class="sub">To see the idea work end to end, scale everything down: a 10-bit virtual address (1024 bytes), split into a 2-bit segment number, a 4-bit VPN and a 4-bit offset — 16-byte pages, up to 16 pages per segment.</p>
+
+      <div class="toy-grid" id="segCards"></div>
+
+      <div class="translate-row">
+        <label for="toyVA" style="font-weight:700">Translate an address</label>
+        <input id="toyVA" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 261">
+        <button id="btnToy" class="primary" type="button">Translate</button>
+        <div class="chips">
+          <span>Or try</span>
+          <button class="chip" type="button" data-va="261">261 · code</button>
+          <button class="chip" type="button" data-va="544">544 · heap</button>
+          <button class="chip" type="button" data-va="1011">1011 · stack</button>
+          <button class="chip" type="button" data-va="20">20 · unused segment</button>
+          <button class="chip" type="button" data-va="336">336 · unallocated page</button>
+        </div>
+      </div>
+      <div class="toy-result" id="toyResult">Pick an address above to see it split into SN, VPN and offset, and looked up in that segment's table.</div>
+    </section>
+  </section>
+
+  <!-- ================= TAB 4: MULTI-LEVEL ================= -->
+  <section class="tabpanel" id="panel-multilevel" role="tabpanel" aria-labelledby="tabbtn-multilevel" hidden>
+    <section class="panel">
+      <h2>Why go multi-level?</h2>
+      <p class="sub">Paged segmentation already skips the table for a whole unused <i>segment</i>. A multi-level table goes further: it adds one more layer of indirection — a <b>page directory</b> — so that if just a <i>range</i> of VPNs within a region is unused, the OS never has to allocate the page of PTEs that would have covered it. The trade-off is one extra memory reference on every translation, even a successful one.</p>
+    </section>
+
+    <section class="panel">
+      <h2>A 16-KB address space with 64-byte pages</h2>
+      <div class="controls-row">
+        <div>
+          <table class="sn">
+            <thead><tr><th>Parameter</th><th>Detail</th></tr></thead>
+            <tbody>
+              <tr><td>Address space</td><td>16 KB</td></tr>
+              <tr><td>Page size</td><td>64 bytes</td></tr>
+              <tr><td>Virtual address</td><td>14 bits</td></tr>
+              <tr><td>VPN</td><td>8 bits</td></tr>
+              <tr><td>Offset</td><td>6 bits</td></tr>
+              <tr><td># of PTEs</td><td>2<sup>8</sup> (256)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <table class="sn">
+            <thead><tr><th>VPN range</th><th>Region</th></tr></thead>
+            <tbody>
+              <tr><td>0000 0000 – 0000 0001</td><td>code</td></tr>
+              <tr><td>0000 0010 – 0000 0011</td><td>(free)</td></tr>
+              <tr><td>0000 0100 – 0000 0101</td><td>heap</td></tr>
+              <tr><td>0000 0110 – 1111 1101</td><td>(free)</td></tr>
+              <tr><td>1111 1110 – 1111 1111</td><td>stack</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mlbits">
+        <div class="mlb-row brackets-top">
+          <div class="mlb-span" style="grid-column:1/5">Page Directory Index</div>
+          <div class="mlb-span" style="grid-column:5/9">Page Table Index</div>
+        </div>
+        <div class="mlb-row cells" id="mlCells"></div>
+        <div class="mlb-row brackets-bottom">
+          <div class="mlb-span" style="grid-column:1/9">VPN</div>
+          <div class="mlb-span" style="grid-column:9/15">Offset</div>
+        </div>
+      </div>
+      <p class="bits-caption">14-bit Virtual address</p>
+      <p class="note">The top 4 bits of the VPN (13–10) pick one of 16 page-directory entries; the next 4 bits (9–6) then pick one of 16 entries inside whichever page of PTEs that entry points to. The low 6 bits (5–0) are the offset within the 64-byte page and never get translated.</p>
+    </section>
+
+    <section class="panel">
+      <h2>The two-level table in memory</h2>
+      <p class="sub">Only 2 of the 16 page-directory entries are valid, so only 2 pages of PTEs exist at all — one at PFN 100 covering VPNs 0000 xxxx (code and heap), the other at PFN 101 covering VPNs 1111 xxxx (the stack). Every other 4-bit prefix needs nothing.</p>
+      <div class="toy-grid" id="mlTables"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Translate a virtual address</h2>
+      <p class="sub">Decimal or hex (0x…), from 0 to 16383.</p>
+      <div class="translate-row">
+        <label for="mlVA" style="font-weight:700">Translate</label>
+        <input id="mlVA" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 0x3F80">
+        <button id="btnML" class="primary" type="button">Translate</button>
+        <div class="chips">
+          <span>Or try</span>
+          <button class="chip" type="button" data-va="0x3">0x3 · code</button>
+          <button class="chip" type="button" data-va="0x100">0x100 · heap</button>
+          <button class="chip" type="button" data-va="0x3F80">0x3F80 · stack (the worked example)</button>
+          <button class="chip" type="button" data-va="0x1400">0x1400 · unmapped region</button>
+          <button class="chip" type="button" data-va="0x200">0x200 · unallocated page</button>
+        </div>
+      </div>
+      <div class="toy-result" id="mlResult">Pick an address above to walk the page directory, then the page of PTEs it points to.</div>
+    </section>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const UNITS = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+function human (bytes) {
+  let u = 0, v = bytes;
+  while (v >= 1024 && u < UNITS.length - 1) { v /= 1024; u++; }
+  const s = v >= 100 || Number.isInteger(v) ? Math.round(v).toLocaleString() : v.toFixed(v >= 10 ? 1 : 2);
+  return `${s} ${UNITS[u]}`;
+}
+const fmtN = n => n <= 1e15 ? n.toLocaleString() : n.toExponential(2);
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    document.querySelectorAll('.tabpanel').forEach(p => p.hidden = p.id !== `panel-${btn.dataset.tab}`);
+  });
+});
+
+/* =========================================================
+   Linear / bigger-page calculators
+   ========================================================= */
+const ADDR_OPTS = [[16, '16-bit'], [20, '20-bit'], [24, '24-bit'], [32, '32-bit'], [36, '36-bit'], [48, '48-bit']];
+const PAGE_OPTS = [[10, '1KB'], [12, '4KB'], [14, '16KB'], [16, '64KB'], [18, '256KB'], [20, '1MB'], [21, '2MB']];
+const PTE_OPTS = [[4, '4 bytes'], [8, '8 bytes']];
+
+function fillSelect (sel, opts, def) {
+  sel.innerHTML = opts.map(([v, l]) => `<option value="${v}"${v === def ? ' selected' : ''}>${l}</option>`).join('');
+}
+fillSelect($('lAddr'), ADDR_OPTS, 32); fillSelect($('lPage'), PAGE_OPTS, 12); fillSelect($('lPte'), PTE_OPTS, 4);
+fillSelect($('bAddr'), ADDR_OPTS, 32); fillSelect($('bPage'), PAGE_OPTS, 14); fillSelect($('bPte'), PTE_OPTS, 4);
+
+function calcTable (addrBits, pageBits, pteBytes) {
+  const vpnBits = addrBits - pageBits;
+  if (vpnBits <= 0) return null;
+  const entries = 2 ** vpnBits;
+  return { vpnBits, entries, size: entries * pteBytes };
+}
+
+let lastLinear = null;
+
+function renderLinear () {
+  const A = +$('lAddr').value, P = +$('lPage').value, E = +$('lPte').value;
+  const r = calcTable(A, P, E);
+  const box = $('lCalc');
+  if (!r) { box.className = 'calcbox err'; box.textContent = 'Page size must be smaller than the address space.'; return; }
+  box.className = 'calcbox';
+  box.textContent = [
+    `VPN bits = ${A} − ${P} = ${r.vpnBits}`,
+    `entries  = 2^${r.vpnBits} = ${fmtN(r.entries)}`,
+    `size     = ${fmtN(r.entries)} × ${E} B = ${human(r.size)}`,
+  ].join('\n');
+  $('lPteCap').textContent = `${E} B / entry`;
+  $('lPageCap').textContent = PAGE_OPTS.find(o => o[0] === P)[1] + ' / page';
+  lastLinear = r;
+  renderCompare();
+}
+
+function renderBigger () {
+  const A = +$('bAddr').value, P = +$('bPage').value, E = +$('bPte').value;
+  const r = calcTable(A, P, E);
+  const box = $('bCalc');
+  if (!r) { box.className = 'calcbox err'; box.textContent = 'Page size must be smaller than the address space.'; sparse(null); return; }
+  box.className = 'calcbox';
+  box.textContent = [
+    `VPN bits = ${A} − ${P} = ${r.vpnBits}`,
+    `entries  = 2^${r.vpnBits} = ${fmtN(r.entries)}`,
+    `size     = ${fmtN(r.entries)} × ${E} B = ${human(r.size)}`,
+  ].join('\n');
+  $('bPteCap').textContent = `${E} B / entry`;
+  $('bPageCap').textContent = PAGE_OPTS.find(o => o[0] === P)[1] + ' / page';
+  sparse(r);
+  renderCompare();
+}
+
+function renderCompare () {
+  if (!lastLinear) return;
+  const A = +$('bAddr').value, P = +$('bPage').value, E = +$('bPte').value;
+  const r = calcTable(A, P, E);
+  if (!r) { $('bCompare').textContent = ''; return; }
+  if (r.size === lastLinear.size) { $('bCompare').textContent = 'Same size as the table on the first tab.'; return; }
+  const smaller = r.size < lastLinear.size;
+  const ratio = smaller ? lastLinear.size / r.size : r.size / lastLinear.size;
+  $('bCompare').textContent = `${ratio.toFixed(ratio < 10 ? 1 : 0)}× ${smaller ? 'smaller' : 'bigger'} than the table on the first tab (${human(lastLinear.size)}).`;
+}
+
+function sparse (r) {
+  if (!r) { $('sparseTable').querySelector('tbody').innerHTML = ''; $('sparseNote').textContent = ''; return; }
+  const wasted = r.entries - 3;
+  const g1 = Math.floor(wasted * 0.4), g2 = wasted - g1;
+  $('sparseTable').querySelector('tbody').innerHTML = [
+    `<tr class="valid"><td>0 · code</td><td>10</td><td>1</td><td>r-x</td><td>1</td><td>0</td></tr>`,
+    `<tr class="gap"><td colspan="6">${fmtN(g1)} more entries — the unused gap before the heap</td></tr>`,
+    `<tr class="valid"><td>heap</td><td>15</td><td>1</td><td>rw-</td><td>1</td><td>1</td></tr>`,
+    `<tr class="gap"><td colspan="6">${fmtN(g2)} more entries — the unused gap before the stack</td></tr>`,
+    `<tr class="valid"><td>stack (top)</td><td>3</td><td>1</td><td>rw-</td><td>1</td><td>1</td></tr>`,
+    `<tr class="valid"><td>stack</td><td>23</td><td>1</td><td>rw-</td><td>1</td><td>1</td></tr>`,
+  ].join('');
+  const pct = wasted / r.entries * 100;
+  $('sparseNote').textContent = `Out of ${fmtN(r.entries)} possible entries, only 3 are ever valid in this example — ${pct >= 99.9 ? '>99.9' : pct.toFixed(1)}% of the table is dead weight.`;
+}
+
+['lAddr', 'lPage', 'lPte'].forEach(id => $(id).onchange = renderLinear);
+['bAddr', 'bPage', 'bPte'].forEach(id => $(id).onchange = renderBigger);
+renderLinear();
+renderBigger();
+
+/* =========================================================
+   Toy hybrid address space: 10-bit VA = SN(2) + VPN(4) + OFF(4)
+   ========================================================= */
+const T_PAGE = 16, T_VA_MAX = 1024;
+const bin2 = v => v.toString(2).padStart(2, '0');
+const bin4 = v => v.toString(2).padStart(4, '0');
+const SEGMENTS = [
+  { sn: 0, name: 'unused', cls: '', color: '#adb5bd', entries: null, note: 'Segment 00 has no page table — there is nothing to look up.' },
+  { sn: 1, name: 'code', cls: 'v1', color: 'var(--p0)', note: 'Grows up from page 0.',
+    entries: mkEntries({ 0: 2, 1: 3 }) },
+  { sn: 2, name: 'heap', cls: 'v2', color: 'var(--p1)', note: 'Grows up from page 0.',
+    entries: mkEntries({ 0: 5, 1: 6, 2: 9 }) },
+  { sn: 3, name: 'stack', cls: 'v3', color: 'var(--p3)', note: 'Grows down from page 15.',
+    entries: mkEntries({ 15: 13, 14: 12 }) },
+];
+function mkEntries (map) {
+  const arr = [];
+  for (let i = 0; i < 16; i++) arr.push(map[i] !== undefined ? { valid: true, pfn: map[i] } : { valid: false, pfn: null });
+  return arr;
+}
+
+function renderSegCards (hitSn = null, hitVpn = null) {
+  $('segCards').innerHTML = SEGMENTS.map(seg => {
+    const active = hitSn === seg.sn ? ' active' : '';
+    if (!seg.entries) {
+      return `<div class="seg-card${active}"><h4><span class="seg-dot" style="background:${seg.color}"></span>SN ${bin2(seg.sn)} · ${seg.name}</h4><p>${seg.note}</p><div class="seg-none">No page table needed.</div></div>`;
+    }
+    const rows = seg.entries.map((e, vpn) => {
+      const hit = hitSn === seg.sn && hitVpn === vpn ? ' hit' : '';
+      return `<tr class="${e.valid ? '' : 'inv'}${hit}"><td>${vpn}</td><td>${e.valid ? e.pfn : '—'}</td><td>${e.valid ? 1 : 0}</td></tr>`;
+    }).join('');
+    return `<div class="seg-card ${seg.cls}${active}"><h4><span class="seg-dot" style="background:${seg.color}"></span>SN ${bin2(seg.sn)} · ${seg.name}</h4><p>${seg.note}</p>` +
+      `<table class="seg-table"><tbody><tr><td><b>VPN</b></td><td><b>PFN</b></td><td><b>V</b></td></tr>${rows}</tbody></table></div>`;
+  }).join('');
+}
+renderSegCards();
+
+function parseToyVA (raw) {
+  const t = raw.trim();
+  if (t === '') return { err: 'Type a virtual address first, for example 261.' };
+  if (!/^\d+$/.test(t)) return { err: `“${t}” is not a decimal address.` };
+  const v = parseInt(t, 10);
+  if (v >= T_VA_MAX) return { err: `${v} is past the end of the 1024-byte toy address space (0–1023).` };
+  return { v };
+}
+
+function translateToy (raw) {
+  const input = $('toyVA'), out = $('toyResult');
+  const r = parseToyVA(raw);
+  if (r.err) { out.className = 'toy-result fault'; out.textContent = r.err; input.setAttribute('aria-invalid', 'true'); renderSegCards(); return; }
+  input.removeAttribute('aria-invalid');
+  const va = r.v, sn = (va >> 8) & 0b11, vpn = (va >> 4) & 0xF, off = va & 0xF;
+  const seg = SEGMENTS[sn];
+  const split = `<div class="split"><span class="toy-bit sn">SN ${bin2(sn)}</span><span class="toy-bit vpn">VPN ${bin4(vpn)}</span><span class="toy-bit off">off ${bin4(off)}</span></div>`;
+
+  if (!seg.entries) {
+    out.className = 'toy-result fault';
+    out.innerHTML = `${split}Address ${va} → segment ${sn} (${seg.name}). Fault: this segment has no page table at all — the hardware doesn't even need to look anything up to know it's invalid.`;
+    renderSegCards(sn, null);
+    return;
+  }
+  const e = seg.entries[vpn];
+  renderSegCards(sn, vpn);
+  if (!e.valid) {
+    out.className = 'toy-result fault';
+    out.innerHTML = `${split}Address ${va} → segment ${sn} (${seg.name}), page ${vpn}. Fault: V = 0 — page ${vpn} of the ${seg.name} segment has never been allocated.`;
+    return;
+  }
+  const pa = e.pfn * T_PAGE + off;
+  out.className = 'toy-result';
+  out.innerHTML = `${split}Address ${va} → segment ${sn} (${seg.name}), page ${vpn} → frame ${e.pfn}.\nPhysical address = (${e.pfn} × 16) + ${off} = ${pa}`;
+}
+
+$('btnToy').onclick = () => translateToy($('toyVA').value);
+$('toyVA').addEventListener('keydown', e => { if (e.key === 'Enter') translateToy(e.target.value); });
+document.querySelectorAll('#panel-hybrid .chip').forEach(c => {
+  c.onclick = () => { $('toyVA').value = c.dataset.va; translateToy(c.dataset.va); };
+});
+
+/* =========================================================
+   Multi-level paging: 14-bit VA = PDI(4) + PTI(4) + offset(6)
+   ========================================================= */
+const ML_VA_MAX = 16384;
+const PAGE_DIR = Array.from({ length: 16 }, (_, i) =>
+  i === 0 ? { pfn: 100, valid: 1 } : i === 15 ? { pfn: 101, valid: 1 } : { pfn: null, valid: 0 });
+const PT100 = [
+  { pfn: 10, valid: 1, prot: 'r-x' }, { pfn: 23, valid: 1, prot: 'r-x' },
+  { pfn: null, valid: 0, prot: '—' }, { pfn: null, valid: 0, prot: '—' },
+  { pfn: 80, valid: 1, prot: 'rw-' }, { pfn: 59, valid: 1, prot: 'rw-' },
+  ...Array.from({ length: 10 }, () => ({ pfn: null, valid: 0, prot: '—' })),
+];
+const PT101 = [
+  ...Array.from({ length: 14 }, () => ({ pfn: null, valid: 0, prot: '—' })),
+  { pfn: 55, valid: 1, prot: 'rw-' }, { pfn: 45, valid: 1, prot: 'rw-' },
+];
+const PT_BY_PFN = { 100: PT100, 101: PT101 };
+const hexA = v => '0x' + v.toString(16).toUpperCase();
+
+function buildMLBits () {
+  let h = '';
+  for (let i = 13; i >= 0; i--) {
+    const cls = i >= 10 ? 'pdi' : i >= 6 ? 'pti' : 'off';
+    h += `<div class="mlb-cell ${cls}">${i}</div>`;
+  }
+  $('mlCells').innerHTML = h;
+}
+buildMLBits();
+
+function renderMLTables (hitPDI = null, hitPTPfn = null, hitPTI = null) {
+  const pdRows = PAGE_DIR.map((e, i) =>
+    `<tr class="${e.valid ? '' : 'inv'}${hitPDI === i ? ' hit' : ''}"><td>${i}</td><td>${e.valid ? e.pfn : '—'}</td><td>${e.valid ? 1 : 0}</td></tr>`).join('');
+  const ptRows = (t, tag) => t.map((e, i) =>
+    `<tr class="${e.valid ? '' : 'inv'}${hitPTPfn === tag && hitPTI === i ? ' hit' : ''}"><td>${i}</td><td>${e.valid ? e.pfn : '—'}</td><td>${e.valid ? 1 : 0}</td><td>${e.prot}</td></tr>`).join('');
+  $('mlTables').innerHTML =
+    `<div class="seg-card${hitPDI != null ? ' active' : ''}"><h4>Page Directory</h4><p>16 entries, one per top-4-bit VPN prefix.</p>` +
+    `<table class="seg-table"><tbody><tr><td><b>Idx</b></td><td><b>PFN</b></td><td><b>V</b></td></tr>${pdRows}</tbody></table></div>` +
+    `<div class="seg-card${hitPTPfn === 100 ? ' active' : ''}"><h4>Page of PT @ PFN 100</h4><p>Covers VPN 0000 xxxx — code and heap.</p>` +
+    `<table class="seg-table"><tbody><tr><td><b>Idx</b></td><td><b>PFN</b></td><td><b>V</b></td><td><b>Prot</b></td></tr>${ptRows(PT100, 100)}</tbody></table></div>` +
+    `<div class="seg-card${hitPTPfn === 101 ? ' active' : ''}"><h4>Page of PT @ PFN 101</h4><p>Covers VPN 1111 xxxx — the stack.</p>` +
+    `<table class="seg-table"><tbody><tr><td><b>Idx</b></td><td><b>PFN</b></td><td><b>V</b></td><td><b>Prot</b></td></tr>${ptRows(PT101, 101)}</tbody></table></div>`;
+}
+renderMLTables();
+
+function parseMLVA (raw) {
+  const t = raw.trim().replace(/[_\s]/g, '');
+  if (t === '') return { err: 'Type a virtual address first, for example 0x3F80.' };
+  let v = NaN;
+  if (/^0x[0-9a-f]+$/i.test(t)) v = parseInt(t.slice(2), 16);
+  else if (/^0b[01]+$/i.test(t)) v = parseInt(t.slice(2), 2);
+  else if (/^\d+$/.test(t)) v = parseInt(t, 10);
+  if (Number.isNaN(v)) return { err: `"${raw.trim()}" is not an address. Use decimal or hex (0x…).` };
+  if (v >= ML_VA_MAX) return { err: `${v} is past the end of the 16KB address space. Addresses run from 0 to ${ML_VA_MAX - 1}.` };
+  return { v };
+}
+
+function translateML (raw) {
+  const input = $('mlVA'), out = $('mlResult');
+  const r = parseMLVA(raw);
+  if (r.err) { out.className = 'toy-result fault'; out.textContent = r.err; input.setAttribute('aria-invalid', 'true'); renderMLTables(); return; }
+  input.removeAttribute('aria-invalid');
+  const va = r.v, pdi = (va >> 10) & 0xF, pti = (va >> 6) & 0xF, off = va & 0x3F;
+  const split = `<div class="split"><span class="toy-bit sn">PDI ${bin4(pdi)}</span><span class="toy-bit vpn">PTI ${bin4(pti)}</span><span class="toy-bit off">off ${off.toString(2).padStart(6, '0')}</span></div>`;
+  const pd = PAGE_DIR[pdi];
+  if (!pd.valid) {
+    out.className = 'toy-result fault';
+    out.innerHTML = `${split}Address ${va} (${hexA(va)}) → Page Directory index ${pdi}. Fault: this entry is invalid — there is no page of PTEs for this region at all, so the OS never had to allocate one.`;
+    renderMLTables(pdi, null, null);
+    return;
+  }
+  const pt = PT_BY_PFN[pd.pfn];
+  renderMLTables(pdi, pd.pfn, pti);
+  const pte = pt[pti];
+  if (!pte.valid) {
+    out.className = 'toy-result fault';
+    out.innerHTML = `${split}Address ${va} (${hexA(va)}) → PD index ${pdi} → PFN ${pd.pfn} (valid) → PT index ${pti}. Fault: V = 0 — this page has never been allocated.`;
+    return;
+  }
+  const pa = (pte.pfn << 6) | off;
+  out.className = 'toy-result';
+  out.innerHTML = `${split}Address ${va} (${hexA(va)}) → PD index ${pdi} → PFN ${pd.pfn} → PT index ${pti} → PFN ${pte.pfn} (${pte.prot}).\nPhysical address = (${pte.pfn} << 6) | ${off} = ${pa} (${hexA(pa)})`;
+}
+
+$('btnML').onclick = () => translateML($('mlVA').value);
+$('mlVA').addEventListener('keydown', e => { if (e.key === 'Enter') translateML(e.target.value); });
+document.querySelectorAll('#panel-multilevel .chip').forEach(c => {
+  c.onclick = () => { $('mlVA').value = c.dataset.va; translateML(c.dataset.va); };
+});
+</script>
+</body>
+</html>

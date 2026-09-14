@@ -524,6 +524,48 @@ footer a{color:var(--ink);text-underline-offset:3px}
           </div>
         </a>
       </li>
+      <li>
+        <a class="tool" href="https://srg-ics-uplb.github.io/cmsc125/viztools/pagetable/">
+          <svg class="thumb" viewBox="0 0 220 120" aria-hidden="true">
+            <g stroke="#172033" stroke-width="1.5">
+              <rect x="14" y="20" width="24" height="26" fill="#e98b00"/>
+              <rect x="38" y="20" width="128" height="26" fill="#fdf3dd"/>
+              <rect x="166" y="20" width="40" height="26" fill="#8fce7a"/>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="8" font-weight="700" fill="#172033" text-anchor="middle">
+              <text x="26" y="37">SN</text>
+              <text x="102" y="37">VPN</text>
+              <text x="186" y="37">off</text>
+            </g>
+            <g stroke="#172033" stroke-width="1.2">
+              <rect x="14" y="60" width="52" height="16" fill="#fff"/>
+              <rect x="14" y="78" width="52" height="16" fill="#fff"/>
+              <rect x="14" y="96" width="52" height="16" fill="url(#htPT)"/>
+              <rect x="78" y="60" width="52" height="16" fill="#cdeef1"/>
+              <rect x="78" y="78" width="52" height="16" fill="#fff"/>
+              <rect x="78" y="96" width="52" height="16" fill="url(#htPT)"/>
+              <rect x="142" y="60" width="52" height="16" fill="#d3f0d9"/>
+              <rect x="142" y="78" width="52" height="16" fill="url(#htPT)"/>
+              <rect x="142" y="96" width="52" height="16" fill="#d3f0d9"/>
+            </g>
+            <defs>
+              <pattern id="htPT" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="6" height="6" fill="#f4f7f9"/><rect width="1" height="6" fill="#c9d3db"/>
+              </pattern>
+            </defs>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="7.5" fill="#4d596b" text-anchor="middle">
+              <text x="40" y="71">code</text>
+              <text x="104" y="89">heap</text>
+              <text x="168" y="107">stack</text>
+            </g>
+          </svg>
+          <div>
+            <p class="tool-title">Smaller page tables: bigger pages and paged segmentation</p>
+            <p class="tool-desc">Watch a flat page table balloon with address-space size, shrink it with bigger pages, and see how splitting it by segment lets an unused region skip its table entirely.</p>
+            <span class="chapter"><b>Chapter 20</b>, Paging: Smaller Tables</span>
+          </div>
+        </a>
+      </li>
     </ul>
   </section>
 
