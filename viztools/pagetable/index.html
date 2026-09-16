@@ -152,6 +152,14 @@ button.primary:hover{background:#2c3a57}
 .toy-bit.vpn{background:var(--vpn)}
 .toy-bit.off{background:var(--off)}
 
+.steps{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.steps li{position:relative;padding-left:20px;font-family:var(--mono);font-size:.92rem;line-height:1.55}
+.steps li::before{content:"";position:absolute;left:0;top:.5em;width:7px;height:7px;background:var(--ink);border-radius:1px}
+.steps b{font-family:var(--sans);font-weight:700}
+.steps .ok{color:var(--ok);font-weight:700}
+.steps .bad{color:var(--bad);font-weight:700}
+.toy-result .steps{white-space:normal}
+
 @media (max-width: 900px){
   .controls-row{grid-template-columns:1fr}
   .toy-grid{grid-template-columns:1fr}
@@ -609,6 +617,16 @@ const PT101 = [
 ];
 const PT_BY_PFN = { 100: PT100, 101: PT101 };
 const hexA = v => '0x' + v.toString(16).toUpperCase();
+const hexA4 = v => '0x' + v.toString(16).toUpperCase().padStart(4, '0');
+const toBin = (v, w) => v.toString(2).padStart(w, '0');
+function binGroup (bits) {
+  const rem = bits.length % 4;
+  const parts = [];
+  let i = 0;
+  if (rem) { parts.push(bits.slice(0, rem)); i = rem; }
+  for (; i < bits.length; i += 4) parts.push(bits.slice(i, i + 4));
+  return parts.join(' ');
+}
 
 function buildMLBits () {
   let h = '';
@@ -652,26 +670,39 @@ function translateML (raw) {
   const r = parseMLVA(raw);
   if (r.err) { out.className = 'toy-result fault'; out.textContent = r.err; input.setAttribute('aria-invalid', 'true'); renderMLTables(); return; }
   input.removeAttribute('aria-invalid');
-  const va = r.v, pdi = (va >> 10) & 0xF, pti = (va >> 6) & 0xF, off = va & 0x3F;
-  const split = `<div class="split"><span class="toy-bit sn">PDI ${bin4(pdi)}</span><span class="toy-bit vpn">PTI ${bin4(pti)}</span><span class="toy-bit off">off ${off.toString(2).padStart(6, '0')}</span></div>`;
+  const va = r.v, vpn = (va >> 6) & 0xFF, pdi = (vpn >> 4) & 0xF, pti = vpn & 0xF, off = va & 0x3F;
+  const split = `<div class="split"><span class="toy-bit sn">PDI ${bin4(pdi)}</span><span class="toy-bit vpn">PTI ${bin4(pti)}</span><span class="toy-bit off">off ${toBin(off, 6)}</span></div>`;
+
+  const steps = [];
+  steps.push(`<li><b>Binary</b> = ${binGroup(toBin(va, 14))}</li>`);
+  steps.push(`<li><b>VPN</b> = ${toBin(vpn, 8)}</li>`);
+  steps.push(`<li><b>Offset</b> = ${toBin(off, 6)}</li>`);
+
   const pd = PAGE_DIR[pdi];
   if (!pd.valid) {
+    steps.push(`<li><b>Page Directory Index</b> = ${toBin(pdi, 4)}, we obtain an <span class="bad">invalid</span> PFN — page fault (no page of PTEs exists for this region, so the OS never had to allocate one)</li>`);
     out.className = 'toy-result fault';
-    out.innerHTML = `${split}Address ${va} (${hexA(va)}) → Page Directory index ${pdi}. Fault: this entry is invalid — there is no page of PTEs for this region at all, so the OS never had to allocate one.`;
+    out.innerHTML = `${split}Address ${va} (${hexA(va)}) — page fault at the page directory.<ul class="steps">${steps.join('')}</ul>`;
     renderMLTables(pdi, null, null);
     return;
   }
+  steps.push(`<li><b>Page Directory Index</b> = ${toBin(pdi, 4)}, we obtain a <span class="ok">valid</span> PFN = ${pd.pfn}</li>`);
+
   const pt = PT_BY_PFN[pd.pfn];
   renderMLTables(pdi, pd.pfn, pti);
   const pte = pt[pti];
   if (!pte.valid) {
+    steps.push(`<li><b>Index into the page of PT @ PFN:${pd.pfn}</b> = ${toBin(pti, 4)}, we obtain an <span class="bad">invalid</span> PFN — page fault (this page has never been allocated)</li>`);
     out.className = 'toy-result fault';
-    out.innerHTML = `${split}Address ${va} (${hexA(va)}) → PD index ${pdi} → PFN ${pd.pfn} (valid) → PT index ${pti}. Fault: V = 0 — this page has never been allocated.`;
+    out.innerHTML = `${split}Address ${va} (${hexA(va)}) — page fault at the page of PTEs.<ul class="steps">${steps.join('')}</ul>`;
     return;
   }
+  steps.push(`<li><b>Index into the page of PT @ PFN:${pd.pfn}</b> = ${toBin(pti, 4)}, we obtain a <span class="ok">valid</span> PFN = ${pte.pfn} = ${hexA(pte.pfn)}</li>`);
+
   const pa = (pte.pfn << 6) | off;
+  steps.push(`<li><b>Add offset</b> after shifting left 6 bits to obtain the physical address: ${binGroup(toBin(pte.pfn, 8) + toBin(off, 6))} = ${hexA4(pa)}</li>`);
   out.className = 'toy-result';
-  out.innerHTML = `${split}Address ${va} (${hexA(va)}) → PD index ${pdi} → PFN ${pd.pfn} → PT index ${pti} → PFN ${pte.pfn} (${pte.prot}).\nPhysical address = (${pte.pfn} << 6) | ${off} = ${pa} (${hexA(pa)})`;
+  out.innerHTML = `${split}Address ${va} (${hexA(va)}) → physical address ${pa} (${hexA4(pa)}), protection ${pte.prot}.<ul class="steps">${steps.join('')}</ul>`;
 }
 
 $('btnML').onclick = () => translateML($('mlVA').value);
