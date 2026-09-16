@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swapping: Mechanisms</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --dark:#26324a;
+  --line:#d3dbe2;
+  --ok:#2b8a3e; --bad:#c92a2a;
+  --mark:#ffd43b;
+  --p0:#c77700; --p0t:#fdebc8; --p0i:#8a4f00;
+  --p1:#0b7285; --p1t:#cdeef1; --p1i:#06606b;
+  --p2:#5f3dc4; --p2t:#e5dbff; --p2i:#4527a0;
+  --p3:#2b8a3e; --p3t:#d3f0d9; --p3i:#1f6a2f;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.page{max-width:1180px;margin:0 auto;padding:32px 28px 56px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0 0 24px;max-width:76ch;color:var(--ink-soft)}
+h2{font-size:1.25rem;margin:0 0 6px;font-weight:700}
+h3{font-size:1rem;margin:18px 0 6px;font-weight:700}
+.sub{margin:0 0 14px;font-size:.9rem;color:var(--ink-soft)}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+
+/* ---------- Tabs ---------- */
+.tabbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tab{font:inherit;font-size:.98rem;font-weight:700;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:10px 16px;cursor:pointer}
+.tab:hover{background:#fff}
+.tab[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabpanel{display:flex;flex-direction:column;gap:16px}
+
+/* ---------- Takeaway / note ---------- */
+.takeaway{margin:0;padding:14px 20px;border-radius:8px;background:var(--mark);border:2px solid var(--ink);font-weight:700;font-size:1.05rem;box-shadow:4px 4px 0 rgba(23,32,51,.15)}
+.takeaway .hl{color:var(--bad)}
+.note{margin:8px 0 0;font-size:.9rem;color:var(--ink-soft)}
+.bullets{margin:0 0 4px;padding-left:20px}
+.bullets li{margin:0 0 4px}
+.bullets .hl{color:var(--p0);font-weight:700}
+
+/* ---------- Legend ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 4px;font-size:.85rem;color:var(--ink-soft)}
+.legend-item{display:flex;align-items:center;gap:6px}
+.swatch{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--ink);display:inline-block;flex:none}
+.swatch.p0{background:var(--p0)} .swatch.p1{background:var(--p1)} .swatch.p2{background:var(--p2)} .swatch.p3{background:var(--p3)}
+.swatch.free{background:var(--hatch)}
+
+/* ---------- Frame / swap-block rows ---------- */
+.framerow-wrap{overflow-x:auto;margin-top:16px}
+.framerow-label{font-weight:700;font-size:.9rem;margin:0 0 6px}
+.framerow{display:flex;border:2px solid var(--ink);border-radius:8px;overflow:hidden;min-width:600px}
+.framerow .cell{flex:1;min-width:72px;padding:12px 6px;text-align:center;border-left:1.5px solid var(--ink);font-family:var(--mono);font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;transition:filter .1s,outline-color .1s;outline:3px solid transparent;outline-offset:-3px}
+.framerow .cell:first-child{border-left:0}
+.framerow .cell:hover{filter:brightness(1.1)}
+.framerow .cell:focus-visible{outline-color:var(--mark)}
+.framerow .cell.selected{outline-color:var(--mark)}
+.framerow .cell.free{background:var(--hatch);color:var(--ink-soft);font-style:italic;font-weight:400}
+.framerow .cell.p0{background:var(--p0)} .framerow .cell.p1{background:var(--p1)} .framerow .cell.p2{background:var(--p2)} .framerow .cell.p3{background:var(--p3)}
+.framerow .cell .idx{display:block;font-size:.68rem;font-weight:400;opacity:.85;margin-bottom:3px}
+.framerow-caption{text-align:center;font-weight:700;font-size:.82rem;margin-top:6px;color:var(--ink-soft)}
+
+/* ---------- Sparse-style PTE table ---------- */
+.tablewrap{overflow-x:auto;margin-top:10px}
+table.pt{width:100%;border-collapse:collapse;font-size:.88rem}
+.pt th{text-align:center;font-weight:600;font-size:.78rem;color:var(--ink-soft);border-bottom:2px solid var(--ink);padding:4px 6px;white-space:nowrap}
+.pt th:first-child{text-align:left}
+.pt td{padding:6px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12.5px;text-align:center;white-space:nowrap}
+.pt td:first-child{text-align:left;font-family:var(--sans);font-weight:700}
+.pt tr.mem td{background:#fff}
+.pt tr.disk td{background:repeating-linear-gradient(135deg,#fff 0 6px,#e9ecef 6px 7px)}
+.pt tr.hit td{background:var(--mark) !important}
+.pt .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;border:1px solid var(--ink)}
+
+.calcbox{margin:12px 0 0;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.65;white-space:pre-wrap}
+
+/* ---------- Page-fault flow diagram ---------- */
+.pf-wrap{margin-top:6px}
+.pf-canvas{width:100%;max-width:820px;margin:0 auto;display:block}
+.pf-arrow{fill:none;stroke:#b9c2cb;stroke-width:2;transition:stroke .15s,stroke-width .15s}
+.pf-arrow.done{stroke:var(--ink);stroke-width:2}
+.pf-arrow.active{stroke:var(--bad);stroke-width:3.5}
+.pf-label{font-family:var(--mono);font-size:11.5px;font-weight:700;fill:#98a2ac;transition:fill .15s}
+.pf-label.done{fill:var(--ink-soft)}
+.pf-label.active{fill:var(--bad)}
+.pf-box{fill:#fff;stroke:var(--ink);stroke-width:2;transition:stroke .15s,stroke-width .15s}
+.pf-box.active{stroke:var(--bad);stroke-width:3}
+.pf-title{font-family:var(--sans);font-weight:700;font-size:13px;fill:var(--ink)}
+.pf-sub{font-family:var(--mono);font-size:10.5px;fill:var(--ink-soft)}
+.pf-row{fill:#f0f3f5;stroke:var(--line);stroke-width:1}
+.pf-row.hit{fill:var(--mark);stroke:var(--ink)}
+.pf-disk{fill:#eef2f5;stroke:var(--ink);stroke-width:2}
+.pf-frame{fill:#f8fafb;stroke:var(--ink);stroke-width:1.5}
+.pf-frame.filled{fill:var(--p1t)}
+
+.pf-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+button{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+.chip{font-size:.85rem;padding:5px 10px;border-width:1.5px}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips>span{font-size:.85rem;color:var(--ink-soft)}
+
+.toy-result{margin-top:14px;padding:12px 16px;border:2px solid var(--ink);border-radius:8px;background:#fff;font-family:var(--mono);font-size:.95rem;line-height:1.6}
+.toy-result.fault{border-color:var(--bad);background:#fff0f0}
+.toy-result.hit{border-color:var(--ok);background:#f1fbf3}
+.toy-result b{font-family:var(--sans)}
+
+.steps{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.steps li{position:relative;padding-left:20px;font-family:var(--sans);font-size:.92rem;line-height:1.55;color:var(--ink-soft)}
+.steps li::before{content:"";position:absolute;left:0;top:.55em;width:7px;height:7px;background:var(--line);border-radius:1px}
+.steps li.active{color:var(--ink);font-weight:700}
+.steps li.active::before{background:var(--bad)}
+.steps li.done::before{background:var(--ink)}
+.steps b{font-family:var(--mono)}
+
+@media (max-width: 900px){
+  .framerow{min-width:0}
+  .framerow .cell{min-width:0;font-size:.7rem;padding:9px 3px}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 40px}
+  h1{font-size:1.7rem}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Swapping: Mechanisms</h1>
+    <p class="intro">Chapter 21's key idea: physical memory doesn't have to hold every page a process owns. The OS reserves a slice of disk as <b>swap space</b> and moves pages back and forth between it and physical frames, so address spaces can be bigger than RAM. This tool follows the mechanism end to end &mdash; where a page can live, and what happens when the hardware reaches for one that isn't there.</p>
+  </header>
+
+  <nav class="tabbar" role="tablist" aria-label="Choose a topic">
+    <button class="tab" role="tab" id="tabbtn-swapspace" aria-selected="true" aria-controls="panel-swapspace" data-tab="swapspace">1 &middot; Swap space</button>
+    <button class="tab" role="tab" id="tabbtn-pagefault" aria-selected="false" aria-controls="panel-pagefault" data-tab="pagefault">2 &middot; Page-fault control flow</button>
+  </nav>
+
+  <!-- ================= TAB 1: SWAP SPACE ================= -->
+  <section class="tabpanel" id="panel-swapspace" role="tabpanel" aria-labelledby="tabbtn-swapspace">
+    <section class="panel">
+      <h2>Reserve some space on the disk</h2>
+      <ul class="bullets sub">
+        <li>The OS carves out a chunk of disk for moving pages back and forth &mdash; the <span class="hl">swap space</span>.</li>
+        <li>It remembers what lives there in <span class="hl">page-sized units</span>, the same granularity as a physical frame.</li>
+        <li>A page is either <b>resident</b> (has a valid PFN) or <b>swapped out</b> (has a disk address instead) &mdash; a PTE needs a bit to say which.</li>
+      </ul>
+      <p class="note">Click any frame or swap block below to see the page-table entry it corresponds to.</p>
+
+      <div class="legend">
+        <span class="legend-item"><span class="swatch p0"></span>Proc 0</span>
+        <span class="legend-item"><span class="swatch p1"></span>Proc 1</span>
+        <span class="legend-item"><span class="swatch p2"></span>Proc 2</span>
+        <span class="legend-item"><span class="swatch p3"></span>Proc 3</span>
+        <span class="legend-item"><span class="swatch free"></span>Free</span>
+      </div>
+
+      <div class="framerow-wrap">
+        <p class="framerow-label">Physical Memory</p>
+        <div class="framerow" id="memRow"></div>
+        <p class="framerow-caption">PFN 0 &ndash; 3</p>
+      </div>
+      <div class="framerow-wrap">
+        <p class="framerow-label" style="margin-top:14px">Swap Space</p>
+        <div class="framerow" id="swapRow"></div>
+        <p class="framerow-caption">Block 0 &ndash; 7</p>
+      </div>
+
+      <div class="toy-result" id="swapInspect">Pick a frame or a swap block above to inspect its page-table entry.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Every page, one page table</h2>
+      <p class="sub">Same four processes, all their pages. Whether a page is <b>in memory</b> or <b>on disk</b> is just one more field in its PTE &mdash; the process never notices which.</p>
+      <div class="tablewrap">
+        <table class="pt" id="pteTable">
+          <thead><tr><th>Process</th><th>VPN</th><th>Present</th><th>Location</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="takeaway">Swap space lets the sum of every process's address space <span class="hl">exceed physical memory</span> &mdash; the trade-off is that reaching for a swapped-out page now costs a disk access.</p>
+  </section>
+
+  <!-- ================= TAB 2: PAGE-FAULT CONTROL FLOW ================= -->
+  <section class="tabpanel" id="panel-pagefault" role="tabpanel" aria-labelledby="tabbtn-pagefault" hidden>
+    <section class="panel">
+      <h2>PTE is used for data such as the PFN of the page, or a disk address</h2>
+      <p class="sub">Every PTE carries a <b>present</b> bit. If it's 1, the PFN field is good and translation finishes in hardware. If it's 0, the hardware can't finish the translation itself &mdash; it traps into the OS, which looks at the very same PTE to find the page on disk, fetches it, and only then lets the instruction continue.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Walk the six steps</h2>
+      <div class="chips" style="margin-bottom:6px">
+        <span>Scenario</span>
+        <button class="chip" type="button" data-scn="hit" aria-pressed="false">Resident page &middot; no fault</button>
+        <button class="chip" type="button" data-scn="fault" aria-pressed="true">Page fault &middot; full walk</button>
+      </div>
+
+      <div class="pf-wrap">
+        <svg class="pf-canvas" viewBox="0 0 760 430" role="img" aria-label="Page fault control flow diagram">
+          <defs>
+            <marker id="ah-grey" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#b9c2cb"/></marker>
+            <marker id="ah-ink" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#172033"/></marker>
+            <marker id="ah-red" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#c92a2a"/></marker>
+          </defs>
+
+          <!-- Operating System box -->
+          <rect class="pf-box" id="box-os" x="40" y="24" width="200" height="66" rx="6"/>
+          <text class="pf-title" x="140" y="62" text-anchor="middle">Operating System</text>
+
+          <!-- Secondary Storage (disk) -->
+          <g id="box-disk">
+            <ellipse class="pf-disk" cx="620" cy="52" rx="90" ry="16"/>
+            <path class="pf-disk" d="M530,52 v40 a90,16 0 0 0 180,0 v-40" />
+            <ellipse class="pf-disk" cx="620" cy="92" rx="90" ry="16" fill="#eef2f5"/>
+            <text class="pf-title" x="620" y="56" text-anchor="middle">Secondary Storage</text>
+          </g>
+
+          <!-- Virtual Address box -->
+          <rect class="pf-box" id="box-va" x="40" y="250" width="170" height="150" rx="6"/>
+          <text class="pf-title" x="125" y="272" text-anchor="middle">Virtual Address</text>
+          <rect class="pf-row" id="row-loadm" x="55" y="288" width="140" height="30" rx="3"/>
+          <text class="pf-sub" x="125" y="308" text-anchor="middle">Load M</text>
+
+          <!-- Page Table box -->
+          <rect class="pf-box" id="box-pt" x="300" y="250" width="180" height="150" rx="6"/>
+          <text class="pf-title" x="390" y="272" text-anchor="middle">Page Table</text>
+          <rect class="pf-row" x="316" y="286" width="148" height="22"/>
+          <rect class="pf-row" x="316" y="308" width="148" height="22"/>
+          <rect class="pf-row hit" id="row-i" x="316" y="330" width="148" height="22"/>
+          <text class="pf-sub" x="470" y="345" text-anchor="start" font-weight="700">i</text>
+          <rect class="pf-row" x="316" y="352" width="148" height="22"/>
+
+          <!-- Page Frame stack -->
+          <rect class="pf-box" id="box-frames" x="580" y="250" width="150" height="150" rx="6"/>
+          <text class="pf-title" x="655" y="272" text-anchor="middle" font-size="12">Page Frames</text>
+          <rect class="pf-frame" x="596" y="284" width="118" height="24"/>
+          <rect class="pf-frame" x="596" y="311" width="118" height="24"/>
+          <rect class="pf-frame filled" id="frame-target" x="596" y="338" width="118" height="24"/>
+          <rect class="pf-frame" x="596" y="365" width="118" height="24"/>
+
+          <!-- Arrows -->
+          <path class="pf-arrow" id="arrow-1" marker-end="url(#ah-grey)" d="M210,300 L296,300"/>
+          <text class="pf-label" id="label-1" x="253" y="290" text-anchor="middle">1 &middot; Reference</text>
+
+          <path class="pf-arrow" id="arrow-2" marker-end="url(#ah-grey)" d="M420,246 C 420,180 260,140 200,94"/>
+          <text class="pf-label" id="label-2" x="330" y="150" text-anchor="middle">2 &middot; Trap</text>
+
+          <path class="pf-arrow" id="arrow-3" marker-end="url(#ah-grey)" d="M244,50 C 340,30 420,30 480,50"/>
+          <text class="pf-label" id="label-3" x="365" y="24" text-anchor="middle">3 &middot; Check storage whether page exists</text>
+
+          <path class="pf-arrow" id="arrow-4" marker-end="url(#ah-grey)" d="M600,104 C 630,170 655,200 655,246"/>
+          <text class="pf-label" id="label-4" x="678" y="180" text-anchor="middle">4 &middot; Get the page</text>
+
+          <path class="pf-arrow" id="arrow-5" marker-end="url(#ah-grey)" d="M594,352 C 540,352 528,341 484,341"/>
+          <text class="pf-label" id="label-5" x="538" y="368" text-anchor="middle">5 &middot; Reset Page Table</text>
+
+          <path class="pf-arrow" id="arrow-6" marker-end="url(#ah-grey)" d="M298,378 C 260,410 200,410 128,390"/>
+          <text class="pf-label" id="label-6" x="213" y="422" text-anchor="middle">6 &middot; reinstruction</text>
+        </svg>
+      </div>
+
+      <div class="pf-controls">
+        <button id="pfPrev" type="button">&larr; Prev</button>
+        <button id="pfNext" class="primary" type="button">Next &rarr;</button>
+        <button id="pfPlay" type="button">&#9654; Play</button>
+        <button id="pfReset" type="button">Reset</button>
+      </div>
+
+      <div class="toy-result" id="pfResult">Press <b>Next</b> to start the walk, or <b>Play</b> to animate it end to end.</div>
+
+      <ol class="steps" id="pfSteps"></ol>
+    </section>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    document.querySelectorAll('.tabpanel').forEach(p => p.hidden = p.id !== `panel-${btn.dataset.tab}`);
+  });
+});
+
+/* =========================================================
+   Tab 1: swap space diagram + PTE table
+   ========================================================= */
+const PROCS = ['p0', 'p1', 'p2', 'p3'];
+
+// physical memory: PFN -> {proc, vpn}
+const MEM = [
+  { proc: 0, vpn: 0 },
+  { proc: 1, vpn: 2 },
+  { proc: 1, vpn: 3 },
+  { proc: 2, vpn: 0 },
+];
+// swap space: block -> {proc, vpn} or null (free)
+const SWAP = [
+  { proc: 0, vpn: 1 },
+  { proc: 0, vpn: 2 },
+  null,
+  { proc: 1, vpn: 0 },
+  { proc: 1, vpn: 1 },
+  { proc: 3, vpn: 0 },
+  { proc: 2, vpn: 1 },
+  { proc: 3, vpn: 1 },
+];
+
+function renderFrameRow(container, entries, kind) {
+  container.innerHTML = entries.map((e, i) => {
+    if (!e) return `<div class="cell free" data-kind="${kind}" data-idx="${i}" tabindex="0"><span class="idx">${kind === 'mem' ? 'PFN ' + i : 'Block ' + i}</span>Free</div>`;
+    return `<div class="cell p${e.proc}" data-kind="${kind}" data-idx="${i}" tabindex="0"><span class="idx">${kind === 'mem' ? 'PFN ' + i : 'Block ' + i}</span>P${e.proc}&middot;VPN${e.vpn}</div>`;
+  }).join('');
+}
+renderFrameRow($('memRow'), MEM, 'mem');
+renderFrameRow($('swapRow'), SWAP, 'swap');
+
+function clearSelection() {
+  document.querySelectorAll('.framerow .cell.selected').forEach(c => c.classList.remove('selected'));
+}
+
+function inspect(kind, idx) {
+  clearSelection();
+  const cell = document.querySelector(`.cell[data-kind="${kind}"][data-idx="${idx}"]`);
+  cell.classList.add('selected');
+  const box = $('swapInspect');
+  const e = kind === 'mem' ? MEM[idx] : SWAP[idx];
+  if (!e) {
+    box.className = 'toy-result';
+    box.innerHTML = kind === 'mem'
+      ? `<b>PFN ${idx}</b> is a free physical frame &mdash; the next page fault that needs one can use it.`
+      : `<b>Block ${idx}</b> is free swap space &mdash; available the next time a page needs to be evicted.`;
+    return;
+  }
+  if (kind === 'mem') {
+    box.className = 'toy-result hit';
+    box.innerHTML = `<b>Proc ${e.proc}, VPN ${e.vpn}</b> is resident.<br>Its PTE: present&nbsp;=&nbsp;1, PFN&nbsp;=&nbsp;${idx}. The hardware can finish the translation on its own.`;
+  } else {
+    box.className = 'toy-result fault';
+    box.innerHTML = `<b>Proc ${e.proc}, VPN ${e.vpn}</b> is swapped out.<br>Its PTE: present&nbsp;=&nbsp;0, disk&nbsp;block&nbsp;=&nbsp;${idx}. Referencing it now would trigger a page fault.`;
+  }
+}
+document.querySelectorAll('.framerow .cell').forEach(c => {
+  c.addEventListener('click', () => inspect(c.dataset.kind, +c.dataset.idx));
+  c.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); inspect(c.dataset.kind, +c.dataset.idx); } });
+});
+
+// combined PTE table
+function buildPteTable() {
+  const rows = [];
+  for (let p = 0; p < 4; p++) {
+    const pages = [];
+    MEM.forEach((e, pfn) => { if (e && e.proc === p) pages.push({ vpn: e.vpn, present: true, loc: `PFN ${pfn}`, cls: 'mem' }); });
+    SWAP.forEach((e, blk) => { if (e && e.proc === p) pages.push({ vpn: e.vpn, present: false, loc: `Disk block ${blk}`, cls: 'disk' }); });
+    pages.sort((a, b) => a.vpn - b.vpn);
+    pages.forEach((pg, i) => {
+      rows.push(`<tr class="${pg.cls}"><td>${i === 0 ? `<span class="dot" style="background:var(--${'p' + p})"></span>Proc ${p}` : ''}</td><td>${pg.vpn}</td><td>${pg.present ? 1 : 0}</td><td>${pg.loc}</td></tr>`);
+    });
+  }
+  $('pteTable').querySelector('tbody').innerHTML = rows.join('');
+}
+buildPteTable();
+
+/* =========================================================
+   Tab 2: page-fault control flow
+   ========================================================= */
+const STEPS_FAULT = [
+  { arrow: 1, boxes: ['box-va', 'box-pt'], extra: ['row-loadm'], title: '1 &middot; Reference', desc: 'The CPU executes <b>Load M</b>. The hardware splits the virtual address and looks up the matching entry in the page table.' },
+  { arrow: 2, boxes: ['box-pt', 'box-os'], extra: ['row-i'], title: '2 &middot; Trap', desc: `Entry <b>i</b>'s present bit is 0 &mdash; the page isn't in a physical frame. The hardware raises a page-fault exception, trapping into the OS.` },
+  { arrow: 3, boxes: ['box-os', 'box-disk'], title: '3 &middot; Check storage whether page exists', desc: `The OS's fault handler reads the same PTE and finds a disk address instead of a PFN, so it checks the swap space for that page.` },
+  { arrow: 4, boxes: ['box-disk', 'box-frames'], extra: ['frame-target'], title: '4 &middot; Get the page', desc: `The OS issues an I/O request. The disk transfers the page into a free physical frame while the process sleeps (blocked).` },
+  { arrow: 5, boxes: ['box-frames', 'box-pt'], extra: ['row-i'], title: '5 &middot; Reset page table', desc: `The OS updates PTE <b>i</b>: present set to 1, and the PFN field now names the frame that was just filled.` },
+  { arrow: 6, boxes: ['box-pt', 'box-va'], extra: ['row-loadm'], title: '6 &middot; reinstruction', desc: `<b>Load M</b> is retried from the top. This time the page table lookup succeeds in hardware &mdash; no trap, the load just completes.` },
+];
+const STEPS_HIT = [
+  { arrow: 1, boxes: ['box-va', 'box-pt'], extra: ['row-loadm', 'row-i'], title: '1 &middot; Reference', desc: `The CPU executes <b>Load M</b>. The page table entry's present bit is already 1, so the hardware fills in the PFN and finishes the translation itself &mdash; no trap, no OS involvement.` },
+];
+
+let scenario = 'fault';
+let steps = STEPS_FAULT;
+let step = 0; // 0 = not started; N = step N shown
+let playTimer = null;
+
+function allIds() {
+  const ids = new Set();
+  for (let i = 1; i <= 6; i++) { ids.add('arrow-' + i); ids.add('label-' + i); }
+  ['box-os', 'box-disk', 'box-va', 'box-pt', 'box-frames', 'row-loadm', 'row-i', 'frame-target'].forEach(id => ids.add(id));
+  return ids;
+}
+
+function resetDiagram() {
+  allIds().forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('active', 'done');
+    if (el.tagName === 'path') el.setAttribute('marker-end', 'url(#ah-grey)');
+  });
+}
+
+function renderStepsList() {
+  $('pfSteps').innerHTML = steps.map((s, i) =>
+    `<li id="pfli-${i + 1}"><span>${s.title}</span> &mdash; ${s.desc}</li>`
+  ).join('');
+}
+
+function render() {
+  resetDiagram();
+  const maxStep = steps.length;
+  $('pfPrev').disabled = step <= 0;
+  $('pfNext').disabled = step >= maxStep;
+
+  for (let i = 1; i <= step; i++) {
+    const s = steps[i - 1];
+    const isCurrent = i === step;
+    const arrowEl = $('arrow-' + s.arrow);
+    const labelEl = $('label-' + s.arrow);
+    arrowEl.classList.add(isCurrent ? 'active' : 'done');
+    labelEl.classList.add(isCurrent ? 'active' : 'done');
+    arrowEl.setAttribute('marker-end', `url(#ah-${isCurrent ? 'red' : 'ink'})`);
+    s.boxes.forEach(id => { const b = $(id); if (isCurrent) b.classList.add('active'); else b.classList.remove('active'); });
+    (s.extra || []).forEach(id => { const b = $(id); if (isCurrent) b.classList.add('active'); });
+    const li = $('pfli-' + i);
+    li.classList.toggle('active', isCurrent);
+    li.classList.toggle('done', !isCurrent);
+  }
+
+  const out = $('pfResult');
+  if (step === 0) {
+    out.className = 'toy-result';
+    out.innerHTML = scenario === 'fault'
+      ? 'Press <b>Next</b> to start the walk, or <b>Play</b> to animate it end to end.'
+      : 'Press <b>Next</b> to see what happens when the page is already resident.';
+  } else {
+    const s = steps[step - 1];
+    const last = step === maxStep;
+    out.className = 'toy-result' + (last ? (scenario === 'fault' ? ' hit' : ' hit') : '');
+    out.innerHTML = `<b>${s.title}</b><br>${s.desc}` + (last ? (scenario === 'fault' ? '<br><br>Fault resolved &mdash; the process never even knew its page had been on disk.' : '<br><br>No fault at all: a resident page costs nothing beyond the ordinary lookup.') : '');
+  }
+}
+
+function setScenario(name) {
+  scenario = name;
+  steps = name === 'fault' ? STEPS_FAULT : STEPS_HIT;
+  step = 0;
+  stopPlay();
+  document.querySelectorAll('.chip[data-scn]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.scn === name)));
+  renderStepsList();
+  render();
+}
+
+function stopPlay() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; $('pfPlay').textContent = '▶ Play'; }
+}
+
+$('pfNext').addEventListener('click', () => { if (step < steps.length) { step++; render(); } if (step >= steps.length) stopPlay(); });
+$('pfPrev').addEventListener('click', () => { stopPlay(); if (step > 0) { step--; render(); } });
+$('pfReset').addEventListener('click', () => { stopPlay(); step = 0; render(); });
+$('pfPlay').addEventListener('click', () => {
+  if (playTimer) { stopPlay(); return; }
+  if (step >= steps.length) step = 0;
+  $('pfPlay').textContent = '⏸ Pause';
+  playTimer = setInterval(() => {
+    if (step >= steps.length) { stopPlay(); return; }
+    step++; render();
+    if (step >= steps.length) stopPlay();
+  }, 1100);
+});
+document.querySelectorAll('.chip[data-scn]').forEach(c => c.addEventListener('click', () => setScenario(c.dataset.scn)));
+
+setScenario('fault');
+</script>
+</body>
+</html>
