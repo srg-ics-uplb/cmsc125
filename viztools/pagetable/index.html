@@ -85,6 +85,7 @@ table.pt{width:100%;border-collapse:collapse;font-size:.88rem}
 .pt tr.valid td{background:#fff}
 .pt tr.valid td:first-child{box-shadow:inset 5px 0 0 var(--ok)}
 .pt tr.gap td{background:repeating-linear-gradient(135deg,#fff 0 6px,#e9ecef 6px 7px);color:var(--ink-soft);font-family:var(--sans);font-style:italic;text-align:center;font-size:.85rem;padding:8px}
+.pt tr.hit td{background:var(--mark) !important}
 
 /* ---------- Bit strip ---------- */
 .bitstrip{display:flex;border:2px solid var(--ink);border-radius:6px;overflow:hidden;height:52px}
@@ -176,8 +177,8 @@ button.primary:hover{background:#2c3a57}
 <div class="page">
 
   <header>
-    <h1>Smaller page tables</h1>
-    <p class="intro">Chapter 18's linear page table has one entry for every page in the address space, whether or not it's used. This tool follows Chapter 20, Paging: Smaller Tables, through four ways to shrink it: bigger pages, combining paging with segmentation, and multi-level page tables.</p>
+    <h1>Page Table Design</h1>
+    <p class="intro">Chapter 18's linear page table has one entry for every page in the address space, whether or not it's used. This tool follows Chapter 20, Paging: Smaller Tables, through ways to shrink it: bigger pages, combining paging with segmentation, multi-level page tables, and inverted page tables.</p>
   </header>
 
   <nav class="tabbar" role="tablist" aria-label="Choose an approach">
@@ -185,6 +186,7 @@ button.primary:hover{background:#2c3a57}
     <button class="tab" role="tab" id="tabbtn-bigger" aria-selected="false" aria-controls="panel-bigger" data-tab="bigger">2 · Bigger pages</button>
     <button class="tab" role="tab" id="tabbtn-hybrid" aria-selected="false" aria-controls="panel-hybrid" data-tab="hybrid">3 · Paged segmentation</button>
     <button class="tab" role="tab" id="tabbtn-multilevel" aria-selected="false" aria-controls="panel-multilevel" data-tab="multilevel">4 · Multi-level paging</button>
+    <button class="tab" role="tab" id="tabbtn-inverted" aria-selected="false" aria-controls="panel-inverted" data-tab="inverted">5 · Inverted page tables</button>
   </nav>
 
   <!-- ================= TAB 1: LINEAR ================= -->
@@ -407,6 +409,61 @@ segment 00 (unused)      = 0 B — nothing to allocate</pre>
         </div>
       </div>
       <div class="toy-result" id="mlResult">Pick an address above to walk the page directory, then the page of PTEs it points to.</div>
+    </section>
+  </section>
+
+  <!-- ================= TAB 5: INVERTED ================= -->
+  <section class="tabpanel" id="panel-inverted" role="tabpanel" aria-labelledby="tabbtn-inverted" hidden>
+    <section class="panel">
+      <h2>One entry per physical frame, not per virtual page</h2>
+      <p class="sub">Every table so far has one entry per <i>virtual</i> page, so its size grows with the address space — and every process gets its own copy. An <b>inverted page table</b> flips this around: there's a single table, shared by <i>all</i> processes, with exactly one entry per <i>physical frame</i>. Since physical memory is normally far smaller than the sum of every process's virtual address space, the table stays small no matter how many processes are running or how big their address spaces are.</p>
+      <p class="note">The trade-off: each entry must now record <i>which process</i> and <i>which virtual page</i> currently live in that frame, and the hardware can no longer index the table directly by VPN — it has to <i>search</i> for the entry whose (PID, VPN) matches. A real implementation doesn't scan the table one frame at a time like the demo below; it hashes (PID, VPN) into a hash table so a lookup still costs about one comparison, not one per physical frame.</p>
+    </section>
+
+    <section class="panel">
+      <h2>An 8-frame inverted page table</h2>
+      <p class="sub">Two processes, <b>P0</b> and <b>P1</b>, each with a 1KB virtual address space of their own, share these same 8 physical frames. The table has one row per frame — regardless of which process, or how many processes, are using it.</p>
+      <table class="sn">
+        <thead><tr><th>Parameter</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>Physical memory</td><td>512 B</td></tr>
+          <tr><td>Frame / page size</td><td>64 B</td></tr>
+          <tr><td># of physical frames</td><td>2<sup>3</sup> (8)</td></tr>
+          <tr><td>Per-process virtual address</td><td>10 bits (1 KB)</td></tr>
+          <tr><td>VPN</td><td>4 bits</td></tr>
+          <tr><td>Offset</td><td>6 bits</td></tr>
+        </tbody>
+      </table>
+      <div class="tablewrap" style="margin-top:14px">
+        <table class="pt" id="iptTable">
+          <thead><tr><th>Frame (PFN)</th><th>PID</th><th>VPN</th><th>Prot</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Translate (PID, VPN) → PFN</h2>
+      <p class="sub">Pick a process and an address in <i>its</i> address space (decimal or hex, 0–1023). The table is searched frame by frame for a matching (PID, VPN) — the frame it's found in <i>is</i> the physical frame number.</p>
+      <div class="translate-row">
+        <label for="iptPID" style="font-weight:700">Process</label>
+        <select id="iptPID">
+          <option value="0">P0</option>
+          <option value="1">P1</option>
+        </select>
+        <label for="iptVA" style="font-weight:700">Address</label>
+        <input id="iptVA" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 336">
+        <button id="btnIPT" class="primary" type="button">Translate</button>
+      </div>
+      <div class="chips" style="margin-top:8px">
+        <span>Or try</span>
+        <button class="chip" type="button" data-pid="0" data-va="0">P0 · 0 · code</button>
+        <button class="chip" type="button" data-pid="0" data-va="336">P0 · 336 · heap</button>
+        <button class="chip" type="button" data-pid="1" data-va="928">P1 · 928 · stack</button>
+        <button class="chip" type="button" data-pid="0" data-va="192">P0 · 192 · unallocated page</button>
+        <button class="chip" type="button" data-pid="1" data-va="320">P1 · 320 · unallocated page</button>
+      </div>
+      <div class="toy-result" id="iptResult">Pick a process and an address above to search the table for a matching frame.</div>
     </section>
   </section>
 </div>
@@ -709,6 +766,87 @@ $('btnML').onclick = () => translateML($('mlVA').value);
 $('mlVA').addEventListener('keydown', e => { if (e.key === 'Enter') translateML(e.target.value); });
 document.querySelectorAll('#panel-multilevel .chip').forEach(c => {
   c.onclick = () => { $('mlVA').value = c.dataset.va; translateML(c.dataset.va); };
+});
+
+/* =========================================================
+   Inverted page table: 8 physical frames shared by 2 processes,
+   each with a 10-bit VA = VPN(4) + offset(6)
+   ========================================================= */
+const IPT_VA_MAX = 1024;
+const IPT = [
+  { pid: 0, vpn: 0, valid: 1, prot: 'r-x' },
+  { pid: 0, vpn: 1, valid: 1, prot: 'r-x' },
+  { pid: 1, vpn: 0, valid: 1, prot: 'r-x' },
+  { pid: null, vpn: null, valid: 0 },
+  { pid: 0, vpn: 5, valid: 1, prot: 'rw-' },
+  { pid: 1, vpn: 14, valid: 1, prot: 'rw-' },
+  { pid: null, vpn: null, valid: 0 },
+  { pid: 1, vpn: 15, valid: 1, prot: 'rw-' },
+];
+
+function renderIPTTable (hitFrame = null) {
+  $('iptTable').querySelector('tbody').innerHTML = IPT.map((e, i) => {
+    if (!e.valid) return `<tr class="gap"><td colspan="4">frame ${i} — free</td></tr>`;
+    return `<tr class="valid${hitFrame === i ? ' hit' : ''}"><td>frame ${i}</td><td>P${e.pid}</td><td>${e.vpn}</td><td>${e.prot}</td></tr>`;
+  }).join('');
+}
+renderIPTTable();
+
+function parseIPTVA (raw) {
+  const t = raw.trim().replace(/[_\s]/g, '');
+  if (t === '') return { err: 'Type an address first, for example 336.' };
+  let v = NaN;
+  if (/^0x[0-9a-f]+$/i.test(t)) v = parseInt(t.slice(2), 16);
+  else if (/^\d+$/.test(t)) v = parseInt(t, 10);
+  if (Number.isNaN(v)) return { err: `"${raw.trim()}" is not an address. Use decimal or hex (0x…).` };
+  if (v >= IPT_VA_MAX) return { err: `${v} is past the end of this process's 1024-byte address space (0–${IPT_VA_MAX - 1}).` };
+  return { v };
+}
+
+function translateIPT (pidRaw, raw) {
+  const input = $('iptVA'), out = $('iptResult');
+  const pid = +pidRaw;
+  const r = parseIPTVA(raw);
+  if (r.err) { out.className = 'toy-result fault'; out.textContent = r.err; input.setAttribute('aria-invalid', 'true'); renderIPTTable(); return; }
+  input.removeAttribute('aria-invalid');
+  const va = r.v, vpn = (va >> 6) & 0xF, off = va & 0x3F;
+  const split = `<div class="split"><span class="toy-bit sn">PID ${pid}</span><span class="toy-bit vpn">VPN ${bin4(vpn)}</span><span class="toy-bit off">off ${toBin(off, 6)}</span></div>`;
+
+  const steps = [];
+  steps.push(`<li><b>Binary</b> = ${binGroup(toBin(va, 10))}</li>`);
+  steps.push(`<li><b>VPN</b> = ${toBin(vpn, 4)}</li>`);
+  steps.push(`<li><b>Offset</b> = ${toBin(off, 6)}</li>`);
+  steps.push(`<li><b>Search key</b> = (PID ${pid}, VPN ${toBin(vpn, 4)})</li>`);
+
+  let hitFrame = null;
+  for (let i = 0; i < IPT.length; i++) {
+    const e = IPT[i];
+    if (!e.valid) { steps.push(`<li>Frame ${i}: free — skip</li>`); continue; }
+    if (e.pid === pid && e.vpn === vpn) {
+      steps.push(`<li>Frame ${i}: (PID ${e.pid}, VPN ${e.vpn}) — <span class="ok">match</span>, stop searching → PFN = ${i}</li>`);
+      hitFrame = i;
+      break;
+    }
+    steps.push(`<li>Frame ${i}: (PID ${e.pid}, VPN ${e.vpn}) — no match</li>`);
+  }
+  renderIPTTable(hitFrame);
+
+  if (hitFrame === null) {
+    steps.push(`<li>Searched all ${IPT.length} frames — <span class="bad">no entry</span> for (PID ${pid}, VPN ${vpn}) → page fault (page not resident)</li>`);
+    out.className = 'toy-result fault';
+    out.innerHTML = `${split}(PID ${pid}, address ${va} / ${hexA(va)}) — page fault.<ul class="steps">${steps.join('')}</ul>`;
+    return;
+  }
+  const pa = hitFrame * 64 + off;
+  steps.push(`<li><b>Add offset</b> after shifting left 6 bits to obtain the physical address: ${binGroup(toBin(hitFrame, 3) + toBin(off, 6))} = ${hexA(pa)}</li>`);
+  out.className = 'toy-result';
+  out.innerHTML = `${split}(PID ${pid}, address ${va} / ${hexA(va)}) → physical address ${pa} (${hexA(pa)}), protection ${IPT[hitFrame].prot}.<ul class="steps">${steps.join('')}</ul>`;
+}
+
+$('btnIPT').onclick = () => translateIPT($('iptPID').value, $('iptVA').value);
+$('iptVA').addEventListener('keydown', e => { if (e.key === 'Enter') translateIPT($('iptPID').value, e.target.value); });
+document.querySelectorAll('#panel-inverted .chip').forEach(c => {
+  c.onclick = () => { $('iptPID').value = c.dataset.pid; $('iptVA').value = c.dataset.va; translateIPT(c.dataset.pid, c.dataset.va); };
 });
 </script>
 </body>
