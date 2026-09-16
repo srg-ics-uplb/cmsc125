@@ -129,6 +129,24 @@ button.primary:hover:not(:disabled){background:#2c3a57}
 .tl2-label{font-weight:700;font-size:.85rem;margin:14px 0 4px}
 .tl2-label:first-of-type{margin-top:2px}
 
+/* ---------- SQMS: cons list + affinity schedule tables ---------- */
+.cons-list{margin:0;padding-left:22px;counter-reset:cons}
+.cons-list li{margin:0 0 8px;padding-left:2px}
+.cons-list .con-tag{font-weight:700;color:var(--bad)}
+.sched-aff-wrap{overflow-x:auto;margin:10px 0 2px}
+table.sched-aff{border-collapse:collapse;width:100%;min-width:420px}
+table.sched-aff th,table.sched-aff td{border:1.5px solid var(--ink);padding:0;text-align:center}
+table.sched-aff thead th{background:#fff;font-size:.72rem;font-weight:700;color:var(--ink-soft);padding:6px 4px;border-bottom:2px solid var(--ink);font-family:var(--mono)}
+table.sched-aff tbody th{background:#fff;font-size:.8rem;font-weight:700;padding:6px 10px;text-align:left;white-space:nowrap;font-family:var(--mono)}
+table.sched-aff td.jobcell{height:38px;color:#fff;font-weight:700;font-family:var(--mono);font-size:.95rem}
+table.sched-aff td.jobcell.pending{background:var(--hatch)}
+table.sched-aff td.jobcell.new{animation:cellPop .35s ease-out}
+table.sched-aff td.repeat{font-family:var(--sans);font-weight:400;font-style:italic;color:var(--ink-soft);font-size:.76rem;white-space:nowrap;padding:0 10px}
+@keyframes cellPop{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+.cpu-quad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:10px 0}
+@media (max-width:760px){.cpu-quad{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:420px){.cpu-quad{grid-template-columns:1fr}}
+
 @media (max-width: 900px){
   .cpu-pair{grid-template-columns:1fr}
 }
@@ -265,12 +283,16 @@ button.primary:hover:not(:disabled){background:#2c3a57}
       <ul class="bullets sub">
         <li><b>Single-Queue Multiprocessor Scheduling (SQMS)</b> puts every runnable job in one global queue and lets any single-CPU policy (RR, SJF, &hellip;) pick from it.</li>
         <li>Simple to build &mdash; it reuses single-CPU scheduling almost unchanged, and naturally keeps CPUs load-balanced.</li>
-        <li>But every pop needs the queue's lock (Tab 2), and nothing stops the same job from landing on a different CPU each time it runs (Tab 3).</li>
       </ul>
+      <h3>Cons</h3>
+      <ol class="bullets sub cons-list">
+        <li><span class="con-tag">(1) Lack of scalability</span> &mdash; some form of locking needs to be inserted around the shared queue so CPUs popping from it at the same time don't race each other (Tab 2). More CPUs means more contention for that one lock.</li>
+        <li><span class="con-tag">(2) Cache affinity issue</span> &mdash; nothing ties a job to the CPU it last ran on, so it can land on a different CPU almost every time it's rescheduled (Tab 3).</li>
+      </ol>
     </section>
 
     <section class="panel">
-      <h2>Walk five jobs through one queue and two CPUs</h2>
+      <h2>Con (1) and (2) together: five jobs, one queue, two CPUs</h2>
       <p class="qcap">Shared queue (front &rarr; back)</p>
       <div class="jobqueue" id="sqQueue"></div>
       <div class="cpu-pair">
@@ -284,9 +306,31 @@ button.primary:hover:not(:disabled){background:#2c3a57}
         <button id="sqReset" type="button">Reset</button>
       </div>
       <div class="toy-result" id="sqResult">Press <b>Next</b> to start, or <b>Play</b> to animate.</div>
+      <p class="note">Every pop above happens under the queue's lock &mdash; that's Con (1). Watch job A: it starts on CPU 0, but later gets pulled back off the queue by CPU 1 &mdash; that's Con (2).</p>
     </section>
 
-    <p class="takeaway">SQMS scales <span class="hl">poorly</span> as CPUs are added &mdash; more CPUs means more contention for the one queue lock &mdash; and it has <span class="hl">no cache affinity</span> at all.</p>
+    <section class="panel">
+      <h2>Con (2) in detail: 4 CPUs, 1 shared queue</h2>
+      <p class="sub">Five processes, A&ndash;E, cycle through a single queue feeding four CPUs &mdash; only four can run at once, so one process always waits. Pick an option, then step through the rounds and watch the schedule table fill in.</p>
+      <div class="chips">
+        <span>Option</span>
+        <button class="chip" type="button" data-opt="problem" aria-pressed="true">1 &middot; Cache affinity problem</button>
+        <button class="chip" type="button" data-opt="fixed" aria-pressed="false">2 &middot; Cache affinity fixed</button>
+      </div>
+
+      <div class="cpu-quad" id="sqQuad"></div>
+      <div class="sched-aff-wrap"><table class="sched-aff" id="sqAffTable"></table></div>
+
+      <div class="controls-row">
+        <button id="sqAffPrev" type="button">&larr; Prev</button>
+        <button id="sqAffNext" class="primary" type="button">Next round &rarr;</button>
+        <button id="sqAffPlay" type="button">&#9654; Play</button>
+        <button id="sqAffReset" type="button">Reset</button>
+      </div>
+      <div class="toy-result" id="sqAffResult">Press <b>Next round</b> to populate round 1, or <b>Play</b> to animate through all five rounds.</div>
+    </section>
+
+    <p class="takeaway">SQMS scales <span class="hl">poorly</span> as CPUs are added (Con 1), and by default has <span class="hl">no cache affinity</span> at all (Con 2) &mdash; Option 1 above. Real single-queue schedulers add explicit affinity mechanisms, like Option 2, accepting a little load imbalance to keep most processes warm.</p>
   </section>
 
   <!-- ================= TAB 5: MQMS ================= -->
@@ -603,6 +647,94 @@ $('sqPlay').addEventListener('click', () => {
   }, 1500);
 });
 sqRender();
+
+const SQ_AFF_NAIVE = [
+  ['A', 'E', 'D', 'C', 'B'],
+  ['B', 'A', 'E', 'D', 'C'],
+  ['C', 'B', 'A', 'E', 'D'],
+  ['D', 'C', 'B', 'A', 'E'],
+];
+const SQ_AFF_KEEP = [
+  ['A', 'E', 'A', 'A', 'A'],
+  ['B', 'B', 'E', 'B', 'B'],
+  ['C', 'C', 'C', 'E', 'C'],
+  ['D', 'D', 'D', 'D', 'E'],
+];
+const SQ_SCHED = { problem: SQ_AFF_NAIVE, fixed: SQ_AFF_KEEP };
+const SQ_ALL_JOBS = ['A', 'B', 'C', 'D', 'E'];
+let sqOption = 'problem', sqRound = 0, sqAffTimer = null;
+
+const sqColFor = (option, round) => SQ_SCHED[option].map(row => row[round - 1]);
+const sqWaitingFor = (option, round) => SQ_ALL_JOBS.find(p => !sqColFor(option, round).includes(p));
+
+function sqAffDescribe(option, round) {
+  const col = sqColFor(option, round);
+  const waiting = sqWaitingFor(option, round);
+  const assign = col.map((j, i) => `CPU${i} = ${j}`).join(', ');
+  if (option === 'problem') {
+    if (round === 1) return `<b>Round 1:</b> ${assign}. ${waiting} is left waiting &mdash; five processes, only four CPUs, so someone always sits out. Every cache starts cold.`;
+    return `<b>Round ${round}:</b> ${assign}. ${waiting} waits this round. Compare to round ${round - 1}: everyone shifted to a new CPU (or into the wait slot) &mdash; the single queue has no memory of who ran where.`;
+  }
+  if (round === 1) return `<b>Round 1:</b> ${assign}. E is left waiting for a free CPU. A, B, C and D each claim a "home" CPU.`;
+  const eCpu = col.indexOf('E');
+  return `<b>Round ${round}:</b> E takes over CPU${eCpu} for this round, so ${waiting} waits instead. A, B, C and D otherwise keep running on the CPU they always do &mdash; only E actually migrates.`;
+}
+function sqRenderQuad() {
+  const col = sqRound > 0 ? sqColFor(sqOption, sqRound) : [null, null, null, null];
+  $('sqQuad').innerHTML = col.map((job, i) => {
+    const inner = job ? `<div class="cpu-job" style="background:var(${SQ_COLORS[job]})">${job}</div>` : `<div class="cpu-job idle">idle</div>`;
+    return `<div class="cpu-box"><div class="cpu-name">CPU ${i}</div>${inner}</div>`;
+  }).join('');
+}
+function sqRenderAffTable() {
+  const rows = SQ_SCHED[sqOption];
+  const rounds = rows[0].length;
+  const thead = `<thead><tr><th></th>${Array.from({ length: rounds }, (_, i) => `<th>Round ${i + 1}</th>`).join('')}<th></th></tr></thead>`;
+  const tbody = `<tbody>${rows.map((row, cpu) => {
+    const cells = row.map((job, i) => {
+      const r = i + 1;
+      if (r > sqRound) return `<td class="jobcell pending">&nbsp;</td>`;
+      return `<td class="jobcell${r === sqRound ? ' new' : ''}" style="background:var(${SQ_COLORS[job]})">${job}</td>`;
+    }).join('');
+    return `<tr><th>CPU${cpu}</th>${cells}<td class="repeat">&hellip; repeat &hellip;</td></tr>`;
+  }).join('')}</tbody>`;
+  $('sqAffTable').innerHTML = thead + tbody;
+}
+function sqAffRender() {
+  sqRenderAffTable();
+  sqRenderQuad();
+  $('sqAffPrev').disabled = sqRound <= 0;
+  $('sqAffNext').disabled = sqRound >= 5;
+  const out = $('sqAffResult');
+  if (sqRound === 0) {
+    out.className = 'toy-result';
+    out.innerHTML = `Press <b>Next round</b> to populate round 1, or <b>Play</b> to animate through all five rounds.`;
+  } else {
+    out.className = 'toy-result' + (sqOption === 'problem' ? ' bad' : ' good');
+    out.innerHTML = sqAffDescribe(sqOption, sqRound) + (sqRound === 5 ? ` Then the whole pattern repeats.` : ``);
+  }
+}
+function sqAffStopPlay() { if (sqAffTimer) { clearInterval(sqAffTimer); sqAffTimer = null; $('sqAffPlay').textContent = '▶ Play'; } }
+$('sqAffNext').addEventListener('click', () => { if (sqRound < 5) { sqRound++; sqAffRender(); } if (sqRound >= 5) sqAffStopPlay(); });
+$('sqAffPrev').addEventListener('click', () => { sqAffStopPlay(); if (sqRound > 0) { sqRound--; sqAffRender(); } });
+$('sqAffReset').addEventListener('click', () => { sqAffStopPlay(); sqRound = 0; sqAffRender(); });
+$('sqAffPlay').addEventListener('click', () => {
+  if (sqAffTimer) { sqAffStopPlay(); return; }
+  if (sqRound >= 5) sqRound = 0;
+  $('sqAffPlay').textContent = '⏸ Pause';
+  sqAffTimer = setInterval(() => {
+    if (sqRound >= 5) { sqAffStopPlay(); return; }
+    sqRound++; sqAffRender();
+    if (sqRound >= 5) sqAffStopPlay();
+  }, 1300);
+});
+document.querySelectorAll('#panel-sqms .chip[data-opt]').forEach(c => c.addEventListener('click', () => {
+  sqAffStopPlay();
+  sqOption = c.dataset.opt; sqRound = 0;
+  document.querySelectorAll('#panel-sqms .chip[data-opt]').forEach(b => b.setAttribute('aria-pressed', String(b === c)));
+  sqAffRender();
+}));
+sqAffRender();
 
 /* =========================================================
    Tab 5: MQMS
