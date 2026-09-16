@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multiprocessor Scheduling</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#d3dbe2;
+  --ok:#2b8a3e; --bad:#c92a2a;
+  --mark:#ffd43b;
+  --j0:#c77700; --j1:#0b7285; --j2:#5f3dc4; --j3:#2b8a3e; --j4:#c2255c; --j5:#1971c2;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.page{max-width:1180px;margin:0 auto;padding:32px 28px 56px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0 0 24px;max-width:76ch;color:var(--ink-soft)}
+h2{font-size:1.25rem;margin:0 0 6px;font-weight:700}
+h3{font-size:1rem;margin:18px 0 6px;font-weight:700}
+.sub{margin:0 0 14px;font-size:.9rem;color:var(--ink-soft)}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0;margin-bottom:16px}
+.panel:last-child{margin-bottom:0}
+
+/* ---------- Tabs ---------- */
+.tabbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tab{font:inherit;font-size:.95rem;font-weight:700;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:10px 14px;cursor:pointer}
+.tab:hover{background:#fff}
+.tab[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabpanel{display:flex;flex-direction:column;gap:16px}
+
+/* ---------- Bullets / notes / takeaway ---------- */
+.bullets{margin:0 0 4px;padding-left:20px}
+.bullets li{margin:0 0 6px}
+.bullets .hl{color:var(--bad);font-weight:700}
+.note{margin:8px 0 0;font-size:.9rem;color:var(--ink-soft)}
+.takeaway{margin:0;padding:14px 20px;border-radius:8px;background:var(--mark);border:2px solid var(--ink);font-weight:700;font-size:1.05rem;box-shadow:4px 4px 0 rgba(23,32,51,.15)}
+.takeaway .hl{color:var(--bad)}
+
+/* ---------- Buttons / chips ---------- */
+button{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+.chip{font-size:.85rem;padding:5px 10px;border-width:1.5px}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+.chips>span{font-size:.85rem;color:var(--ink-soft)}
+.controls-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+
+/* ---------- Result box / steps ---------- */
+.toy-result{margin-top:14px;padding:12px 16px;border:2px solid var(--ink);border-radius:8px;background:#fff;font-size:.95rem;line-height:1.6}
+.toy-result.bad{border-color:var(--bad);background:#fff0f0}
+.toy-result.good{border-color:var(--ok);background:#f1fbf3}
+.toy-result.warn{border-color:#e98b00;background:#fff8ec}
+.toy-result b{font-family:var(--mono)}
+.steps{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.steps li{position:relative;padding-left:20px;font-size:.88rem;line-height:1.5;color:var(--ink-soft)}
+.steps li::before{content:"";position:absolute;left:0;top:.5em;width:7px;height:7px;background:var(--line);border-radius:1px}
+.steps li.active{color:var(--ink);font-weight:700}
+.steps li.active::before{background:var(--bad)}
+.steps li.done::before{background:var(--ink)}
+.steps b{font-family:var(--mono)}
+
+/* ---------- Job chips / queues ---------- */
+.jobqueue{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:52px;padding:10px;border:2px dashed var(--line);border-radius:8px;background:#fff}
+.jobqueue .empty-note{color:var(--ink-soft);font-style:italic;font-size:.85rem;padding:6px}
+.jobchip{width:42px;height:42px;border-radius:6px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:1rem;color:#fff;flex:none}
+.qcap{font-size:.78rem;font-weight:700;color:var(--ink-soft);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.03em}
+
+/* ---------- CPU boxes ---------- */
+.cpu-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:10px 0}
+.cpu-box{border:2px solid var(--ink);border-radius:8px;padding:14px;text-align:center;background:#fff;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:box-shadow .15s,border-color .15s}
+.cpu-box .cpu-name{font-weight:700;font-size:.78rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em}
+.cpu-box .cpu-job{width:56px;height:56px;border-radius:8px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:1.3rem;color:#fff}
+.cpu-box .cpu-job.idle{background:var(--hatch);color:var(--ink-soft);font-size:.7rem;font-weight:600}
+.cpu-box.warn{border-color:var(--bad);box-shadow:0 0 0 3px #ffd6d6}
+
+/* ---------- Cache coherence diagram ---------- */
+.cache-val{margin-top:6px;padding:8px 14px;border:2px solid var(--ink);border-radius:6px;font-family:var(--mono);font-weight:700;background:#fff;font-size:.92rem}
+.cache-val.invalid{background:var(--hatch);color:var(--ink-soft);font-weight:400;font-style:italic}
+.cache-val.stale{border-color:var(--bad);color:var(--bad);background:#fff0f0}
+.cache-val.fresh{border-color:var(--ok);color:var(--ok);background:#f1fbf3}
+.bus-line{height:2px;background:var(--ink);margin:18px 40px 26px;position:relative}
+.bus-line::before{content:"shared memory bus";position:absolute;left:50%;top:-20px;transform:translateX(-50%);font-family:var(--mono);font-size:.7rem;color:var(--ink-soft);background:var(--panel);padding:0 8px}
+.mem-box{max-width:260px;margin:0 auto;padding:14px;border:2px solid var(--ink);border-radius:8px;background:#fff;text-align:center;font-family:var(--mono);font-weight:700}
+
+/* ---------- Synchronization: linked list + pointers + lock ---------- */
+.listrow{display:flex;gap:14px;margin:16px 0 10px;flex-wrap:wrap}
+.listnode{width:64px;height:52px;border:2px solid var(--ink);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:1.05rem;background:#fff}
+.listnode.ishead{background:var(--mark)}
+.listnode.null{border-style:dashed;color:var(--ink-soft);font-size:.8rem;font-weight:400}
+.ptrline{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.ptr-chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.82rem;font-weight:700;padding:5px 10px;border-radius:6px;border:2px solid var(--ink);background:#fff}
+.ptr-chip.head{background:var(--ink);color:#fff;border-color:var(--ink)}
+.ptr-chip.t1{border-color:var(--j0);color:var(--j0)}
+.ptr-chip.t2{border-color:var(--j1);color:var(--j1)}
+.lock-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.82rem;font-weight:700;padding:5px 12px;border-radius:999px;border:2px solid var(--ink);background:#fff;margin:6px 0}
+.lock-pill.locked{background:var(--bad);color:#fff;border-color:var(--bad)}
+.lock-pill.unlocked{background:var(--ok);color:#fff;border-color:var(--ok)}
+.lock-pill.none{background:#fff8ec;border-color:#e98b00;color:#8a4f00}
+
+/* ---------- Cache affinity timeline ---------- */
+.tl2{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tl2-cell{width:80px;padding:8px 6px;border:2px solid var(--ink);border-radius:6px;background:#fff;text-align:center;cursor:pointer;font-size:.8rem}
+.tl2-cell:hover{background:#fff8db}
+.tl2-cell .rd{font-family:var(--mono);font-size:.66rem;color:var(--ink-soft);margin-bottom:3px}
+.tl2-cell .cpu{font-weight:700;margin-bottom:4px}
+.tl2-cell .badge{display:inline-block;font-family:var(--mono);font-weight:700;font-size:.7rem;padding:1px 7px;border-radius:999px}
+.tl2-cell .badge.warm{background:var(--ok);color:#fff}
+.tl2-cell .badge.cold{background:var(--bad);color:#fff}
+.tl2-label{font-weight:700;font-size:.85rem;margin:14px 0 4px}
+.tl2-label:first-of-type{margin-top:2px}
+
+@media (max-width: 900px){
+  .cpu-pair{grid-template-columns:1fr}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 40px}
+  h1{font-size:1.7rem}
+  .listnode{width:52px;height:44px;font-size:.9rem}
+  .tl2-cell{width:66px;font-size:.72rem}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Multiprocessor Scheduling</h1>
+    <p class="intro">Chapter 10 puts several CPUs, each with its own cache, in front of the scheduler built in Chapters 7&ndash;9. This tool follows the three issues a single-CPU scheduler never had to face &mdash; cache coherence, synchronization and cache affinity &mdash; then compares the two classic ways to organize run queues across CPUs: one shared queue (SQMS) and one queue per CPU (MQMS), including what MQMS has to do about the load imbalance it creates.</p>
+  </header>
+
+  <nav class="tabbar" role="tablist" aria-label="Choose a topic">
+    <button class="tab" role="tab" id="tabbtn-coherence" aria-selected="true" aria-controls="panel-coherence" data-tab="coherence">1 &middot; Cache coherence</button>
+    <button class="tab" role="tab" id="tabbtn-sync" aria-selected="false" aria-controls="panel-sync" data-tab="sync">2 &middot; Synchronization</button>
+    <button class="tab" role="tab" id="tabbtn-affinity" aria-selected="false" aria-controls="panel-affinity" data-tab="affinity">3 &middot; Cache affinity</button>
+    <button class="tab" role="tab" id="tabbtn-sqms" aria-selected="false" aria-controls="panel-sqms" data-tab="sqms">4 &middot; Single-queue (SQMS)</button>
+    <button class="tab" role="tab" id="tabbtn-mqms" aria-selected="false" aria-controls="panel-mqms" data-tab="mqms">5 &middot; Multi-queue (MQMS)</button>
+    <button class="tab" role="tab" id="tabbtn-balance" aria-selected="false" aria-controls="panel-balance" data-tab="balance">6 &middot; Fixing load imbalance</button>
+  </nav>
+
+  <!-- ================= TAB 1: CACHE COHERENCE ================= -->
+  <section class="tabpanel" id="panel-coherence" role="tabpanel" aria-labelledby="tabbtn-coherence">
+    <section class="panel">
+      <h2>Why one CPU's assumptions break with several</h2>
+      <ul class="bullets sub">
+        <li>Every CPU on a multicore chip has its <span class="hl">own private cache</span> to avoid hitting main memory on every access.</li>
+        <li>Caching keeps single-CPU scheduling cheap &mdash; but now the same memory location can have <span class="hl">multiple, disagreeing copies</span>, one per CPU cache.</li>
+        <li>This is the <b>cache coherence</b> problem: hardware has to make sure every CPU eventually sees the same value for the same address.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Watch a stale read happen</h2>
+      <p class="sub">CPU 1 caches a value, then CPU 2 changes it. Step through with and without a coherence protocol.</p>
+      <div class="chips">
+        <span>Scenario</span>
+        <button class="chip" type="button" data-scn="nosnoop" aria-pressed="true">Without coherence</button>
+        <button class="chip" type="button" data-scn="snoop" aria-pressed="false">With bus snooping</button>
+      </div>
+
+      <div class="cpu-pair">
+        <div class="cpu-box"><div class="cpu-name">CPU 1</div><div class="cache-val invalid" id="cohVal1">cache: empty</div></div>
+        <div class="cpu-box"><div class="cpu-name">CPU 2</div><div class="cache-val invalid" id="cohVal2">cache: empty</div></div>
+      </div>
+      <div class="bus-line"></div>
+      <div class="mem-box" id="cohMem">Memory: D = 50</div>
+
+      <div class="controls-row">
+        <button id="cohPrev" type="button">&larr; Prev</button>
+        <button id="cohNext" class="primary" type="button">Next &rarr;</button>
+        <button id="cohPlay" type="button">&#9654; Play</button>
+        <button id="cohReset" type="button">Reset</button>
+      </div>
+      <div class="toy-result" id="cohResult">Press <b>Next</b> to start, or <b>Play</b> to animate.</div>
+      <ol class="steps" id="cohSteps"></ol>
+    </section>
+
+    <p class="takeaway">Coherence is solved in <span class="hl">hardware</span>, not by the scheduler: protocols like bus snooping watch every write and invalidate or update stale copies so all CPUs agree on one value per address.</p>
+  </section>
+
+  <!-- ================= TAB 2: SYNCHRONIZATION ================= -->
+  <section class="tabpanel" id="panel-sync" role="tabpanel" aria-labelledby="tabbtn-sync" hidden>
+    <section class="panel">
+      <h2>Shared data now means shared <i>across CPUs</i></h2>
+      <ul class="bullets sub">
+        <li>The OS keeps shared data structures &mdash; run queues, free lists &mdash; that code on any CPU might touch at the same time.</li>
+        <li>Without protection, two CPUs interleaving on the same structure race each other and can corrupt it.</li>
+        <li>Locks fix correctness, but every CPU that wants the lock has to wait its turn &mdash; a single lock becomes a bottleneck as the CPU count grows.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Two CPUs pop the same free list</h2>
+      <p class="sub">T1 runs on CPU 0, T2 on CPU 1. Both call <b>pop()</b> on a 3-node free list, A &rarr; B &rarr; C, at almost the same time.</p>
+      <div class="chips">
+        <span>Scenario</span>
+        <button class="chip" type="button" data-scn="nolock" aria-pressed="true">No lock</button>
+        <button class="chip" type="button" data-scn="lock" aria-pressed="false">With a lock</button>
+      </div>
+
+      <div class="listrow" id="syncList"></div>
+      <div class="ptrline" id="syncPtrs"></div>
+      <div id="syncLockWrap"></div>
+
+      <div class="controls-row">
+        <button id="syPrev" type="button">&larr; Prev</button>
+        <button id="syNext" class="primary" type="button">Next &rarr;</button>
+        <button id="syPlay" type="button">&#9654; Play</button>
+        <button id="syReset" type="button">Reset</button>
+      </div>
+      <div class="toy-result" id="syResult">Press <b>Next</b> to start, or <b>Play</b> to animate.</div>
+      <ol class="steps" id="sySteps"></ol>
+    </section>
+
+    <p class="takeaway">A shared structure touched by several CPUs needs a lock to stay correct &mdash; the cost is CPUs piling up waiting for it, exactly the scalability problem a single shared run queue runs into (Tab 4).</p>
+  </section>
+
+  <!-- ================= TAB 3: CACHE AFFINITY ================= -->
+  <section class="tabpanel" id="panel-affinity" role="tabpanel" aria-labelledby="tabbtn-affinity" hidden>
+    <section class="panel">
+      <h2>A warm cache is worth keeping</h2>
+      <ul class="bullets sub">
+        <li>Whichever CPU a process last ran on has its data sitting in that CPU's cache &mdash; a <b>warm</b> cache.</li>
+        <li>Move the process to a different CPU and that cache starts empty for it &mdash; a <b>cold</b> start, paid for in extra memory stalls until it warms back up.</li>
+        <li>A scheduler with <b>cache affinity</b> tries to keep a process on the same CPU run after run.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Same six time slices for process P, two policies</h2>
+      <p class="sub">Click any round on either row to see why it was warm or cold.</p>
+      <p class="tl2-label">Ignore affinity &mdash; whichever CPU happens to be free</p>
+      <div class="tl2" id="affIgnoreRow"></div>
+      <p class="tl2-label">Respect affinity &mdash; prefer P's last CPU</p>
+      <div class="tl2" id="affRespectRow"></div>
+      <div class="toy-result" id="affResult">Click a round above on either row.</div>
+    </section>
+
+    <p class="takeaway">Same process, same six rounds &mdash; respecting affinity turns most of them <span class="hl">warm</span> instead of <span class="hl">cold</span>.</p>
+  </section>
+
+  <!-- ================= TAB 4: SQMS ================= -->
+  <section class="tabpanel" id="panel-sqms" role="tabpanel" aria-labelledby="tabbtn-sqms" hidden>
+    <section class="panel">
+      <h2>One queue, shared by every CPU</h2>
+      <ul class="bullets sub">
+        <li><b>Single-Queue Multiprocessor Scheduling (SQMS)</b> puts every runnable job in one global queue and lets any single-CPU policy (RR, SJF, &hellip;) pick from it.</li>
+        <li>Simple to build &mdash; it reuses single-CPU scheduling almost unchanged, and naturally keeps CPUs load-balanced.</li>
+        <li>But every pop needs the queue's lock (Tab 2), and nothing stops the same job from landing on a different CPU each time it runs (Tab 3).</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Walk five jobs through one queue and two CPUs</h2>
+      <p class="qcap">Shared queue (front &rarr; back)</p>
+      <div class="jobqueue" id="sqQueue"></div>
+      <div class="cpu-pair">
+        <div class="cpu-box" id="sqCpu0"><div class="cpu-name">CPU 0</div><div class="cpu-job idle" id="sqCpu0Job">idle</div></div>
+        <div class="cpu-box" id="sqCpu1"><div class="cpu-name">CPU 1</div><div class="cpu-job idle" id="sqCpu1Job">idle</div></div>
+      </div>
+      <div class="controls-row">
+        <button id="sqPrev" type="button">&larr; Prev</button>
+        <button id="sqNext" class="primary" type="button">Next &rarr;</button>
+        <button id="sqPlay" type="button">&#9654; Play</button>
+        <button id="sqReset" type="button">Reset</button>
+      </div>
+      <div class="toy-result" id="sqResult">Press <b>Next</b> to start, or <b>Play</b> to animate.</div>
+    </section>
+
+    <p class="takeaway">SQMS scales <span class="hl">poorly</span> as CPUs are added &mdash; more CPUs means more contention for the one queue lock &mdash; and it has <span class="hl">no cache affinity</span> at all.</p>
+  </section>
+
+  <!-- ================= TAB 5: MQMS ================= -->
+  <section class="tabpanel" id="panel-mqms" role="tabpanel" aria-labelledby="tabbtn-mqms" hidden>
+    <section class="panel">
+      <h2>One queue per CPU</h2>
+      <ul class="bullets sub">
+        <li><b>Multi-Queue Multiprocessor Scheduling (MQMS)</b> gives each CPU its own queue and its own lock.</li>
+        <li>No shared lock to fight over, and a job that stays in one queue keeps running on the same CPU &mdash; good affinity, for free.</li>
+        <li>The catch: queues fill and drain independently, so nothing keeps their lengths in balance.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Two independent queues can drift apart</h2>
+      <div class="cpu-pair">
+        <div>
+          <p class="qcap">CPU 0's queue</p>
+          <div class="jobqueue" id="mqQueue0"></div>
+        </div>
+        <div>
+          <p class="qcap">CPU 1's queue</p>
+          <div class="jobqueue" id="mqQueue1"></div>
+        </div>
+      </div>
+      <div class="cpu-pair">
+        <div class="cpu-box" id="mqCpu0"><div class="cpu-name">CPU 0</div><div class="cpu-job idle" id="mqCpu0Job">idle</div></div>
+        <div class="cpu-box" id="mqCpu1"><div class="cpu-name">CPU 1</div><div class="cpu-job idle" id="mqCpu1Job">idle</div></div>
+      </div>
+      <div class="controls-row">
+        <button id="mqPrev" type="button">&larr; Prev</button>
+        <button id="mqNext" class="primary" type="button">Next &rarr;</button>
+        <button id="mqPlay" type="button">&#9654; Play</button>
+        <button id="mqReset" type="button">Reset</button>
+      </div>
+      <div class="toy-result" id="mqResult">Press <b>Next</b> to start, or <b>Play</b> to animate.</div>
+    </section>
+
+    <p class="takeaway">MQMS scales and preserves affinity, but with no coordination between queues it can leave one CPU <span class="hl">idle</span> while another stays backed up &mdash; the load-imbalance problem.</p>
+  </section>
+
+  <!-- ================= TAB 6: FIXING LOAD IMBALANCE ================= -->
+  <section class="tabpanel" id="panel-balance" role="tabpanel" aria-labelledby="tabbtn-balance" hidden>
+    <section class="panel">
+      <h2>Approaches to load imbalance</h2>
+      <ul class="bullets sub">
+        <li><b>Migration:</b> the OS explicitly moves a waiting job from a long queue to a short one.</li>
+        <li><b>Work stealing:</b> a CPU whose queue is (nearly) empty periodically peeks at another queue and steals a job off its tail instead of waiting to be handed one.</li>
+        <li>The tuning problem is <i>how often</i> to check: too often and you pay constant overhead and throw away the affinity MQMS was giving you for free; too rarely and CPUs sit idle while work piles up elsewhere.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Try work stealing</h2>
+      <p class="sub">Picking up where Tab 5 left off: CPU 0's queue is backed up, CPU 1's is empty.</p>
+      <div class="cpu-pair">
+        <div>
+          <p class="qcap">CPU 0's queue</p>
+          <div class="jobqueue" id="lbQueue0"></div>
+        </div>
+        <div>
+          <p class="qcap">CPU 1's queue</p>
+          <div class="jobqueue" id="lbQueue1"></div>
+        </div>
+      </div>
+      <div class="controls-row">
+        <button id="lbSteal" class="primary" type="button">Steal a job</button>
+        <button id="lbReset" type="button">Reset</button>
+      </div>
+      <div class="toy-result" id="lbResult">CPU 1's queue is empty while CPU 0 still has jobs waiting. Click <b>Steal a job</b> to have CPU 1 check CPU 0's queue and take one off the tail.</div>
+      <ol class="steps" id="lbLog"></ol>
+    </section>
+
+    <p class="takeaway">Balance the queues just enough to keep every CPU busy &mdash; not so often that stealing itself becomes the bottleneck.</p>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    document.querySelectorAll('.tabpanel').forEach(p => p.hidden = p.id !== `panel-${btn.dataset.tab}`);
+  });
+});
+
+/* =========================================================
+   Tab 1: Cache coherence
+   ========================================================= */
+const COH = {
+  nosnoop: [
+    { c1: null, c2: null, mem: 50, desc: `Memory holds D = 50. Neither CPU has cached it yet.` },
+    { c1: { val: 50, state: 'fresh' }, c2: null, mem: 50, desc: `CPU 1 executes <b>Load A</b>. Cache miss, so it fetches D from memory into its own cache: 50.` },
+    { c1: { val: 50, state: 'stale' }, c2: { val: 100, state: 'fresh' }, mem: 100, desc: `CPU 2 executes <b>Store A, D = 100</b>. It updates its own cache and writes through to memory. CPU 1's cached copy is never touched.` },
+    { c1: { val: 50, state: 'stale' }, c2: { val: 100, state: 'fresh' }, mem: 100, desc: `CPU 1 executes <b>Load A</b> again. It still hits on its old cache line and returns 50 &mdash; even though memory (and CPU 2) now say 100. Two CPUs now disagree about the same address.`, bad: true },
+  ],
+  snoop: [
+    { c1: null, c2: null, mem: 50, desc: `Memory holds D = 50. Neither CPU has cached it yet.` },
+    { c1: { val: 50, state: 'fresh' }, c2: null, mem: 50, desc: `CPU 1 executes <b>Load A</b>. Cache miss, so it fetches D from memory into its own cache: 50.` },
+    { c1: null, c2: { val: 100, state: 'fresh' }, mem: 100, desc: `CPU 2 executes <b>Store A, D = 100</b>. Every cache snoops the bus, so CPU 1 sees this write to A go by and invalidates its own copy.` },
+    { c1: { val: 100, state: 'fresh' }, c2: { val: 100, state: 'fresh' }, mem: 100, desc: `CPU 1 executes <b>Load A</b> again. Its line was invalidated, so this is a cache miss &mdash; it fetches the current value from memory: 100. Correct!`, good: true },
+  ],
+};
+let cohScn = 'nosnoop', cohStep = 0, cohTimer = null;
+
+function cohRenderCache(el, c) {
+  el.classList.remove('invalid', 'stale', 'fresh');
+  if (!c) { el.classList.add('invalid'); el.textContent = 'cache: empty'; return; }
+  el.classList.add(c.state);
+  el.textContent = `cache: D = ${c.val}`;
+}
+function cohRenderStepsList() {
+  $('cohSteps').innerHTML = COH[cohScn].map((s, i) => `<li id="cohli-${i}">${i === 0 ? 'Start' : 'Step ' + i}: ${s.desc}</li>`).join('');
+}
+function cohRender() {
+  const arr = COH[cohScn], s = arr[cohStep];
+  cohRenderCache($('cohVal1'), s.c1);
+  cohRenderCache($('cohVal2'), s.c2);
+  $('cohMem').textContent = `Memory: D = ${s.mem}`;
+  $('cohPrev').disabled = cohStep <= 0;
+  $('cohNext').disabled = cohStep >= arr.length - 1;
+  const out = $('cohResult');
+  out.className = 'toy-result' + (s.bad ? ' bad' : s.good ? ' good' : '');
+  out.innerHTML = s.desc;
+  arr.forEach((_, i) => {
+    const li = $('cohli-' + i);
+    li.classList.toggle('active', i === cohStep);
+    li.classList.toggle('done', i < cohStep);
+  });
+}
+function cohStopPlay() { if (cohTimer) { clearInterval(cohTimer); cohTimer = null; $('cohPlay').textContent = '▶ Play'; } }
+$('cohNext').addEventListener('click', () => { const arr = COH[cohScn]; if (cohStep < arr.length - 1) { cohStep++; cohRender(); } if (cohStep >= arr.length - 1) cohStopPlay(); });
+$('cohPrev').addEventListener('click', () => { cohStopPlay(); if (cohStep > 0) { cohStep--; cohRender(); } });
+$('cohReset').addEventListener('click', () => { cohStopPlay(); cohStep = 0; cohRender(); });
+$('cohPlay').addEventListener('click', () => {
+  if (cohTimer) { cohStopPlay(); return; }
+  const arr = COH[cohScn];
+  if (cohStep >= arr.length - 1) cohStep = 0;
+  $('cohPlay').textContent = '⏸ Pause';
+  cohTimer = setInterval(() => {
+    const arr2 = COH[cohScn];
+    if (cohStep >= arr2.length - 1) { cohStopPlay(); return; }
+    cohStep++; cohRender();
+    if (cohStep >= arr2.length - 1) cohStopPlay();
+  }, 1400);
+});
+document.querySelectorAll('#panel-coherence .chip').forEach(c => c.addEventListener('click', () => {
+  cohStopPlay();
+  cohScn = c.dataset.scn; cohStep = 0;
+  document.querySelectorAll('#panel-coherence .chip').forEach(b => b.setAttribute('aria-pressed', String(b === c)));
+  cohRenderStepsList(); cohRender();
+}));
+cohRenderStepsList(); cohRender();
+
+/* =========================================================
+   Tab 2: Synchronization
+   ========================================================= */
+const SYNC_NODES = ['A', 'B', 'C'];
+const SY = {
+  nolock: [
+    { head: 'A', tmp1: null, tmp2: null, given1: null, given2: null, lock: null, desc: `Three nodes remain on the free list: A &rarr; B &rarr; C. T1 (CPU 0) and T2 (CPU 1) each call <b>pop()</b> at almost the same time &mdash; nothing protects head.` },
+    { head: 'A', tmp1: 'A', tmp2: null, given1: null, given2: null, lock: null, desc: `T1 reads the shared head pointer: <b>tmp1 = A</b>.` },
+    { head: 'A', tmp1: 'A', tmp2: 'A', given1: null, given2: null, lock: null, desc: `Before T1 can update head, T2 also reads it: <b>tmp2 = A</b> too. Both threads now think they popped the same node.`, warn: true },
+    { head: 'B', tmp1: 'A', tmp2: 'A', given1: null, given2: null, lock: null, desc: `T1 sets <b>head = tmp1-&gt;next</b>, advancing head to B.` },
+    { head: 'B', tmp1: 'A', tmp2: 'A', given1: null, given2: null, lock: null, desc: `T2 also sets <b>head = tmp2-&gt;next</b> &mdash; using its own stale tmp, A &mdash; so head becomes B again. Node C is never reached this way.` },
+    { head: 'B', tmp1: 'A', tmp2: 'A', given1: 'A', given2: null, lock: null, desc: `T1 <b>returns tmp1</b> to its caller: Node A.` },
+    { head: 'B', tmp1: 'A', tmp2: 'A', given1: 'A', given2: 'A', lock: null, desc: `T2 also <b>returns tmp2</b>: Node A &mdash; the same node T1 already has! Two callers now believe they exclusively own Node A.`, bad: true },
+  ],
+  lock: [
+    { head: 'A', tmp1: null, tmp2: null, given1: null, given2: null, lock: null, desc: `Same starting list. This time <b>pop()</b> is protected by a lock around its critical section.` },
+    { head: 'A', tmp1: 'A', tmp2: null, given1: null, given2: null, lock: 'T1', desc: `T1 acquires the lock, then reads head: <b>tmp1 = A</b>.` },
+    { head: 'A', tmp1: 'A', tmp2: null, given1: null, given2: null, lock: 'T1', desc: `T2 tries to acquire the same lock, but it is held by T1, so T2 <b>waits</b>.`, warn: true },
+    { head: 'B', tmp1: 'A', tmp2: null, given1: null, given2: null, lock: null, desc: `T1 sets <b>head = tmp1-&gt;next</b>, advancing head to B, and releases the lock.` },
+    { head: 'B', tmp1: 'A', tmp2: 'B', given1: null, given2: null, lock: 'T2', desc: `T2 now acquires the lock and reads the <i>current</i> head: <b>tmp2 = B</b> &mdash; not A, because T1 already moved it.` },
+    { head: 'C', tmp1: 'A', tmp2: 'B', given1: null, given2: null, lock: null, desc: `T2 sets <b>head = tmp2-&gt;next</b>, advancing head to C, and releases the lock.` },
+    { head: 'C', tmp1: 'A', tmp2: 'B', given1: 'A', given2: 'B', lock: null, desc: `T1 returns A and T2 returns B &mdash; every node handed out exactly once, and the list correctly ends with head = C.`, good: true },
+  ],
+};
+let syScn = 'nolock', syStep = 0, syTimer = null;
+
+function syRenderStepsList() {
+  $('sySteps').innerHTML = SY[syScn].map((s, i) => `<li id="syli-${i}">${i === 0 ? 'Start' : 'Step ' + i}: ${s.desc}</li>`).join('');
+}
+function syUpdateStepsHighlight() {
+  SY[syScn].forEach((_, i) => { const li = $('syli-' + i); li.classList.toggle('active', i === syStep); li.classList.toggle('done', i < syStep); });
+}
+function syRender() {
+  const arr = SY[syScn], s = arr[syStep];
+  $('syncList').innerHTML = SYNC_NODES.map(n => `<div class="listnode${s.head === n ? ' ishead' : ''}">${n}</div>`).join('') + `<div class="listnode null">null</div>`;
+  $('syncPtrs').innerHTML = [
+    `<span class="ptr-chip head">head &rarr; ${s.head ?? 'null'}</span>`,
+    `<span class="ptr-chip t1">T1.tmp &rarr; ${s.tmp1 ?? '—'}</span>`,
+    `<span class="ptr-chip t2">T2.tmp &rarr; ${s.tmp2 ?? '—'}</span>`,
+  ].join('');
+  $('syncLockWrap').innerHTML = syScn === 'nolock'
+    ? `<span class="lock-pill none">&#9888; unprotected &mdash; no lock around head</span>`
+    : (s.lock ? `<span class="lock-pill locked">&#128274; locked &mdash; held by ${s.lock}</span>` : `<span class="lock-pill unlocked">&#128275; unlocked</span>`);
+  $('syPrev').disabled = syStep <= 0;
+  $('syNext').disabled = syStep >= arr.length - 1;
+  const out = $('syResult');
+  out.className = 'toy-result' + (s.bad ? ' bad' : s.good ? ' good' : s.warn ? ' warn' : '');
+  let extra = '';
+  if (s.given1 || s.given2) {
+    extra = `<br>T1 returned: <b>${s.given1 ?? '—'}</b> &middot; T2 returned: <b>${s.given2 ?? '—'}</b>` +
+      (s.given1 && s.given1 === s.given2 ? ` <span style="color:var(--bad);font-weight:700">&mdash; collision!</span>` : ``);
+  }
+  out.innerHTML = s.desc + extra;
+  syUpdateStepsHighlight();
+}
+function syStopPlay() { if (syTimer) { clearInterval(syTimer); syTimer = null; $('syPlay').textContent = '▶ Play'; } }
+$('syNext').addEventListener('click', () => { const arr = SY[syScn]; if (syStep < arr.length - 1) { syStep++; syRender(); } if (syStep >= arr.length - 1) syStopPlay(); });
+$('syPrev').addEventListener('click', () => { syStopPlay(); if (syStep > 0) { syStep--; syRender(); } });
+$('syReset').addEventListener('click', () => { syStopPlay(); syStep = 0; syRender(); });
+$('syPlay').addEventListener('click', () => {
+  if (syTimer) { syStopPlay(); return; }
+  const arr = SY[syScn];
+  if (syStep >= arr.length - 1) syStep = 0;
+  $('syPlay').textContent = '⏸ Pause';
+  syTimer = setInterval(() => {
+    const arr2 = SY[syScn];
+    if (syStep >= arr2.length - 1) { syStopPlay(); return; }
+    syStep++; syRender();
+    if (syStep >= arr2.length - 1) syStopPlay();
+  }, 1500);
+});
+document.querySelectorAll('#panel-sync .chip').forEach(c => c.addEventListener('click', () => {
+  syStopPlay(); syScn = c.dataset.scn; syStep = 0;
+  document.querySelectorAll('#panel-sync .chip').forEach(b => b.setAttribute('aria-pressed', String(b === c)));
+  syRenderStepsList(); syRender();
+}));
+syRenderStepsList(); syRender();
+
+/* =========================================================
+   Tab 3: Cache affinity
+   ========================================================= */
+const AFF_IGNORE = [0, 1, 0, 1, 0, 1];
+const AFF_RESPECT = [0, 0, 0, 1, 1, 1];
+const affWarm = (seq, i) => i > 0 && seq[i] === seq[i - 1];
+function affRenderRow(containerId, seq, label) {
+  $(containerId).innerHTML = seq.map((cpu, i) => {
+    const warm = affWarm(seq, i);
+    return `<div class="tl2-cell" data-row="${label}" data-i="${i}"><div class="rd">Round ${i + 1}</div><div class="cpu">CPU ${cpu}</div><span class="badge ${warm ? 'warm' : 'cold'}">${warm ? 'warm' : 'cold'}</span></div>`;
+  }).join('');
+}
+affRenderRow('affIgnoreRow', AFF_IGNORE, 'ignore');
+affRenderRow('affRespectRow', AFF_RESPECT, 'respect');
+function affExplain(label, i) {
+  const seq = label === 'ignore' ? AFF_IGNORE : AFF_RESPECT;
+  const cpu = seq[i], warm = affWarm(seq, i), name = label === 'ignore' ? 'Ignore-affinity' : 'Respect-affinity';
+  const out = $('affResult');
+  if (i === 0) {
+    out.className = 'toy-result';
+    out.innerHTML = `<b>${name}, round 1:</b> P's very first run, on CPU ${cpu}. Every cache starts cold.`;
+  } else if (warm) {
+    out.className = 'toy-result good';
+    out.innerHTML = `<b>${name}, round ${i + 1}:</b> P runs on CPU ${cpu} again &mdash; the same CPU as last round, so its cache is still warm. No refill needed.`;
+  } else {
+    out.className = 'toy-result bad';
+    out.innerHTML = `<b>${name}, round ${i + 1}:</b> P runs on CPU ${cpu}, having last run on CPU ${seq[i - 1]}. That's a migration &mdash; CPU ${cpu}'s cache has none of P's data, so this round starts cold.`;
+  }
+}
+document.querySelectorAll('.tl2-cell').forEach(c => c.addEventListener('click', () => affExplain(c.dataset.row, +c.dataset.i)));
+
+/* =========================================================
+   Tab 4: SQMS
+   ========================================================= */
+const SQ_COLORS = { A: '--j0', B: '--j1', C: '--j2', D: '--j3', E: '--j4' };
+const SQ_SNAPS = [
+  { queue: ['A', 'B', 'C', 'D', 'E'], cpu0: null, cpu1: null, done: [], desc: `Five jobs sit in one shared queue. A and C need two quantums each; B, D and E need one. Both CPUs start idle.` },
+  { queue: ['B', 'C', 'D', 'E'], cpu0: 'A', cpu1: null, done: [], desc: `CPU 0 goes idle, locks the queue, pops A off the front, unlocks, and starts running it.` },
+  { queue: ['C', 'D', 'E'], cpu0: 'A', cpu1: 'B', done: [], desc: `CPU 1 does the same: lock, pop B, unlock, run.` },
+  { queue: ['D', 'E', 'A'], cpu0: 'C', cpu1: 'B', done: [], desc: `CPU 0 finishes a quantum of A. A isn't done yet, so under the same lock it goes to the tail of the queue &mdash; then CPU 0 pops the new front, C.` },
+  { queue: ['E', 'A'], cpu0: 'C', cpu1: 'D', done: ['B'], desc: `CPU 1 finishes B, which only needed one quantum, so B retires. CPU 1 locks the queue and pops D.` },
+  { queue: ['A', 'C'], cpu0: 'E', cpu1: 'D', done: ['B'], desc: `CPU 0 finishes a quantum of C. Same pattern: C goes to the tail, CPU 0 pops the new front, E.` },
+  { queue: ['C'], cpu0: 'E', cpu1: 'A', done: ['B', 'D'], migrate: true, desc: `CPU 1 finishes D and pulls the next job &mdash; which happens to be A. A ran on CPU 0 back at step 1; now it lands on CPU 1. The shared queue has no memory of that, so A's warm cache on CPU 0 is now useless.` },
+  { queue: [], cpu0: 'C', cpu1: 'A', done: ['B', 'D', 'E'], desc: `CPU 0 finishes E and pulls the last job, C &mdash; which happens to land back on CPU 0, purely by chance.` },
+  { queue: [], cpu0: null, cpu1: 'A', done: ['B', 'D', 'E', 'A'], desc: `CPU 1 finishes A's last quantum. Only C is left, still running on CPU 0.` },
+  { queue: [], cpu0: null, cpu1: null, done: ['B', 'D', 'E', 'A', 'C'], desc: `CPU 0 finishes C. All jobs are done &mdash; but A had to rebuild its cache state mid-run purely because of where the shared queue happened to leave it. That, plus the lock every pop needs, is the price of one shared queue.` },
+];
+let sqStep = 0, sqTimer = null;
+function sqRenderCpuJob(jobEl, job) {
+  if (!job) { jobEl.className = 'cpu-job idle'; jobEl.textContent = 'idle'; jobEl.style.background = ''; return; }
+  jobEl.className = 'cpu-job'; jobEl.textContent = job; jobEl.style.background = `var(${SQ_COLORS[job]})`;
+}
+function sqRender() {
+  const s = SQ_SNAPS[sqStep];
+  $('sqQueue').innerHTML = s.queue.length ? s.queue.map(j => `<div class="jobchip" style="background:var(${SQ_COLORS[j]})">${j}</div>`).join('') : `<span class="empty-note">queue empty</span>`;
+  sqRenderCpuJob($('sqCpu0Job'), s.cpu0);
+  sqRenderCpuJob($('sqCpu1Job'), s.cpu1);
+  $('sqCpu0').classList.remove('warn');
+  $('sqCpu1').classList.toggle('warn', !!s.migrate);
+  $('sqPrev').disabled = sqStep <= 0;
+  $('sqNext').disabled = sqStep >= SQ_SNAPS.length - 1;
+  const out = $('sqResult');
+  out.className = 'toy-result' + (s.migrate ? ' bad' : '');
+  out.innerHTML = s.desc + (s.done.length ? `<br><span style="color:var(--ink-soft);font-size:.85rem">Finished so far: ${s.done.join(', ')}</span>` : ``);
+}
+function sqStopPlay() { if (sqTimer) { clearInterval(sqTimer); sqTimer = null; $('sqPlay').textContent = '▶ Play'; } }
+$('sqNext').addEventListener('click', () => { if (sqStep < SQ_SNAPS.length - 1) { sqStep++; sqRender(); } if (sqStep >= SQ_SNAPS.length - 1) sqStopPlay(); });
+$('sqPrev').addEventListener('click', () => { sqStopPlay(); if (sqStep > 0) { sqStep--; sqRender(); } });
+$('sqReset').addEventListener('click', () => { sqStopPlay(); sqStep = 0; sqRender(); });
+$('sqPlay').addEventListener('click', () => {
+  if (sqTimer) { sqStopPlay(); return; }
+  if (sqStep >= SQ_SNAPS.length - 1) sqStep = 0;
+  $('sqPlay').textContent = '⏸ Pause';
+  sqTimer = setInterval(() => {
+    if (sqStep >= SQ_SNAPS.length - 1) { sqStopPlay(); return; }
+    sqStep++; sqRender();
+    if (sqStep >= SQ_SNAPS.length - 1) sqStopPlay();
+  }, 1500);
+});
+sqRender();
+
+/* =========================================================
+   Tab 5: MQMS
+   ========================================================= */
+const MQ_COLORS = { A: '--j0', B: '--j1', C: '--j2' };
+const MQ_SNAPS = [
+  { q0: ['A', 'B'], q1: ['C'], cpu0: null, cpu1: null, desc: `Each CPU owns its own queue and lock, so there is no contention between them &mdash; and once a job lands in a queue, it stays there.` },
+  { q0: ['B'], q1: [], cpu0: 'A', cpu1: 'C', desc: `Both CPUs pull from their own queue at the same time &mdash; no lock to fight over. CPU 0 starts A; CPU 1 starts C.` },
+  { q0: ['B'], q1: [], cpu0: 'A', cpu1: null, desc: `CPU 1 finishes C &mdash; its only job &mdash; and its queue is now empty. CPU 1 goes idle.` },
+  { q0: ['A'], q1: [], cpu0: 'B', cpu1: null, desc: `CPU 0 requeues A (one quantum left) and pulls B. CPU 1 is still idle &mdash; its queue has nothing, even though CPU 0 clearly has more work than it can get through alone.` },
+  { q0: [], q1: [], cpu0: 'A', cpu1: null, desc: `CPU 0 finishes B and starts A's last quantum. CPU 1 has been idle since step 2 &mdash; the whole time CPU 0 stayed backed up.` },
+  { q0: [], q1: [], cpu0: null, cpu1: null, desc: `CPU 0 finishes A. Both CPUs are idle now, but for several quantums CPU 1 sat unused while CPU 0 was busy &mdash; fixed, per-CPU queues can't share work on their own.` },
+];
+let mqStep = 0, mqTimer = null;
+function mqRenderQueue(id, arr) { $(id).innerHTML = arr.length ? arr.map(j => `<div class="jobchip" style="background:var(${MQ_COLORS[j]})">${j}</div>`).join('') : `<span class="empty-note">queue empty</span>`; }
+function mqRenderCpu(jobEl, job) {
+  if (!job) { jobEl.className = 'cpu-job idle'; jobEl.textContent = 'idle'; jobEl.style.background = ''; }
+  else { jobEl.className = 'cpu-job'; jobEl.textContent = job; jobEl.style.background = `var(${MQ_COLORS[job]})`; }
+}
+function mqRender() {
+  const s = MQ_SNAPS[mqStep];
+  mqRenderQueue('mqQueue0', s.q0); mqRenderQueue('mqQueue1', s.q1);
+  mqRenderCpu($('mqCpu0Job'), s.cpu0); mqRenderCpu($('mqCpu1Job'), s.cpu1);
+  $('mqCpu1').classList.toggle('warn', mqStep > 0 && s.cpu1 === null && s.q1.length === 0);
+  $('mqPrev').disabled = mqStep <= 0;
+  $('mqNext').disabled = mqStep >= MQ_SNAPS.length - 1;
+  const out = $('mqResult');
+  out.className = 'toy-result' + (mqStep > 0 && s.cpu1 === null ? ' bad' : '');
+  out.innerHTML = s.desc;
+}
+function mqStopPlay() { if (mqTimer) { clearInterval(mqTimer); mqTimer = null; $('mqPlay').textContent = '▶ Play'; } }
+$('mqNext').addEventListener('click', () => { if (mqStep < MQ_SNAPS.length - 1) { mqStep++; mqRender(); } if (mqStep >= MQ_SNAPS.length - 1) mqStopPlay(); });
+$('mqPrev').addEventListener('click', () => { mqStopPlay(); if (mqStep > 0) { mqStep--; mqRender(); } });
+$('mqReset').addEventListener('click', () => { mqStopPlay(); mqStep = 0; mqRender(); });
+$('mqPlay').addEventListener('click', () => {
+  if (mqTimer) { mqStopPlay(); return; }
+  if (mqStep >= MQ_SNAPS.length - 1) mqStep = 0;
+  $('mqPlay').textContent = '⏸ Pause';
+  mqTimer = setInterval(() => {
+    if (mqStep >= MQ_SNAPS.length - 1) { mqStopPlay(); return; }
+    mqStep++; mqRender();
+    if (mqStep >= MQ_SNAPS.length - 1) mqStopPlay();
+  }, 1500);
+});
+mqRender();
+
+/* =========================================================
+   Tab 6: Fixing load imbalance (work stealing)
+   ========================================================= */
+const LB_COLORS = { X: '--j0', Y: '--j1', Z: '--j2', W: '--j3' };
+let lbQ0 = ['X', 'Y', 'Z', 'W'], lbQ1 = [];
+function lbRenderQueue(id, arr) { $(id).innerHTML = arr.length ? arr.map(j => `<div class="jobchip" style="background:var(${LB_COLORS[j]})">${j}</div>`).join('') : `<span class="empty-note">queue empty</span>`; }
+const lbBalanced = () => (lbQ0.length - lbQ1.length) <= 1;
+function lbRender() {
+  lbRenderQueue('lbQueue0', lbQ0); lbRenderQueue('lbQueue1', lbQ1);
+  $('lbSteal').disabled = lbBalanced();
+}
+$('lbSteal').addEventListener('click', () => {
+  if (lbBalanced()) return;
+  const job = lbQ0.pop();
+  lbQ1.push(job);
+  const li = document.createElement('li');
+  li.innerHTML = `CPU 1 steals <b>${job}</b> from the tail of CPU 0's queue. Queues are now ${lbQ0.length} / ${lbQ1.length}.`;
+  $('lbLog').appendChild(li);
+  lbRender();
+  const out = $('lbResult');
+  if (lbBalanced()) {
+    out.className = 'toy-result good';
+    out.innerHTML = `Balanced: CPU 0 has ${lbQ0.length}, CPU 1 has ${lbQ1.length} &mdash; within one job of each other. Stealing stops here.`;
+  } else {
+    out.className = 'toy-result';
+    out.innerHTML = `Still imbalanced (${lbQ0.length} vs ${lbQ1.length}). Click <b>Steal a job</b> again.`;
+  }
+});
+$('lbReset').addEventListener('click', () => {
+  lbQ0 = ['X', 'Y', 'Z', 'W']; lbQ1 = [];
+  $('lbLog').innerHTML = '';
+  const out = $('lbResult');
+  out.className = 'toy-result';
+  out.innerHTML = `CPU 1's queue is empty while CPU 0 still has jobs waiting. Click <b>Steal a job</b> to have CPU 1 check CPU 0's queue and take one off the tail.`;
+  lbRender();
+});
+lbRender();
+</script>
+</body>
+</html>
