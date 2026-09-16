@@ -375,17 +375,38 @@ table.sched-aff td.repeat{font-family:var(--sans);font-weight:400;font-style:ita
   <!-- ================= TAB 6: FIXING LOAD IMBALANCE ================= -->
   <section class="tabpanel" id="panel-balance" role="tabpanel" aria-labelledby="tabbtn-balance" hidden>
     <section class="panel">
-      <h2>Approaches to load imbalance</h2>
+      <h2>Two ways to move work across queues</h2>
       <ul class="bullets sub">
-        <li><b>Migration:</b> the OS explicitly moves a waiting job from a long queue to a short one.</li>
-        <li><b>Work stealing:</b> a CPU whose queue is (nearly) empty periodically peeks at another queue and steals a job off its tail instead of waiting to be handed one.</li>
-        <li>The tuning problem is <i>how often</i> to check: too often and you pay constant overhead and throw away the affinity MQMS was giving you for free; too rarely and CPUs sit idle while work piles up elsewhere.</li>
+        <li><b>Migration:</b> the OS notices the imbalance itself and explicitly moves a waiting job from a long queue to a short one.</li>
+        <li><b>Work stealing:</b> instead of waiting for the OS to notice, a CPU whose own queue is (nearly) empty periodically peeks at another queue and steals a job off its tail. It's the same move as migration &mdash; just decided locally, by the idle side, instead of centrally.</li>
+        <li>The tuning problem for stealing is <i>how often</i> to check: too often and you pay constant overhead and throw away the affinity MQMS was giving you for free; too rarely and CPUs sit idle while work piles up elsewhere.</li>
       </ul>
     </section>
 
     <section class="panel">
-      <h2>Try work stealing</h2>
-      <p class="sub">Picking up where Tab 5 left off: CPU 0's queue is backed up, CPU 1's is empty.</p>
+      <h2>Approach 1 &middot; Migration: the OS moves a specific job</h2>
+      <p class="sub">Q0 (CPU 0) is empty; Q1 (CPU 1) holds B and D. The OS decides to move one of them over &mdash; either choice fixes the imbalance equally well.</p>
+      <div class="cpu-pair">
+        <div>
+          <p class="qcap">Q0 (CPU 0)</p>
+          <div class="jobqueue" id="migQueue0"></div>
+        </div>
+        <div>
+          <p class="qcap">Q1 (CPU 1)</p>
+          <div class="jobqueue" id="migQueue1"></div>
+        </div>
+      </div>
+      <div class="controls-row">
+        <button id="migMoveB" class="primary" type="button">Move B to CPU 0</button>
+        <button id="migMoveD" class="primary" type="button">Move D to CPU 0</button>
+        <button id="migReset" type="button">Reset</button>
+      </div>
+      <div class="toy-result" id="migResult">Q0 is empty while Q1 has two jobs waiting. Move either B or D over to balance them.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Approach 2 &middot; Work stealing: the idle CPU helps itself</h2>
+      <p class="sub">Picking up where Tab 5 left off: CPU 0's queue is backed up, CPU 1's is empty. This time nobody tells CPU 1 what to do &mdash; it checks for itself.</p>
       <div class="cpu-pair">
         <div>
           <p class="qcap">CPU 0's queue</p>
@@ -404,7 +425,7 @@ table.sched-aff td.repeat{font-family:var(--sans);font-weight:400;font-style:ita
       <ol class="steps" id="lbLog"></ol>
     </section>
 
-    <p class="takeaway">Balance the queues just enough to keep every CPU busy &mdash; not so often that stealing itself becomes the bottleneck.</p>
+    <p class="takeaway">Whether the OS pushes a job (migration) or an idle CPU pulls one for itself (work stealing), the fix is the same move &mdash; spread the queues back out before a CPU sits idle for too long.</p>
   </section>
 </div>
 
@@ -782,7 +803,40 @@ $('mqPlay').addEventListener('click', () => {
 mqRender();
 
 /* =========================================================
-   Tab 6: Fixing load imbalance (work stealing)
+   Tab 6a: Fixing load imbalance (migration)
+   ========================================================= */
+const MIG_COLORS = { B: '--j1', D: '--j3' };
+let migQ0 = [], migQ1 = ['B', 'D'];
+function migRenderQueue(id, arr) { $(id).innerHTML = arr.length ? arr.map(j => `<div class="jobchip" style="background:var(${MIG_COLORS[j]})">${j}</div>`).join('') : `<span class="empty-note">queue empty</span>`; }
+function migRender() {
+  migRenderQueue('migQueue0', migQ0);
+  migRenderQueue('migQueue1', migQ1);
+  $('migMoveB').disabled = !migQ1.includes('B');
+  $('migMoveD').disabled = !migQ1.includes('D');
+}
+function migMove(job) {
+  if (!migQ1.includes(job)) return;
+  migQ1 = migQ1.filter(j => j !== job);
+  migQ0 = migQ0.concat(job);
+  migRender();
+  const other = job === 'B' ? 'D' : 'B';
+  const out = $('migResult');
+  out.className = 'toy-result good';
+  out.innerHTML = `The OS moves <b>${job}</b> to Q0. Q0 and Q1 now have one job each &mdash; balanced. Moving ${other} instead would have worked just as well; migration only needs <i>some</i> job to cross over.`;
+}
+$('migMoveB').addEventListener('click', () => migMove('B'));
+$('migMoveD').addEventListener('click', () => migMove('D'));
+$('migReset').addEventListener('click', () => {
+  migQ0 = []; migQ1 = ['B', 'D'];
+  migRender();
+  const out = $('migResult');
+  out.className = 'toy-result';
+  out.innerHTML = `Q0 is empty while Q1 has two jobs waiting. Move either B or D over to balance them.`;
+});
+migRender();
+
+/* =========================================================
+   Tab 6b: Fixing load imbalance (work stealing)
    ========================================================= */
 const LB_COLORS = { X: '--j0', Y: '--j1', Z: '--j2', W: '--j3' };
 let lbQ0 = ['X', 'Y', 'Z', 'W'], lbQ1 = [];
