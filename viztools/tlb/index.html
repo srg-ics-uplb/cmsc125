@@ -133,6 +133,7 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);bord
 .slot.new{background:var(--mark);font-weight:700}
 .readout{margin-top:12px;font-size:.86rem}
 .readout b{font-weight:800}
+.totalBadge{display:inline-block;margin-top:12px;padding:9px 18px;border:2px solid var(--ink);border-radius:8px;background:var(--mark);font-weight:800;font-size:1.02rem}
 
 .lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:22px;margin-top:22px;align-items:start}
 .key{border-left:5px solid var(--c2)}
@@ -250,21 +251,16 @@ footer a{color:var(--ink);text-underline-offset:3px}
 
     <!-- Scenario 4: replacement policy and TLB reach -->
     <section id="sec3" class="scenario-body" hidden>
-      <div class="cmp2">
-        <div class="mini">
-          <h3>LRU replacement</h3>
-          <div class="slotrow" id="s4_slots_lru"></div>
-        </div>
-        <div class="mini">
-          <h3>Random replacement</h3>
-          <div class="slotrow" id="s4_slots_rand"></div>
-        </div>
+      <div class="mini">
+        <h3>Physical page frames (LRU replacement, 3 entries)</h3>
+        <div class="slotrow" id="s4_slots_lru"></div>
       </div>
       <div class="chart" id="s4_chartBox">
         <div id="s4_chartRows"></div>
-        <p class="chart-note">A loop that cycles through 6 pages, over and over, with only 4 TLB entries to hold them &mdash; the working set does not fit in the TLB&rsquo;s reach.</p>
+        <p class="chart-note">Reference row: the classic 17-reference worked example, replayed against a 3-entry TLB.</p>
       </div>
       <div class="readout" id="s4_readout"></div>
+      <div class="totalBadge" id="s4_total" hidden></div>
     </section>
 
   </div>
@@ -290,16 +286,6 @@ footer a{color:var(--ink);text-underline-offset:3px}
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-
-/* ---------- seeded random, for the replacement-policy comparison ---------- */
-function mulberry32(a){
-  return function(){
-    a |= 0; a = a + 0x6D2B79F5 | 0;
-    let t = Math.imul(a ^ a >>> 15, 1 | a);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
 
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
@@ -587,30 +573,14 @@ function s3RenderFrame(fr, idx, frames){
 /* =========================================================================
    Scenario 4 — replacement policy and TLB reach
    ========================================================================= */
-const S4_PAGES = 6, S4_CAP = 4, S4_LAPS = 2;
-
-function s4Sequence(){
-  const seq = [];
-  for(let lap=0; lap<S4_LAPS; lap++) for(let p=0;p<S4_PAGES;p++) seq.push(p);
-  return seq;
-}
+const S4_CAP = 3;
+const S4_REF = [7,0,1,2,0,3,0,4,2,3,0,3,2,1,2,0,1];
 
 function s4SimulateLRU(seq){
   let entries = []; // MRU first
   return seq.map(p=>{
     const hit = entries.includes(p);
     entries = hit ? [p, ...entries.filter(v=>v!==p)] : [p, ...entries].slice(0, S4_CAP);
-    return { p, hit, snap:[...entries] };
-  });
-}
-function s4SimulateRandom(seq, seed){
-  const rnd = mulberry32(seed);
-  let entries = [];
-  return seq.map(p=>{
-    const hit = entries.includes(p);
-    if(hit){ /* order doesn't matter for random */ }
-    else if(entries.length < S4_CAP){ entries = [...entries, p]; }
-    else { const victim = Math.floor(rnd()*entries.length); entries = entries.map((v,i)=> i===victim ? p : v); }
     return { p, hit, snap:[...entries] };
   });
 }
@@ -626,26 +596,23 @@ function s4RenderSlots(containerId, snap){
 }
 
 function s4Build(){
-  const seq = s4Sequence();
+  const seq = S4_REF.slice();
   const lru = s4SimulateLRU(seq);
-  const rnd = s4SimulateRandom(seq, 7);
-  const frames = seq.map((p,t)=>({ p, lru:lru[t], rnd:rnd[t] }));
+  const frames = seq.map((p,t)=>({ p, lru:lru[t] }));
 
   const rows = $('s4_chartRows');
   rows.innerHTML = '';
   const cols = 'repeat('+frames.length+',minmax(24px,1fr))';
-  ['lru','rand'].forEach(kind=>{
-    const r = document.createElement('div');
-    r.className = 'crow'; r.style.gridTemplateColumns = '54px '+cols;
-    r.innerHTML = '<div class="clab">'+(kind==='lru'?'LRU':'random')+'</div>';
-    for(let t=0;t<frames.length;t++){
-      const c = document.createElement('div');
-      c.className = 'cell'; c.dataset.t = t; c.dataset.kind = kind;
-      c.addEventListener('click', ()=>{ stop(); go(t+1); });
-      r.appendChild(c);
-    }
-    rows.appendChild(r);
-  });
+  const r = document.createElement('div');
+  r.className = 'crow'; r.style.gridTemplateColumns = '54px '+cols;
+  r.innerHTML = '<div class="clab">LRU</div>';
+  for(let t=0;t<frames.length;t++){
+    const c = document.createElement('div');
+    c.className = 'cell'; c.dataset.t = t;
+    c.addEventListener('click', ()=>{ stop(); go(t+1); });
+    r.appendChild(c);
+  }
+  rows.appendChild(r);
   const ax = document.createElement('div');
   ax.className = 'crow'; ax.style.gridTemplateColumns = '54px '+cols;
   ax.innerHTML = '<div class="clab"></div>' + frames.map(f=>'<div class="axis">'+f.p+'</div>').join('');
@@ -655,37 +622,39 @@ function s4Build(){
 
 function s4RenderFrame(fr, idx, frames){
   document.querySelectorAll('#s4_chartRows .cell').forEach(c=>{
-    const t = +c.dataset.t, kind = c.dataset.kind;
+    const t = +c.dataset.t;
     const f = frames[t];
-    const hit = kind==='lru' ? f.lru.hit : f.rnd.hit;
-    let cls = 'cell '+(hit?'hit':'miss');
+    let cls = 'cell '+(f.lru.hit?'hit':'miss');
     if(t>idx-1) cls+=' future';
     if(t===idx-1) cls+=' now';
     c.className = cls;
     c.textContent = f.p;
   });
 
+  const totalEl = $('s4_total');
   if(!fr){
     s4RenderSlots('s4_slots_lru', []);
-    s4RenderSlots('s4_slots_rand', []);
     $('s4_readout').innerHTML = '';
-    return { title:'Before the first access', body:'Press Play, or step through one page access at a time.' };
+    totalEl.hidden = true;
+    return { title:'Before the first reference', body:'Press Play, or step through one reference at a time.' };
   }
 
   s4RenderSlots('s4_slots_lru', fr.lru.snap);
-  s4RenderSlots('s4_slots_rand', fr.rnd.snap);
 
   const done = frames.slice(0, idx);
-  const lruHits = done.filter(f=>f.lru.hit).length;
-  const rndHits = done.filter(f=>f.rnd.hit).length;
-  $('s4_readout').innerHTML = 'After '+idx+' accesses: <b style="color:var(--c2)">LRU</b> hit rate '
-    + Math.round(lruHits/idx*100)+'%; <b style="color:var(--c0)">random</b> hit rate '+Math.round(rndHits/idx*100)+'%.';
+  const misses = done.filter(f=>!f.lru.hit).length;
+  const hits = done.length - misses;
+  $('s4_readout').innerHTML = 'After '+idx+' reference'+(idx!==1?'s':'')+': <b style="color:var(--good)">'+hits+' hit'+(hits!==1?'s':'')+'</b>, <b style="color:var(--bad)">'+misses+' miss'+(misses!==1?'es':'')+'</b>.';
 
-  const title = 'Access page '+fr.p;
-  const body = 'The loop revisits 6 pages but the TLB holds only 4. Under LRU, the page needed next is always exactly the one least recently used &mdash; '
-    + (fr.lru.hit ? 'this one happens to still be resident.' : 'so it was just evicted, and this access misses.')
-    + ' Random eviction sometimes keeps the right page by chance &mdash; '
-    + (fr.rnd.hit ? 'it did here.' : 'not this time.');
+  const finished = idx === frames.length;
+  totalEl.hidden = false;
+  totalEl.textContent = finished ? ('Total '+misses+' TLB miss'+(misses!==1?'es':'')) : (misses+' TLB miss'+(misses!==1?'es':'')+' so far');
+
+  const title = 'Reference page '+fr.p;
+  const body = 'Only '+S4_CAP+' physical page frames are available. '
+    + (fr.lru.hit
+        ? 'Page '+fr.p+' is still resident, so this reference hits.'
+        : 'Page '+fr.p+' is not resident, so LRU evicts whichever page has gone longest without being referenced and loads page '+fr.p+' in its place &mdash; a miss.');
   return { title, body };
 }
 
@@ -747,17 +716,17 @@ const SC = [
   },
   {
     n:'4', tab:'Replacement policy and TLB reach', secId:'sec3',
-    blurb:'A TLB is small: its <b>reach</b> (entries &times; page size) is far smaller than physical memory. When a working set is bigger than the TLB, the replacement policy — and sometimes just bad luck — decides the hit rate.',
+    blurb:'A TLB is small: its <b>reach</b> (entries &times; page size) is far smaller than physical memory, so when the working set does not fit, some policy must decide what to evict. The objective is to minimize the TLB miss rate; the classic policy is <b>LRU</b>.',
     build(){ return s4Build(); },
     renderFrame(fr, idx, frames){ return s4RenderFrame(fr, idx, frames); },
     key(){ return [
-      'TLB reach = number of entries &times; page size. A 4-entry TLB with 16-byte pages reaches only 64 bytes; real TLBs are bigger but so are working sets.',
-      'When a loop’s working set exceeds the TLB’s reach, some misses are unavoidable no matter the policy &mdash; this is a capacity problem, not a policy problem.',
-      'Worse: for a perfectly cyclic access pattern larger than the TLB, LRU is the <i>worst possible</i> policy &mdash; the entry it evicts is always exactly the one needed next, so the hit rate can be 0%.',
-      'Random (or round-robin) replacement has no such pathological case and can do noticeably better here, which is why some real TLBs use it despite LRU sounding smarter.',
+      'The objective of a replacement policy is to minimize the TLB miss rate.',
+      '<b>LRU (Least Recently Used)</b> evicts the entry that has not recently been used, taking advantage of <i>locality</i> in the memory reference stream: pages touched recently are likely to be touched again soon.',
+      'TLB reach = number of entries &times; page size. With only 3 entries here, any working set bigger than 3 pages guarantees some misses no matter the policy &mdash; a capacity problem, not just a policy problem.',
+      'For this classic 17-reference string against a 3-entry TLB, LRU produces 11 misses and 6 hits.',
       'One real fix for reach is bigger pages (more bytes covered per entry), traded off against more internal fragmentation &mdash; the same trade-off Chapter 18 raised for page-table size.'
     ]; },
-    side:'<p>The access pattern here is a 6-page loop repeated twice, with only 4 TLB slots. Compare the two hit-rate readouts as you step through.</p>'
+    side:'<p>Watch the physical page frames (right panel) as the reference row plays out. Each miss evicts the least-recently-used page and installs the newly referenced one in its place.</p>'
   },
 ];
 
