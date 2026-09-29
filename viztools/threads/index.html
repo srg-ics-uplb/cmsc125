@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concurrency: an introduction</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#d3dbe2;
+  --bad:#c92a2a;
+  --good:#2b8a3e;
+  --mark:#ffd43b;
+  --t1:#1864ab;
+  --t1s:#d0ebff;
+  --t2:#9c36b5;
+  --t2s:#f3d9fa;
+  --t3:#e8590c;
+  --t3s:#ffe8cc;
+  --os:#495057;
+  --shared:#b2f2bb;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important}
+.page{max-width:1280px;margin:0 auto;padding:32px 28px 56px}
+
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:72ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+h3{font-size:.95rem;margin:14px 0 6px;font-weight:700}
+.sub{margin:0 0 12px;font-size:.88rem;color:var(--ink-soft)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.speed{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-soft)}
+select{padding:6px 8px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+
+.tabs{display:flex;gap:6px;margin:0 0 22px;padding:5px;background:var(--panel);border:2px solid var(--ink);border-radius:10px;overflow-x:auto}
+.tabs button{flex:1 1 0;min-width:150px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;border-radius:6px;background:transparent;padding:7px 12px;text-align:left;line-height:1.25}
+.tabs button b{font-size:.95rem;white-space:nowrap}
+.tabs button span{font-size:.78rem;color:var(--ink-soft);white-space:nowrap}
+.tabs button:hover{background:#fff}
+.tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabs button[aria-selected="true"] span{color:#c8d2e0}
+
+.chapter{margin:0 0 14px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.chapter h2{font-size:1.5rem;letter-spacing:-.01em}
+.chapter span{font-size:.9rem;color:var(--ink-soft)}
+.rule{height:3px;background:var(--ink);border-radius:2px;margin:0 0 18px}
+
+.card{border-width:3px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start;min-height:180px;margin-bottom:12px}
+.step-count{margin:0 0 2px;font-size:.9rem;color:var(--ink-soft)}
+.card h2{font-size:1.5rem;line-height:1.2;margin:0 0 8px}
+.card p.body{margin:0;max-width:64ch}
+.calc{margin:0;align-self:center;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.card.t1{border-color:var(--t1)}.card.t1 .calc{border-left-color:var(--t1)}
+.card.t2{border-color:var(--t2)}.card.t2 .calc{border-left-color:var(--t2)}
+.card.os{border-color:var(--os)}.card.os .calc{border-left-color:var(--os)}
+.card.bad{border-color:var(--bad)}.card.bad .calc{border-left-color:var(--bad)}
+.card.good{border-color:var(--good)}.card.good .calc{border-left-color:var(--good)}
+.who{display:inline-block;font-size:.8rem;font-weight:700;border-radius:999px;padding:1px 10px;border:2px solid var(--ink);margin-left:8px;vertical-align:middle}
+.who.t1{background:var(--t1s)}.who.t2{background:var(--t2s)}.who.os{background:#dee2e6}
+.who.bad{background:#ffc9c9}.who.good{background:var(--shared)}
+
+.timeline{display:flex;flex-wrap:wrap;gap:10px;row-gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
+.tl-group{min-width:40px;display:flex;flex-direction:column;gap:5px}
+.tl-steps{display:flex;gap:2px}
+.tl-step{flex:1;height:16px;padding:0;border:0;border-radius:2px;background:var(--g);opacity:.28;min-width:6px}
+.tl-step:hover{opacity:.6}
+.tl-step.done{opacity:1}
+.tl-step.now{opacity:1;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.tl-label{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:20px;align-items:start}
+.main.wide{grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr)}
+.side{display:flex;flex-direction:column;gap:20px;min-width:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+
+.trow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-bottom:10px}
+.trow label{display:flex;flex-direction:column;font-size:.84rem;color:var(--ink-soft);gap:3px}
+.seg{display:inline-flex;border:2px solid var(--ink);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 14px;font-size:.88rem;background:var(--panel)}
+.seg button.on{background:var(--ink);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips > span{font-size:.88rem;color:var(--ink-soft)}
+.chip{font-size:.85rem;padding:3px 10px;border-width:1.5px;border-radius:999px}
+.chip.on,.chip.on:hover{background:var(--ink);color:#fff}
+
+/* address space */
+svg.aspace{display:block;width:100%;max-width:470px;height:auto;margin:0 auto;font-family:var(--mono)}
+.aspace .reg{stroke:var(--ink);stroke-width:2;transition:opacity .3s}
+.aspace .reg.dim{opacity:.25}
+.aspace .lbl{font-size:12px;fill:var(--ink)}
+.aspace .addr{font-size:11px;fill:var(--ink-soft)}
+.aspace .tick{stroke:var(--ink-soft);stroke-width:1}
+.aspace .arrow{stroke:var(--ink);stroke-width:1.5;marker-end:url(#ah)}
+.aspace .ring{fill:none;stroke:var(--mark);stroke-width:5;opacity:0;transition:opacity .3s}
+.aspace .ring.on{opacity:1}
+
+/* generic tables */
+table.tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+.tbl th{font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--ink-soft);text-align:left;border-bottom:2px solid var(--ink);padding:4px 7px;white-space:nowrap}
+.tbl td{padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap;transition:background-color .3s}
+.tbl tr.empty td{color:#9aa6b2;background:var(--hatch)}
+.tbl td.mark{background:var(--mark)}
+.tbl td.t1{background:var(--t1s)}
+.tbl td.t2{background:var(--t2s)}
+.tbl td.dimtxt{color:#9aa6b2}
+
+/* cpu + tcb boxes */
+.cpu{border:3px solid var(--ink);border-radius:8px;background:#fff;padding:10px 12px;transition:box-shadow .3s,border-color .3s}
+.cpu.t1{border-color:var(--t1)}
+.cpu.t2{border-color:var(--t2)}
+.cpu.os{border-color:var(--os)}
+.cpu h3{margin:0 0 6px}
+.regs{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-family:var(--mono);font-size:13px;margin:0}
+.regs dt{color:var(--ink-soft)}
+.regs dd{margin:0;transition:background-color .3s}
+.regs dd.hl{background:var(--mark);border-radius:3px;padding:0 4px;margin:0 -4px}
+.tcb{border:2px solid var(--line);border-radius:6px;background:#fff;padding:9px 11px;transition:border-color .25s,box-shadow .25s}
+.tcb.active{border-color:var(--ink);box-shadow:0 0 0 3px var(--mark)}
+.tcb b{font-family:var(--mono);font-size:.9rem}
+.tcb.p1 b{color:var(--t1)}
+.tcb.p2 b{color:var(--t2)}
+.flow{display:flex;align-items:center;justify-content:center;gap:10px;margin:10px 0;font-size:.85rem;color:var(--ink-soft)}
+.flow i{font-style:normal;font-size:1.3rem}
+
+/* code listings */
+table.code{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+.code td{padding:4px 7px;border-bottom:1px solid var(--line);transition:background-color .3s}
+.code td.ln{color:#9aa6b2;width:1%;white-space:nowrap}
+.code tr.cur td{background:#ffe8a3}
+.code tr.cur td.ln{box-shadow:inset 4px 0 0 var(--ink)}
+.code tr.done td{color:var(--ink-soft)}
+pre.src{font-family:var(--mono);font-size:13px;margin:0 0 10px;padding:9px 11px;background:#fff;border:1.5px solid var(--line);border-radius:5px;white-space:pre;overflow-x:auto}
+code{font-family:var(--mono);font-size:.86em;background:#fff;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+
+/* output console */
+.out{font-family:var(--mono);font-size:13.5px;background:var(--ink);color:#e9eef2;border-radius:6px;padding:10px 12px;min-height:118px;white-space:pre-wrap}
+.out .new{background:var(--mark);color:var(--ink);border-radius:3px}
+
+/* counter display */
+.mem{display:flex;align-items:center;gap:14px;border:3px solid var(--ink);border-radius:8px;background:#fff;padding:12px 16px;justify-content:center}
+.mem b{font-family:var(--mono);font-size:2.2rem;line-height:1;transition:color .3s}
+.mem b.chg{color:var(--bad)}
+.mem span{font-size:.85rem;color:var(--ink-soft);font-family:var(--mono)}
+.takeaway{margin:10px 0 0;padding:9px 12px;border-left:4px solid var(--good);background:#fff;font-size:.9rem}
+.takeaway.bad{border-left-color:var(--bad)}
+.warn{margin:14px 0 0;padding:10px 12px;border:2px dashed var(--bad);border-radius:6px;background:#fff;font-size:.9rem}
+.warn b{color:var(--bad)}
+.note{margin:14px 0 0;padding:10px 12px;border-left:4px solid var(--ink);background:#fff;font-size:.9rem}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+.foot{margin-top:34px;font-size:.85rem;color:var(--ink-soft)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0;padding:0;list-style:none;font-size:.86rem;color:var(--ink-soft)}
+.legend li{display:flex;align-items:center;gap:7px}
+.sw{width:13px;height:13px;border:1.5px solid var(--ink);display:inline-block}
+
+@media (max-width: 1100px){ .main,.main.wide{grid-template-columns:1fr} }
+@media (max-width: 980px){
+  .top,.two{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .card{grid-template-columns:1fr;gap:12px;min-height:0}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.75rem}
+  .tl-label{display:none}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>Concurrency: an introduction</h1>
+      <p class="intro">A thread is another point of execution inside a single process: its own program counter, its own registers and its own stack, but the same address space as every other thread in the program. The tabs below follow OSTEP Chapter 26, from what a second stack looks like to why a shared counter ends up with the wrong value.</p>
+    </div>
+    <div class="controls">
+      <button id="btnRestart" type="button">Restart</button>
+      <button id="btnPrev" type="button">Back</button>
+      <button id="btnPlay" type="button">Play</button>
+      <button id="btnNext" type="button" class="primary">Next step</button>
+      <label class="speed">Speed
+        <select id="speed">
+          <option value="2600">Slow</option>
+          <option value="1500" selected>Normal</option>
+          <option value="700">Fast</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab1" data-t="1" aria-controls="panel1" aria-selected="true"><b>1. A thread's stack</b><span>one address space, many stacks</span></button>
+    <button type="button" role="tab" id="tab2" data-t="2" aria-controls="panel2" aria-selected="false"><b>2. Context switch</b><span>saving state in a TCB</span></button>
+    <button type="button" role="tab" id="tab3" data-t="3" aria-controls="panel3" aria-selected="false"><b>3. Execution paths</b><span>three orderings, two threads</span></button>
+    <button type="button" role="tab" id="tab4" data-t="4" aria-controls="panel4" aria-selected="false"><b>4. A race condition</b><span>counter = counter + 1</span></button>
+  </nav>
+
+  <!-- ================= PANEL 1 ================= -->
+  <div class="tabpanel" id="panel1" role="tabpanel" aria-labelledby="tab1">
+    <div class="chapter"><h2>A thread's stack</h2><span>what has to be private when everything else is shared</span></div>
+    <div class="rule"></div>
+
+    <section class="panel card" id="card1">
+      <div><p class="step-count"></p><h2></h2><p class="body"></p></div>
+      <pre class="calc"></pre>
+    </section>
+    <nav class="timeline" id="tl1" aria-label="Jump to a step"></nav>
+
+    <div class="main">
+      <section class="panel">
+        <h2>The address space</h2>
+        <p class="sub">A 16KB address space, drawn as in the chapter. Code and heap are shared by every thread; each stack belongs to one thread alone.</p>
+        <svg class="aspace" id="as1" viewBox="0 0 520 440" role="img" aria-label="Address space with thread stacks"></svg>
+        <ul class="legend">
+          <li><span class="sw" style="background:var(--shared)"></span>shared</li>
+          <li><span class="sw" style="background:var(--t1s)"></span>thread 1 only</li>
+          <li><span class="sw" style="background:var(--t2s)"></span>thread 2 only</li>
+          <li><span class="sw" style="background:var(--t3s)"></span>thread 3 only</li>
+        </ul>
+      </section>
+
+      <div class="side">
+        <section class="panel">
+          <h2>How many threads</h2>
+          <p class="sub">Every thread the program creates needs a stack of its own somewhere in the space.</p>
+          <div class="chips" id="thrChips">
+            <button type="button" class="chip" data-n="1">1 thread</button>
+            <button type="button" class="chip on" data-n="2">2 threads</button>
+            <button type="button" class="chip" data-n="3">3 threads</button>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Private and shared</h2>
+          <table class="tbl" id="privTable"></table>
+          <p class="sub" style="margin:10px 0 0">The OS keeps one thread control block per thread, much as it keeps a process control block per process. Switching between threads of the same process leaves the address space, and so the page table, untouched.</p>
+        </section>
+      </div>
+    </div>
+    <p class="kbd-hint">Keyboard: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to step, <kbd>Space</kbd> to play or pause.</p>
+  </div>
+
+  <!-- ================= PANEL 2 ================= -->
+  <div class="tabpanel" id="panel2" role="tabpanel" aria-labelledby="tab2" hidden>
+    <div class="chapter"><h2>A context switch between threads</h2><span>save into one TCB, restore from the other</span></div>
+    <div class="rule"></div>
+
+    <section class="panel card" id="card2">
+      <div><p class="step-count"></p><h2></h2><p class="body"></p></div>
+      <pre class="calc"></pre>
+    </section>
+    <nav class="timeline" id="tl2" aria-label="Jump to a step"></nav>
+
+    <div class="main wide">
+      <section class="panel">
+        <h2>The processor and the two control blocks</h2>
+        <p class="sub" id="cpuSub">One set of registers, two threads that each need their own copy of it.</p>
+        <div class="cpu" id="cpuBox">
+          <h3 id="cpuWho">CPU registers</h3>
+          <dl class="regs" id="cpuRegs"></dl>
+        </div>
+        <div class="flow" id="flowMsg"><i>&#8597;</i><span>the OS moves register state between the CPU and the TCBs</span></div>
+        <div class="two">
+          <div class="tcb p1" id="tcb1"></div>
+          <div class="tcb p2" id="tcb2"></div>
+        </div>
+        <div class="note" id="csNote"></div>
+      </section>
+
+      <div class="side">
+        <section class="panel">
+          <h2>Where the stack pointer is pointing</h2>
+          <p class="sub">Each thread runs on its own stack, so the switch changes the stack pointer as well as the program counter.</p>
+          <svg class="aspace" id="as2" viewBox="0 0 520 440" role="img" aria-label="Address space during a thread switch"></svg>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PANEL 3 ================= -->
+  <div class="tabpanel" id="panel3" role="tabpanel" aria-labelledby="tab3" hidden>
+    <div class="chapter"><h2>Thread creation and execution paths</h2><span>the same program, three legal orderings</span></div>
+    <div class="rule"></div>
+
+    <section class="panel card" id="card3">
+      <div><p class="step-count"></p><h2></h2><p class="body"></p></div>
+      <pre class="calc"></pre>
+    </section>
+    <nav class="timeline" id="tl3" aria-label="Jump to a step"></nav>
+
+    <div class="main wide">
+      <section class="panel">
+        <h2>The trace</h2>
+        <div class="trow">
+          <div class="chips" id="traceChips">
+            <span>Ordering</span>
+            <button type="button" class="chip on" data-tr="0">1. both created first</button>
+            <button type="button" class="chip" data-tr="1">2. T2 runs first</button>
+            <button type="button" class="chip" data-tr="2">3. T1 runs immediately</button>
+            <button type="button" class="chip" id="randTrace">shuffle</button>
+          </div>
+        </div>
+        <table class="tbl" id="traceTable"></table>
+        <p class="sub" style="margin:10px 0 0">Only the ordering differs; the program is identical in all three. Which one happens is up to the scheduler, and it can differ from run to run on the same machine.</p>
+      </section>
+
+      <div class="side">
+        <section class="panel">
+          <h2>The program</h2>
+<pre class="src">void *mythread(void *arg) {
+    printf("%s\n", (char *) arg);
+    return NULL;
+}
+
+int main(int argc, char *argv[]) {
+    pthread_t p1, p2;
+    printf("main: begin\n");
+    Pthread_create(&amp;p1, NULL, mythread, "A");
+    Pthread_create(&amp;p2, NULL, mythread, "B");
+    // join waits for the threads to finish
+    Pthread_join(p1, NULL);
+    Pthread_join(p2, NULL);
+    printf("main: end\n");
+    return 0;
+}</pre>
+        </section>
+        <section class="panel">
+          <h2>Output so far</h2>
+          <div class="out" id="outBox"></div>
+          <p class="takeaway" id="trTake"></p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PANEL 4 ================= -->
+  <div class="tabpanel" id="panel4" role="tabpanel" aria-labelledby="tab4" hidden>
+    <div class="chapter"><h2>A race condition</h2><span>two threads, one shared counter</span></div>
+    <div class="rule"></div>
+
+    <section class="panel card" id="card4">
+      <div><p class="step-count"></p><h2></h2><p class="body"></p></div>
+      <pre class="calc"></pre>
+    </section>
+    <nav class="timeline" id="tl4" aria-label="Jump to a step"></nav>
+
+    <div class="main wide">
+      <section class="panel">
+        <h2>What the hardware actually does</h2>
+        <p class="sub">The line <code>counter = counter + 1</code> compiles into three instructions, and a thread can be interrupted between any two of them.</p>
+        <div class="trow">
+          <div class="chips" id="raceChips">
+            <span>Interrupt thread 1</span>
+            <button type="button" class="chip" data-k="0">never</button>
+            <button type="button" class="chip on" data-k="1">after the load</button>
+            <button type="button" class="chip" data-k="2">after the add</button>
+            <button type="button" class="chip" data-k="3">after the store</button>
+          </div>
+        </div>
+        <div class="two">
+          <div>
+            <h3 style="margin-top:0;color:var(--t1)">Thread 1</h3>
+            <table class="code" id="code1"></table>
+            <dl class="regs" id="regs1" style="margin-top:8px"></dl>
+          </div>
+          <div>
+            <h3 style="margin-top:0;color:var(--t2)">Thread 2</h3>
+            <table class="code" id="code2"></table>
+            <dl class="regs" id="regs2" style="margin-top:8px"></dl>
+          </div>
+        </div>
+        <div class="warn" id="raceWarn" hidden></div>
+      </section>
+
+      <div class="side">
+        <section class="panel">
+          <h2>Shared memory</h2>
+          <p class="sub">One counter at address 0x8049a1c, reachable by both threads because they share the address space.</p>
+          <div class="mem"><span>counter =</span><b id="memVal">50</b></div>
+          <table class="tbl" id="raceLog" style="margin-top:12px"></table>
+          <p class="takeaway" id="raceTake"></p>
+        </section>
+        <section class="panel">
+          <h2>The words for it</h2>
+          <p class="sub" style="margin-bottom:6px">A <strong>critical section</strong> is a piece of code that touches a shared resource, here the three instructions that update the counter.</p>
+          <p class="sub" style="margin-bottom:6px">A <strong>race condition</strong> is when the result depends on when the scheduler happens to switch. The outcome is <strong>indeterminate</strong>: correct on most runs, wrong on some.</p>
+          <p class="sub" style="margin-bottom:0">The fix is <strong>mutual exclusion</strong>, a guarantee that only one thread is inside the critical section at a time, so the update becomes <strong>atomic</strong>. That is what locks are for, and is where the next chapters go.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">Program, traces and the counter example follow OSTEP, Chapter 26, <em>Concurrency: An Introduction</em>.</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const hex = v => '0x' + v.toString(16);
+
+/* =========================================================
+   Generic tour engine: one tour per tab
+   ========================================================= */
+const tours = {};
+function makeTour (n, steps, draw) {
+  const card = $('card' + n);
+  tours[n] = { steps, draw, cur: 0, card, tl: $('tl' + n) };
+  /* group consecutive steps that share a phase */
+  const groups = [];
+  steps.forEach((s, i) => {
+    const last = groups[groups.length - 1];
+    if (last && last.label === s.phase) last.count++;
+    else groups.push({ label: s.phase, color: s.color || '#172033', start: i, count: 1 });
+  });
+  tours[n].groups = groups;
+  tours[n].tl.innerHTML = groups.map(g => {
+    let b = '';
+    for (let i = g.start; i < g.start + g.count; i++) {
+      const t = steps[i].title.replace(/"/g, '&quot;');
+      b += `<button class="tl-step" type="button" data-i="${i}" aria-label="Step ${i + 1}: ${t}" title="Step ${i + 1}: ${t}"></button>`;
+    }
+    return `<div class="tl-group" style="flex:${g.count} 1 0;--g:${g.color}"><div class="tl-steps">${b}</div><div class="tl-label">${g.label}</div></div>`;
+  }).join('');
+  tours[n].tl.onclick = e => {
+    const b = e.target.closest('.tl-step');
+    if (b) { stop(); show(n, +b.dataset.i); }
+  };
+  show(n, 0, false);
+}
+
+function show (n, i, animate = true) {
+  const T = tours[n];
+  if (!T || i < 0 || i >= T.steps.length) return;
+  const root = document.documentElement;
+  if (!animate) root.classList.add('instant');
+  T.cur = i;
+  const s = T.steps[i];
+  T.card.className = 'panel card' + (s.tone ? ' ' + s.tone : '');
+  T.card.querySelector('.step-count').textContent = `Step ${i + 1} of ${T.steps.length}`;
+  T.card.querySelector('h2').innerHTML = s.title + (s.who ? ` <span class="who ${s.who[0]}">${s.who[1]}</span>` : '');
+  T.card.querySelector('.body').textContent = s.body;
+  T.card.querySelector('.calc').textContent = (s.calc || []).join('\n');
+  T.tl.querySelectorAll('.tl-step').forEach(b => {
+    const k = +b.dataset.i;
+    b.classList.toggle('done', k < i);
+    b.classList.toggle('now', k === i);
+    b.setAttribute('aria-current', k === i ? 'step' : 'false');
+  });
+  T.draw(s, i);
+  if (n === tab) syncButtons();
+  if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('instant')));
+}
+
+let timer = null;
+function syncButtons () {
+  const T = tours[tab];
+  $('btnPrev').disabled = !T || T.cur === 0;
+  $('btnNext').disabled = !T || T.cur === T.steps.length - 1;
+}
+function stepBy (d) { const T = tours[tab]; if (T) show(tab, T.cur + d); }
+function play () {
+  stop();
+  const T = tours[tab];
+  if (!T) return;
+  if (T.cur >= T.steps.length - 1) show(tab, 0);
+  $('btnPlay').textContent = 'Pause';
+  const tick = () => {
+    const t = tours[tab];
+    if (!t || t.cur >= t.steps.length - 1) { stop(); return; }
+    show(tab, t.cur + 1);
+    timer = setTimeout(tick, +$('speed').value);
+  };
+  timer = setTimeout(tick, +$('speed').value);
+}
+function stop () { clearTimeout(timer); timer = null; $('btnPlay').textContent = 'Play'; }
+$('btnNext').onclick = () => { stop(); stepBy(1); };
+$('btnPrev').onclick = () => { stop(); stepBy(-1); };
+$('btnPlay').onclick = () => (timer ? stop() : play());
+$('btnRestart').onclick = () => { stop(); show(tab, 0); };
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select, input, #tabs')) return;
+  if (e.key === 'ArrowRight') { stop(); stepBy(1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stop(); stepBy(-1); e.preventDefault(); }
+  else if (e.key === ' ' && !e.target.closest('button')) { timer ? stop() : play(); e.preventDefault(); }
+  else if (e.key === 'Home') { stop(); show(tab, 0); }
+});
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+let tab = 1;
+function showTab (n) {
+  stop();
+  tab = n;
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', +b.dataset.t === n ? 'true' : 'false'));
+  for (let i = 1; i <= 4; i++) $('panel' + i).hidden = i !== n;
+  syncButtons();
+  if (history.replaceState) history.replaceState(null, '', '#' + n);
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]');
+  if (b) showTab(+b.dataset.t);
+});
+$('tabs').addEventListener('keydown', e => {
+  const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+  if (!d) return;
+  e.preventDefault();
+  const n = ((tab - 1 + d + 4) % 4) + 1;
+  showTab(n); $('tab' + n).focus();
+});
+
+/* =========================================================
+   Shared drawing: the address space
+   ========================================================= */
+const KB = 16, TOP = 24, BOT = 412, LEFT = 96, RIGHT = 372;
+const yKB = k => TOP + (k / KB) * (BOT - TOP);
+const STACKS = [
+  { name: 'Stack 1', lo: 15, hi: 16, fill: 'var(--t1s)' },
+  { name: 'Stack 2', lo: 6, hi: 7, fill: 'var(--t2s)' },
+  { name: 'Stack 3', lo: 10, hi: 11, fill: 'var(--t3s)' },
+];
+function drawSpace (svgId, opt) {
+  const { threads = 1, focus = null, spOn = null } = opt || {};
+  let h = `<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink)"/></marker></defs>`;
+  /* free background */
+  h += `<rect class="reg" x="${LEFT}" y="${yKB(0)}" width="${RIGHT - LEFT}" height="${yKB(16) - yKB(0)}" fill="#f1f3f5"/>`;
+  h += `<text class="lbl" x="${(LEFT + RIGHT) / 2}" y="${yKB(8.6)}" text-anchor="middle" fill="var(--ink-soft)">(free)</text>`;
+  const regions = [
+    { name: 'Program code', lo: 0, hi: 1, fill: 'var(--shared)', key: 'code' },
+    { name: 'Heap', lo: 1, hi: 2, fill: 'var(--shared)', key: 'heap' },
+  ];
+  for (let t = 0; t < threads; t++) regions.push({ ...STACKS[t], key: 'stack' + (t + 1) });
+  regions.forEach(r => {
+    const dim = focus && !focus.includes(r.key) ? ' dim' : '';
+    h += `<rect class="reg${dim}" x="${LEFT}" y="${yKB(r.lo)}" width="${RIGHT - LEFT}" height="${yKB(r.hi) - yKB(r.lo)}" fill="${r.fill}"/>`;
+    h += `<text class="lbl${dim}" x="${(LEFT + RIGHT) / 2}" y="${(yKB(r.lo) + yKB(r.hi)) / 2 + 4}" text-anchor="middle">${r.name}</text>`;
+    if (focus && focus.includes(r.key)) {
+      h += `<rect class="ring on" x="${LEFT - 4}" y="${yKB(r.lo) - 4}" width="${RIGHT - LEFT + 8}" height="${yKB(r.hi) - yKB(r.lo) + 8}" rx="4"/>`;
+      h += `<rect class="reg" x="${LEFT}" y="${yKB(r.lo)}" width="${RIGHT - LEFT}" height="${yKB(r.hi) - yKB(r.lo)}" fill="none"/>`;
+    }
+  });
+  /* address ruler */
+  for (let k = 0; k <= KB; k += 2) {
+    h += `<line class="tick" x1="${LEFT - 6}" y1="${yKB(k)}" x2="${LEFT}" y2="${yKB(k)}"/>`;
+    h += `<text class="addr" x="${LEFT - 10}" y="${yKB(k) + 4}" text-anchor="end">${k}KB</text>`;
+  }
+  /* growth arrows */
+  regions.filter(r => r.key.startsWith('stack')).forEach(r => {
+    h += `<line class="arrow" x1="${RIGHT + 14}" y1="${yKB(r.hi) - 2}" x2="${RIGHT + 14}" y2="${yKB(r.lo) - 18}"/>`;
+    h += `<text class="addr" x="${RIGHT + 20}" y="${yKB(r.lo) - 8}">stack grows up</text>`;
+  });
+  h += `<line class="arrow" x1="${RIGHT + 14}" y1="${yKB(2) - 2}" x2="${RIGHT + 14}" y2="${yKB(2) + 26}"/>`;
+  h += `<text class="addr" x="${RIGHT + 20}" y="${yKB(2) + 22}">heap grows down</text>`;
+  /* stack pointer marker */
+  if (spOn) {
+    const r = STACKS[spOn - 1];
+    const y = (yKB(r.lo) + yKB(r.hi)) / 2;
+    h += `<text class="lbl" x="${LEFT - 40}" y="${y + 4}" text-anchor="end" font-weight="700">SP &#9654;</text>`;
+  }
+  $(svgId).innerHTML = h;
+}
+
+/* =========================================================
+   TAB 1: the stack of a thread
+   ========================================================= */
+let nThreads = 2;
+const PRIV = [
+  ['Program counter', 'private', 'each thread is at its own point in the code'],
+  ['Registers', 'private', 'saved and restored on every switch'],
+  ['Stack pointer', 'private', 'points into that thread\u2019s own stack'],
+  ['Stack', 'private', 'locals, parameters, return values, return addresses'],
+  ['Code', 'shared', 'all threads run in the same program'],
+  ['Heap', 'shared', 'malloc\u2019d data is visible to everyone'],
+  ['Globals', 'shared', 'and so are static variables'],
+  ['Page table', 'shared', 'one address space, so no switch on a thread swap'],
+  ['Open files', 'shared', 'the process owns them, not the thread'],
+];
+function buildPriv () {
+  $('privTable').innerHTML = '<thead><tr><th>State</th><th>Per thread?</th><th>Why</th></tr></thead><tbody>' +
+    PRIV.map(([a, b, c]) => `<tr><td>${a}</td><td class="${b === 'private' ? 't1' : ''}" style="${b === 'shared' ? 'background:var(--shared)' : ''}">${b}</td><td style="white-space:normal;font-family:var(--sans);font-size:.85rem">${c}</td></tr>`).join('') + '</tbody>';
+}
+function buildTour1 () {
+  const s = [];
+  s.push({ phase: 'one thread', title: 'A classic single-threaded address space', color: '#7d8b99',
+    body: 'Code at the bottom, the heap above it growing upward, and a single stack at the top of the address space growing down. One thread means one place to put local variables, so one stack is enough.',
+    calc: ['0KB  \u2013  1KB   program code', '1KB  \u2013  2KB   heap, grows toward higher addresses', '15KB \u2013 16KB   stack, grows toward lower addresses'],
+    view: { threads: 1, focus: null } });
+  s.push({ phase: 'one thread', title: 'The stack is where a thread keeps what only it knows', color: '#7d8b99',
+    body: 'Local variables, function parameters, return values and return addresses all live on the stack. That makes the stack the natural home for state that belongs to one execution path and nobody else, which is why it is sometimes called thread-local storage.',
+    calc: ['stack holds:', '  local variables', '  parameters', '  return values', '  return addresses'],
+    view: { threads: 1, focus: ['stack1'] } });
+  if (nThreads === 1) {
+    s.push({ phase: 'one thread', title: 'With one thread, that is the whole story', color: '#7d8b99', tone: 'good',
+      body: 'Nothing here is shared with anyone, because there is nobody to share with. Ask for two threads above to see what the address space has to give up.',
+      calc: ['threads: 1', 'stacks:  1', 'address spaces: 1'],
+      view: { threads: 1, focus: null } });
+    makeTour(1, s, st => drawSpace('as1', st.view));
+    return;
+  }
+  s.push({ phase: 'second thread', title: 'A second thread needs a second stack', color: '#172033', who: ['t2', 'thread 2'],
+    body: 'Creating a thread is a lot like creating a process, except there is no new address space. The new thread gets its own program counter, its own registers, and a stack of its own carved out of the free space between the heap and the first stack.',
+    calc: ['pthread_create(&p, NULL, fn, arg);', '', 'new: PC, registers, stack', 'same: code, heap, globals, files'],
+    view: { threads: 2, focus: ['stack2'] } });
+  s.push({ phase: 'second thread', title: 'Everything outside the stacks is shared', color: '#172033',
+    body: 'Both threads run the same code and reach the same heap. A pointer to a malloc\u2019d structure means the same thing in either thread, which is exactly what makes threads useful and exactly what makes them dangerous.',
+    calc: ['shared: code, heap, globals, open files', 'private: PC, registers, stack'],
+    view: { threads: 2, focus: ['code', 'heap'] } });
+  for (let t = 3; t <= nThreads; t++) {
+    s.push({ phase: 'more threads', title: `Thread ${t} arrives and takes another slice`, color: '#495a73', who: ['t2', 'thread ' + t],
+      body: 'Each new thread needs its own stack somewhere in the free space, and the OS has to find room for it. The address space starts to look less like three neat regions and more like a set of reservations.',
+      calc: [`stacks allocated: ${t}`, 'each one thread-local'],
+      view: { threads: t, focus: ['stack' + t] } });
+  }
+  s.push({ phase: 'consequence', title: 'The simple picture of a growing stack no longer holds', color: '#7d8b99', tone: 'bad',
+    body: 'With stacks scattered through the address space, no single stack can simply grow until it runs into the heap. In practice this rarely bites, because stacks are usually small, unless a thread recurses deeply or allocates a large array as a local variable.',
+    calc: ['stack 1 may grow until it reaches ~' + (nThreads > 1 ? '7KB' : '2KB'), 'stack 2 is hemmed in from both sides', '', 'deep recursion or large locals',
+      '  -> stack overflow'],
+    view: { threads: nThreads, focus: null } });
+  s.push({ phase: 'consequence', title: `One process, ${nThreads} thread${nThreads > 1 ? 's' : ''}, ${nThreads} stack${nThreads > 1 ? 's' : ''}`, color: '#7d8b99', tone: 'good',
+    body: 'That is the whole structural difference. A thread is a separate point of execution with its own stack and register state, living inside an address space it shares with all the others. The next tab shows what the OS has to save when it moves from one to another.',
+    calc: [`threads:  ${nThreads}`, `stacks:   ${nThreads}`, 'address spaces: 1', 'page tables:    1'],
+    view: { threads: nThreads, focus: null } });
+  makeTour(1, s, st => drawSpace('as1', st.view));
+}
+$('thrChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  nThreads = +b.dataset.n;
+  document.querySelectorAll('#thrChips .chip').forEach(c => c.classList.toggle('on', c === b));
+  stop(); buildTour1();
+});
+
+/* =========================================================
+   TAB 2: the context switch
+   ========================================================= */
+const T1_REGS = { pc: 0x100, sp: 0x3f70, eax: 7 };
+const T2_REGS = { pc: 0x200, sp: 0x1b40, eax: 0 };
+function regRows (r, hl) {
+  if (!r) return '<dt>&mdash;</dt><dd>saved state is stale</dd>';
+  return [['PC', hex(r.pc)], ['SP', hex(r.sp)], ['%eax', r.eax]]
+    .map(([k, v]) => `<dt>${k}</dt><dd class="${hl ? 'hl' : ''}">${v}</dd>`).join('');
+}
+function drawSwitch (s) {
+  const v = s.view;
+  $('cpuBox').className = 'cpu ' + v.owner;
+  $('cpuWho').textContent = v.owner === 'os' ? 'CPU registers \u2014 the OS is running' : `CPU registers \u2014 thread ${v.owner === 't1' ? 1 : 2} is running`;
+  $('cpuRegs').innerHTML = regRows(v.cpu, v.cpuHl);
+  $('cpuSub').textContent = v.sub;
+  $('tcb1').innerHTML = `<b>TCB 1 \u2014 thread 1</b><dl class="regs">${regRows(v.tcb1, v.tcbHl === 1)}</dl>`;
+  $('tcb2').innerHTML = `<b>TCB 2 \u2014 thread 2</b><dl class="regs">${regRows(v.tcb2, v.tcbHl === 2)}</dl>`;
+  $('tcb1').className = 'tcb p1' + (v.tcbHl === 1 ? ' active' : '');
+  $('tcb2').className = 'tcb p2' + (v.tcbHl === 2 ? ' active' : '');
+  $('flowMsg').innerHTML = `<i>${v.arrow || '\u21d5'}</i><span>${v.flow}</span>`;
+  $('csNote').innerHTML = v.note;
+  drawSpace('as2', { threads: 2, focus: v.focus, spOn: v.spOn });
+}
+function buildTour2 () {
+  const s = [];
+  const base = { tcb1: null, tcb2: { ...T2_REGS }, note: 'A thread control block holds the same kind of state a process control block does: the register context of one thread. One process has one PCB and as many TCBs as it has threads.' };
+  s.push({ phase: 'thread 1 runs', title: 'Thread 1 is running', color: 'var(--t1)', tone: 't1', who: ['t1', 'thread 1'],
+    body: 'The CPU\u2019s registers hold thread 1\u2019s state: its program counter, its stack pointer pointing into stack 1, and whatever it has in its general registers. Thread 2 exists, but its state is parked in TCB 2.',
+    calc: ['running: thread 1', `PC  = ${hex(T1_REGS.pc)}`, `SP  = ${hex(T1_REGS.sp)}  (stack 1)`, `%eax = ${T1_REGS.eax}`],
+    view: { ...base, owner: 't1', cpu: { ...T1_REGS }, focus: ['stack1'], spOn: 1, sub: 'One set of registers, two threads that each need their own copy of it.', flow: 'nothing is moving yet' } });
+  s.push({ phase: 'into the OS', title: 'A timer interrupt arrives', color: 'var(--os)', tone: 'os', who: ['os', 'OS'],
+    body: 'The hardware traps into the kernel and the scheduler decides that thread 2 should run next. Thread 1 did not ask to stop and will not notice that it did.',
+    calc: ['timer interrupt', '  -> trap into the kernel', '  -> scheduler picks thread 2'],
+    view: { ...base, owner: 'os', cpu: { ...T1_REGS }, focus: null, spOn: 1, sub: 'The kernel now runs, with thread 1\u2019s registers still live in the CPU.', flow: 'the OS has control, thread 1\u2019s state is still in the registers' } });
+  s.push({ phase: 'into the OS', title: 'Save thread 1\u2019s registers into TCB 1', color: 'var(--os)', tone: 'os', who: ['os', 'OS'],
+    body: 'Every register that thread 1 cares about is copied out of the CPU and into TCB 1. This is the only copy of where thread 1 had got to, so it has to be complete before anything else is allowed to touch the registers.',
+    calc: ['save: CPU  ->  TCB 1', `  PC   = ${hex(T1_REGS.pc)}`, `  SP   = ${hex(T1_REGS.sp)}`, `  %eax = ${T1_REGS.eax}`],
+    view: { ...base, owner: 'os', cpu: { ...T1_REGS }, tcb1: { ...T1_REGS }, tcbHl: 1, cpuHl: true, arrow: '\u2193', focus: null, spOn: 1, sub: 'Thread 1\u2019s context is written out.', flow: 'CPU registers are copied into TCB 1' } });
+  s.push({ phase: 'into the OS', title: 'Restore thread 2\u2019s registers from TCB 2', color: 'var(--os)', tone: 'os', who: ['os', 'OS'],
+    body: 'Thread 2\u2019s saved context is loaded back into the CPU. Its program counter points at the instruction it was about to run, and its stack pointer points into stack 2, not stack 1.',
+    calc: ['restore: TCB 2  ->  CPU', `  PC   = ${hex(T2_REGS.pc)}`, `  SP   = ${hex(T2_REGS.sp)}`, `  %eax = ${T2_REGS.eax}`],
+    view: { ...base, owner: 'os', cpu: { ...T2_REGS }, tcb1: { ...T1_REGS }, tcbHl: 2, cpuHl: true, arrow: '\u2191', focus: ['stack2'], spOn: 2, sub: 'Thread 2\u2019s context is loaded.', flow: 'TCB 2 is copied into the CPU registers' } });
+  s.push({ phase: 'into the OS', title: 'The address space does not change', color: 'var(--os)', tone: 'os', who: ['os', 'OS'],
+    body: 'This is the one big difference from a process switch. Both threads live in the same address space, so the page table stays exactly as it was and never has to be switched. Only the register context moves.',
+    calc: ['process switch:  save PCB, switch page table', 'thread switch:   save TCB, keep page table'],
+    view: { ...base, owner: 'os', cpu: { ...T2_REGS }, tcb1: { ...T1_REGS }, focus: ['code', 'heap'], spOn: 2, sub: 'Same address space, same page table.', flow: 'no page table switch is needed' } });
+  s.push({ phase: 'thread 2 runs', title: 'Thread 2 resumes on its own stack', color: 'var(--t2)', tone: 't2', who: ['t2', 'thread 2'],
+    body: 'Return-from-trap hands the CPU to thread 2, which carries on from exactly where it was. Its pushes and pops land in stack 2; stack 1 sits untouched, holding thread 1\u2019s half-finished call chain.',
+    calc: ['running: thread 2', `PC = ${hex(T2_REGS.pc)}`, `SP = ${hex(T2_REGS.sp)}  (stack 2)`],
+    view: { ...base, owner: 't2', cpu: { ...T2_REGS }, tcb1: { ...T1_REGS }, tcb2: null, focus: ['stack2'], spOn: 2, sub: 'Thread 2 is running; thread 1\u2019s context waits in TCB 1.', flow: 'nothing is moving; thread 2 has the CPU' } });
+  s.push({ phase: 'back again', title: 'Later, the same thing happens in reverse', color: '#7d8b99', tone: 'good',
+    body: 'Thread 2\u2019s registers go into TCB 2, thread 1\u2019s come out of TCB 1, and thread 1 resumes at the instruction it was interrupted on with the same values it had. Neither thread can tell how long it was away, or how many times it was switched out, which is precisely the problem the next two tabs are about.',
+    calc: ['save:    CPU   -> TCB 2', 'restore: TCB 1 -> CPU', '', 'thread 1 continues at ' + hex(T1_REGS.pc)],
+    view: { ...base, owner: 't1', cpu: { ...T1_REGS }, tcb1: null, tcb2: { ...T2_REGS }, focus: ['stack1'], spOn: 1, sub: 'Back where we started, one switch later.', flow: 'the register context moves the other way' } });
+  makeTour(2, s, drawSwitch);
+}
+
+/* =========================================================
+   TAB 3: execution paths
+   ========================================================= */
+const E = {
+  begin: ['main', 'prints "main: begin"', ''],
+  c1: ['main', 'creates Thread 1', ''],
+  c2: ['main', 'creates Thread 2', ''],
+  j1: ['main', 'waits for T1', ''],
+  j1r: ['main', 'waits for T1 (returns at once)', ''],
+  j2: ['main', 'waits for T2', ''],
+  j2r: ['main', 'waits for T2 (returns at once)', ''],
+  end: ['main', 'prints "main: end"', ''],
+  t1: ['t1', 'runs, prints "A", returns', 'A'],
+  t2: ['t2', 'runs, prints "B", returns', 'B'],
+};
+const TRACES = [
+  { name: 'Both threads created, then run in order',
+    note: 'main gets to create both threads before either of them is scheduled. When main blocks in join, thread 1 runs to completion, then thread 2.',
+    keys: ['begin', 'c1', 'c2', 'j1', 't1', 'j2', 't2', 'end'], out: 'A then B' },
+  { name: 'Thread 2 runs before thread 1',
+    note: 'Nothing says the threads run in the order they were created. Here the scheduler picks thread 2 first, so B is printed before A, and both joins return without waiting.',
+    keys: ['begin', 'c1', 'c2', 't2', 'j1', 't1', 'j2r', 'end'], out: 'B then A' },
+  { name: 'Thread 1 runs the moment it is created',
+    note: 'Creating a thread can hand the CPU straight to it, before main even reaches the second create. Thread 1 finishes, then main creates thread 2, which also runs immediately.',
+    keys: ['begin', 'c1', 't1', 'c2', 't2', 'j1r', 'j2r', 'end'], out: 'A then B' },
+];
+let traceIdx = 0;
+function buildTour3 () {
+  const tr = TRACES[traceIdx];
+  const rows = tr.keys.map(k => ({ k, who: E[k][0], what: E[k][1], print: E[k][2] }));
+  const s = [];
+  s.push({ phase: 'start', title: tr.name, color: '#7d8b99',
+    body: tr.note + ' Step through to watch which of the three columns is running at each moment.',
+    calc: ['Pthread_create(&p1, ..., "A");', 'Pthread_create(&p2, ..., "B");', 'Pthread_join(p1, NULL);', 'Pthread_join(p2, NULL);'],
+    view: { upto: -1 } });
+  rows.forEach((r, i) => {
+    const who = r.who === 'main' ? ['os', 'main'] : r.who === 't1' ? ['t1', 'thread 1'] : ['t2', 'thread 2'];
+    let body;
+    if (r.k === 'begin') body = 'The program starts with a single thread, the one running main. Nothing is concurrent yet.';
+    else if (r.k === 'c1' || r.k === 'c2') body = `main calls pthread_create. A thread is born with its own stack and its own program counter, set to the start of mythread. Whether it runs now or later is entirely the scheduler\u2019s decision.`;
+    else if (r.k === 't1' || r.k === 't2') body = `The thread runs its one printf and returns. Returning from the thread function ends the thread.`;
+    else if (r.k.startsWith('j') && r.k.endsWith('r')) body = 'The thread being waited for has already finished, so join returns immediately without blocking.';
+    else if (r.k.startsWith('j')) body = 'main blocks in join until that thread finishes, which frees the CPU for the threads to run.';
+    else body = 'Both threads have finished and both joins have returned, so main prints its last line and the program exits.';
+    s.push({ phase: r.who === 'main' ? 'main' : 'thread ' + (r.who === 't1' ? 1 : 2), color: r.who === 't1' ? 'var(--t1)' : r.who === 't2' ? 'var(--t2)' : '#495a73',
+      tone: r.who === 'main' ? 'os' : r.who, who, title: r.what.charAt(0).toUpperCase() + r.what.slice(1), body,
+      calc: [`time ${i + 1}`, `${r.who === 'main' ? 'main' : 'thread ' + (r.who === 't1' ? 1 : 2)}: ${r.what}`].concat(r.print ? ['', `output: ${r.print}`] : []),
+      view: { upto: i, rows } });
+  });
+  s.push({ phase: 'result', title: `The output is "${tr.out}"`, color: '#7d8b99', tone: 'good',
+    body: 'All three orderings come from the same program with no bug in it. The scheduler alone decides which happens, and it can differ between runs on the same machine. Anything the program needs to be true about the order has to be enforced by the program, not assumed.',
+    calc: ['main: begin', tr.out.startsWith('A') ? 'A\nB' : 'B\nA', 'main: end'],
+    view: { upto: rows.length - 1, rows, final: true } });
+  makeTour(3, s, drawTrace);
+}
+function drawTrace (s) {
+  const rows = s.view.rows || TRACES[traceIdx].keys.map(k => ({ k, who: E[k][0], what: E[k][1], print: E[k][2] }));
+  const upto = s.view.upto;
+  let h = '<thead><tr><th>Time</th><th>main</th><th>Thread 1</th><th>Thread 2</th></tr></thead><tbody>';
+  rows.forEach((r, i) => {
+    const on = i <= upto, now = i === upto;
+    const cell = who => {
+      if (r.who !== who) return `<td></td>`;
+      const cls = who === 't1' ? 't1' : who === 't2' ? 't2' : '';
+      return `<td class="${now ? 'mark' : on ? cls : 'dimtxt'}" style="white-space:normal">${r.what}</td>`;
+    };
+    h += `<tr class="${on ? '' : 'empty'}"><td>${i + 1}</td>${cell('main')}${cell('t1')}${cell('t2')}</tr>`;
+  });
+  $('traceTable').innerHTML = h + '</tbody>';
+  const printed = rows.slice(0, upto + 1).filter(r => r.print);
+  let out = 'main: begin\n';
+  if (upto >= 0) {
+    out = rows.slice(0, upto + 1).map(r => r.k === 'begin' ? 'main: begin' : r.k === 'end' ? 'main: end' : r.print).filter(Boolean).join('\n');
+  } else out = '';
+  const lastIsNew = upto >= 0 && (rows[upto].print || rows[upto].k === 'begin' || rows[upto].k === 'end');
+  if (lastIsNew) {
+    const lines = out.split('\n');
+    lines[lines.length - 1] = `<span class="new">${lines[lines.length - 1]}</span>`;
+    out = lines.join('\n');
+  }
+  $('outBox').innerHTML = out || '<span style="opacity:.5">(nothing printed yet)</span>';
+  const take = $('trTake');
+  take.textContent = s.view.final
+    ? `This ordering prints ${TRACES[traceIdx].out}. Try the other two: same program, different output.`
+    : 'The order in which threads run is up to the scheduler.';
+  take.className = 'takeaway' + (s.view.final ? '' : ' ');
+}
+$('traceChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  stop();
+  if (b.id === 'randTrace') {
+    let n = traceIdx;
+    while (n === traceIdx) n = Math.floor(Math.random() * TRACES.length);
+    traceIdx = n;
+  } else traceIdx = +b.dataset.tr;
+  document.querySelectorAll('#traceChips .chip[data-tr]').forEach(c => c.classList.toggle('on', +c.dataset.tr === traceIdx));
+  buildTour3();
+  if (b.id === 'randTrace') play();
+});
+
+/* =========================================================
+   TAB 4: the race condition
+   ========================================================= */
+const ASM = [
+  'mov  0x8049a1c, %eax',
+  'add  $0x1, %eax',
+  'mov  %eax, 0x8049a1c',
+];
+const START = 50;
+let cutAfter = 1;   /* interrupt thread 1 after this many instructions; 0 = never */
+
+function buildTour4 () {
+  const s = [];
+  const evs = [];
+  const k = cutAfter;
+  if (k === 0) { for (let i = 0; i < 3; i++) evs.push({ t: 1, i }); for (let i = 0; i < 3; i++) evs.push({ t: 2, i }); }
+  else {
+    for (let i = 0; i < k; i++) evs.push({ t: 1, i });
+    evs.push({ sw: true, to: 2 });
+    for (let i = 0; i < 3; i++) evs.push({ t: 2, i });
+    if (k < 3) { evs.push({ sw: true, to: 1 }); for (let i = k; i < 3; i++) evs.push({ t: 1, i }); }
+  }
+  /* simulate */
+  let counter = START, eax = { 1: 0, 2: 0 }, saved = { 1: null, 2: null }, pc = { 1: 0, 2: 0 };
+  const log = [];
+  const snap = () => ({ counter, eax: { ...eax }, saved: { ...saved }, pc: { ...pc }, log: log.map(r => ({ ...r })) });
+
+  s.push({ phase: 'setup', title: 'Two threads, one counter', color: '#7d8b99',
+    body: `Both threads run the same three instructions to add one to a shared counter that starts at ${START}. Each has its own %eax, because registers are per-thread state saved and restored across a switch. The counter, being in memory, is shared.`,
+    calc: ['counter = counter + 1', '', ...ASM.map((a, i) => `${i + 1}: ${a}`), '', `counter starts at ${START}`, `expected result: ${START + 2}`],
+    view: snap() });
+
+  evs.forEach(ev => {
+    if (ev.sw) {
+      saved[ev.to === 2 ? 1 : 2] = eax[ev.to === 2 ? 1 : 2];
+      const from = ev.to === 2 ? 1 : 2;
+      const back = ev.to === 1;
+      if (back) eax[1] = saved[1];
+      s.push({ phase: 'switch', title: back ? 'Switch back to thread 1' : 'An interrupt switches to thread 2', color: 'var(--os)', tone: 'os', who: ['os', 'OS'],
+        body: back
+          ? `Thread 1 is restored from its TCB, and with it %eax = ${saved[1]}. That value was read from memory before thread 2 touched anything, and it is now out of date, but nothing in the machine knows that.`
+          : `Thread 1 is interrupted part-way through its update. Its registers, including %eax = ${eax[1]}, are saved into TCB 1, and thread 2 is restored and starts running the same three instructions.`,
+        calc: back ? [`restore TCB 1: %eax = ${saved[1]}`, `memory holds counter = ${counter}`, '', 'thread 1 resumes at instruction ' + (pc[1] + 1)]
+          : [`save TCB ${from}: %eax = ${eax[from]}`, 'restore TCB 2', 'thread 2 starts at instruction 1'],
+        view: snap() });
+      return;
+    }
+    const t = ev.t, i = ev.i;
+    pc[t] = i;
+    let body, calcExtra = [];
+    if (i === 0) { eax[t] = counter; body = `Thread ${t} loads the counter from memory into its own %eax. It reads ${eax[t]}.`; calcExtra = [`%eax(T${t}) = ${eax[t]}`]; }
+    else if (i === 1) { eax[t] = eax[t] + 1; body = `Thread ${t} adds one in its register. Memory is untouched; only this thread\u2019s %eax changed.`; calcExtra = [`%eax(T${t}) = ${eax[t]}`]; }
+    else { const old = counter; counter = eax[t]; body = `Thread ${t} stores its %eax back into the counter, which goes from ${old} to ${counter}.`; calcExtra = [`counter = ${counter}`]; log.push({ t, val: counter }); }
+    pc[t] = i + 1;
+    s.push({ phase: 'thread ' + t, color: t === 1 ? 'var(--t1)' : 'var(--t2)', tone: 't' + t, who: ['t' + t, 'thread ' + t],
+      title: `T${t}, instruction ${i + 1}: ${['load', 'add', 'store'][i]}`, body,
+      calc: [`T${t}: ${ASM[i]}`, ...calcExtra, `memory counter = ${counter}`],
+      view: snap() });
+  });
+
+  const bad = counter !== START + 2;
+  s.push({ phase: 'result', title: `counter ends at ${counter}${bad ? `, not ${START + 2}` : ''}`, color: '#7d8b99', tone: bad ? 'bad' : 'good',
+    body: bad
+      ? 'Two increments happened and only one of them survived. Nothing went wrong in either thread: each loaded, added and stored exactly as written. The loss comes from the interleaving, and the same program will often produce the right answer, which is what makes this kind of bug so hard to find.'
+      : 'This interleaving happens to be harmless: thread 1 finished its store before thread 2 read the counter, so both increments were seen. Other interleavings are not so kind, which is the whole problem. Correctness cannot depend on the scheduler being polite.',
+    calc: [`started at   ${START}`, `expected     ${START + 2}`, `got          ${counter}`, '', bad ? 'one increment was lost' : 'both increments survived'],
+    view: { counter, eax: { ...eax }, saved: { ...saved }, pc: { ...pc }, log: log.map(r => ({ ...r })), final: true, bad } });
+
+  makeTour(4, s, drawRace);
+}
+
+function drawRace (s, idx) {
+  const v = s.view;
+  $('memVal').textContent = v.counter;
+  $('memVal').className = v.counter !== START ? 'chg' : '';
+  const codeFor = (id, t) => {
+    const cur = v.pc[t];
+    $(id).innerHTML = '<tbody>' + ASM.map((a, i) =>
+      `<tr class="${i === cur - 1 && s.who && s.who[1] === 'thread ' + t ? 'cur' : i < cur ? 'done' : ''}"><td class="ln">${i + 1}</td><td>${a}</td></tr>`).join('') + '</tbody>';
+  };
+  codeFor('code1', 1); codeFor('code2', 2);
+  const regFor = (id, t) => {
+    const rows = [['%eax', v.eax[t]]];
+    if (v.saved[t] !== null && v.saved[t] !== undefined) rows.push(['saved in TCB', v.saved[t]]);
+    $(id).innerHTML = rows.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('');
+  };
+  regFor('regs1', 1); regFor('regs2', 2);
+  $('raceLog').innerHTML = '<thead><tr><th>Stores to memory</th></tr></thead><tbody>' +
+    (v.log.length ? v.log.map(r => `<tr><td class="t${r.t}">thread ${r.t} wrote ${r.val}</td></tr>`).join('') : '<tr class="empty"><td>nothing written yet</td></tr>') + '</tbody>';
+  const warn = $('raceWarn');
+  warn.hidden = !v.final || !v.bad;
+  if (!warn.hidden) warn.innerHTML = '<b>Both threads ran correct code.</b> The three instructions that read, modify and write the counter are a <em>critical section</em>: they must not be interleaved with another thread\u2019s copy of the same section. Without that guarantee the outcome depends on when the timer interrupt lands.';
+  const take = $('raceTake');
+  if (v.final) {
+    take.textContent = v.bad
+      ? `Expected ${START + 2}, got ${v.counter}. One increment vanished.`
+      : `Expected ${START + 2}, got ${v.counter}. Correct this time, by luck rather than design.`;
+    take.className = 'takeaway' + (v.bad ? ' bad' : '');
+  } else {
+    take.textContent = `Counter in memory: ${v.counter}. Thread 1 has ${v.eax[1]} in %eax, thread 2 has ${v.eax[2]}.`;
+    take.className = 'takeaway';
+  }
+}
+$('raceChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  stop();
+  cutAfter = +b.dataset.k;
+  document.querySelectorAll('#raceChips .chip').forEach(c => c.classList.toggle('on', c === b));
+  buildTour4();
+});
+
+/* =========================================================
+   Boot
+   ========================================================= */
+buildPriv();
+buildTour1();
+buildTour2();
+buildTour3();
+buildTour4();
+showTab(Math.min(4, Math.max(1, parseInt(location.hash.slice(1), 10) || 1)));
+</script>
+</body>
+</html>

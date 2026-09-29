@@ -644,7 +644,55 @@ footer a{color:var(--ink);text-underline-offset:3px}
       <h2 id="conc">Concurrency</h2>
       <span>Threads, locks, condition variables and semaphores</span>
     </div>
-    <p class="empty">No visualizations here yet.</p>
+    <ul class="tools">
+      <li>
+        <a class="tool" href="https://srg-ics-uplb.github.io/cmsc125/viztools/threads/">
+          <svg class="thumb" viewBox="0 0 220 120" aria-hidden="true">
+            <!-- one address space, two stacks -->
+            <rect x="14" y="10" width="62" height="102" fill="#f1f3f5" stroke="#172033" stroke-width="1.5"/>
+            <g stroke="#172033" stroke-width="1.2">
+              <rect x="14" y="10" width="62" height="13" fill="#b2f2bb"/>
+              <rect x="14" y="23" width="62" height="13" fill="#b2f2bb"/>
+              <rect x="14" y="60" width="62" height="13" fill="#f3d9fa"/>
+              <rect x="14" y="99" width="62" height="13" fill="#d0ebff"/>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="6.5" fill="#172033" text-anchor="middle">
+              <text x="45" y="19.5">code</text>
+              <text x="45" y="32.5">heap</text>
+              <text x="45" y="69.5">stack 2</text>
+              <text x="45" y="108.5">stack 1</text>
+            </g>
+            <!-- two threads sharing one counter -->
+            <g stroke="#172033" stroke-width="1.5">
+              <rect x="98" y="12" width="44" height="20" fill="#d0ebff"/>
+              <rect x="160" y="12" width="44" height="20" fill="#f3d9fa"/>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="8" font-weight="700" fill="#172033" text-anchor="middle">
+              <text x="120" y="25.5">T1</text>
+              <text x="182" y="25.5">T2</text>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="6.5" fill="#4d596b" text-anchor="middle">
+              <text x="120" y="45">+1</text>
+              <text x="182" y="45">+1</text>
+            </g>
+            <g stroke="#172033" stroke-width="1.5" fill="none">
+              <path d="M120 48 L120 62"/><path d="M182 48 L182 62"/>
+            </g>
+            <path d="M115 62 L120 68 L125 62 Z" fill="#172033"/>
+            <path d="M177 62 L182 68 L187 62 Z" fill="#172033"/>
+            <rect x="98" y="70" width="106" height="30" rx="4" fill="#fff" stroke="#172033" stroke-width="2"/>
+            <text x="151" y="81" font-family="ui-monospace,Menlo,monospace" font-size="6.5" fill="#4d596b" text-anchor="middle">shared counter</text>
+            <text x="151" y="95" font-family="ui-monospace,Menlo,monospace" font-size="11" font-weight="700" fill="#c92a2a" text-anchor="middle">51</text>
+            <text x="151" y="112" font-family="ui-monospace,Menlo,monospace" font-size="7" fill="#c92a2a" text-anchor="middle">expected 52</text>
+          </svg>
+          <div>
+            <p class="tool-title">Threads: stacks, switches and a lost increment</p>
+            <p class="tool-desc">Watch a second stack appear in the address space, follow a switch as register state moves through the TCBs, compare the three orderings two threads can run in, and interrupt a counter update to lose an increment.</p>
+            <span class="chapter"><b>Chapter 26</b>, Concurrency: An Introduction</span>
+          </div>
+        </a>
+      </li>
+    </ul>
   </section>
 
   <section class="piece" aria-labelledby="pers">
