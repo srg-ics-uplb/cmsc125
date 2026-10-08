@@ -692,6 +692,54 @@ footer a{color:var(--ink);text-underline-offset:3px}
           </div>
         </a>
       </li>
+      <li>
+        <a class="tool" href="https://srg-ics-uplb.github.io/cmsc125/viztools/locks-cv/">
+          <svg class="thumb" viewBox="0 0 220 120" aria-hidden="true">
+            <defs>
+              <pattern id="hatchLC" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="6" height="6" fill="#f4f7f9"/><rect width="1" height="6" fill="#c9d3db"/>
+              </pattern>
+            </defs>
+            <!-- the restroom: one thread inside, two queued at the door -->
+            <rect x="44" y="22" width="56" height="52" fill="#fff" stroke="#172033" stroke-width="2"/>
+            <rect x="62" y="36" width="20" height="20" fill="#c77700" stroke="#172033" stroke-width="1.2"/>
+            <g stroke="#172033" stroke-width="1.2">
+              <rect x="14" y="30" width="14" height="14" fill="#0b7285"/>
+              <rect x="14" y="52" width="14" height="14" fill="#5f3dc4"/>
+            </g>
+            <path d="M30 37 L40 37" stroke="#172033" stroke-width="1.5"/><path d="M40 33 L44 37 L40 41 Z" fill="#172033"/>
+            <path d="M30 59 L40 59" stroke="#172033" stroke-width="1.5"/><path d="M40 55 L44 59 L40 63 Z" fill="#172033"/>
+            <!-- the bell between the rooms -->
+            <path d="M107 56 Q107 42 115 42 Q123 42 123 56 Z" fill="#ffd43b" stroke="#172033" stroke-width="1.2"/>
+            <circle cx="115" cy="59.5" r="2.2" fill="#172033"/>
+            <g stroke="#c92a2a" stroke-width="1.2" fill="none">
+              <path d="M105 46 L102.5 43.5"/><path d="M125 46 L127.5 43.5"/>
+            </g>
+            <!-- the waiting room: sleepers -->
+            <rect x="130" y="22" width="76" height="52" fill="url(#hatchLC)" stroke="#172033" stroke-width="2" stroke-dasharray="4 3"/>
+            <g stroke="#172033" stroke-width="1.2">
+              <rect x="140" y="38" width="16" height="16" fill="#5f3dc4"/>
+              <rect x="164" y="38" width="16" height="16" fill="#0b7285"/>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="7" font-weight="700" fill="#4d596b">
+              <text x="141" y="66">zzz</text>
+              <text x="165" y="66">zzz</text>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="7.5" font-weight="700" fill="#4d596b" text-anchor="middle">
+              <text x="72" y="90">lock</text>
+              <text x="168" y="90" font-size="7">condition variable</text>
+            </g>
+            <!-- flag -->
+            <rect x="46" y="98" width="52" height="14" rx="3" fill="#c92a2a" stroke="#172033" stroke-width="1.2"/>
+            <text x="72" y="108.5" font-family="ui-monospace,Menlo,monospace" font-size="8" font-weight="700" fill="#fff" text-anchor="middle">flag = 1</text>
+          </svg>
+          <div>
+            <p class="tool-title">Locks and condition variables: the restroom and the waiting room</p>
+            <p class="tool-desc">Build a lock from a plain flag, test-and-set and a sleeping queue, then run a producer-consumer shelf through three versions of the code to see why a woken thread rechecks and why each condition needs its own condition variable.</p>
+            <span class="chapter"><b>Chapters 28 and 30</b>, Locks; Condition Variables</span>
+          </div>
+        </a>
+      </li>
     </ul>
   </section>
 

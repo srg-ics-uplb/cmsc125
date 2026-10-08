@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locks and condition variables</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#d3dbe2;
+  --bad:#c92a2a;
+  --good:#2b8a3e;
+  --mark:#ffd43b;
+  --t1:#1864ab;
+  --t1s:#d0ebff;
+  --t2:#9c36b5;
+  --t2s:#f3d9fa;
+  --t3:#e8590c;
+  --t3s:#ffe8cc;
+  --os:#495057;
+  --shared:#b2f2bb;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important}
+.page{max-width:1280px;margin:0 auto;padding:32px 28px 56px}
+
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:74ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+h3{font-size:.95rem;margin:14px 0 6px;font-weight:700}
+.sub{margin:0 0 12px;font-size:.88rem;color:var(--ink-soft)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.speed{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-soft)}
+select{padding:6px 8px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+
+.tabs{display:flex;gap:6px;margin:0 0 22px;padding:5px;background:var(--panel);border:2px solid var(--ink);border-radius:10px;overflow-x:auto}
+.tabs button{flex:1 1 0;min-width:190px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;border-radius:6px;background:transparent;padding:7px 12px;text-align:left;line-height:1.25}
+.tabs button b{font-size:.95rem;white-space:nowrap}
+.tabs button span{font-size:.78rem;color:var(--ink-soft);white-space:nowrap}
+.tabs button:hover{background:#fff}
+.tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabs button[aria-selected="true"] span{color:#c8d2e0}
+
+.chapter{margin:0 0 14px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.chapter h2{font-size:1.5rem;letter-spacing:-.01em}
+.chapter span{font-size:.9rem;color:var(--ink-soft)}
+.rule{height:3px;background:var(--ink);border-radius:2px;margin:0 0 18px}
+
+.card{border-width:3px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start;min-height:180px;margin-bottom:12px}
+.step-count{margin:0 0 2px;font-size:.9rem;color:var(--ink-soft)}
+.card h2{font-size:1.5rem;line-height:1.2;margin:0 0 8px}
+.card p.body{margin:0;max-width:64ch}
+.calc{margin:0;align-self:center;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.card.t1{border-color:var(--t1)}.card.t1 .calc{border-left-color:var(--t1)}
+.card.t2{border-color:var(--t2)}.card.t2 .calc{border-left-color:var(--t2)}
+.card.t3{border-color:var(--t3)}.card.t3 .calc{border-left-color:var(--t3)}
+.card.os{border-color:var(--os)}.card.os .calc{border-left-color:var(--os)}
+.card.bad{border-color:var(--bad)}.card.bad .calc{border-left-color:var(--bad)}
+.card.good{border-color:var(--good)}.card.good .calc{border-left-color:var(--good)}
+.who{display:inline-block;font-size:.8rem;font-weight:700;border-radius:999px;padding:1px 10px;border:2px solid var(--ink);margin-left:8px;vertical-align:middle}
+.who.t1{background:var(--t1s)}.who.t2{background:var(--t2s)}.who.t3{background:var(--t3s)}.who.os{background:#dee2e6}
+.who.bad{background:#ffc9c9}.who.good{background:var(--shared)}
+
+.timeline{display:flex;flex-wrap:wrap;gap:10px;row-gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
+.tl-group{min-width:40px;display:flex;flex-direction:column;gap:5px}
+.tl-steps{display:flex;gap:2px}
+.tl-step{flex:1;height:16px;padding:0;border:0;border-radius:2px;background:var(--g);opacity:.28;min-width:6px}
+.tl-step:hover{opacity:.6}
+.tl-step.done{opacity:1}
+.tl-step.now{opacity:1;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.tl-label{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:20px;align-items:start}
+.main.wide{grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr)}
+.side{display:flex;flex-direction:column;gap:20px;min-width:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}
+
+.trow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips > span{font-size:.88rem;color:var(--ink-soft)}
+.chip{font-size:.85rem;padding:3px 10px;border-width:1.5px;border-radius:999px}
+.chip.on,.chip.on:hover{background:var(--ink);color:#fff}
+
+/* generic tables */
+table.tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+.tbl th{font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--ink-soft);text-align:left;border-bottom:2px solid var(--ink);padding:4px 7px;white-space:nowrap}
+.tbl td{padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap;transition:background-color .3s}
+.tbl.wrap td{white-space:normal;font-family:var(--sans);font-size:.85rem;vertical-align:top}
+.tbl.wrap td:first-child{font-weight:700}
+.tbl tr.sel td{background:#fff3bf}
+
+/* code listings */
+table.code{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+.code td{padding:4px 7px;border-bottom:1px solid var(--line);transition:background-color .3s}
+.code td.ln{color:#9aa6b2;width:1%;white-space:nowrap}
+.code td.src{white-space:pre-wrap;overflow-wrap:anywhere}
+.code tr.cur td{background:#ffe8a3}
+.code tr.cur td.ln{box-shadow:inset 4px 0 0 var(--ink)}
+.code tr.done td{color:var(--ink-soft)}
+pre.src{font-family:var(--mono);font-size:13px;margin:0 0 10px;padding:9px 11px;background:#fff;border:1.5px solid var(--line);border-radius:5px;white-space:pre;overflow-x:auto}
+pre.src mark{background:var(--mark);color:var(--ink);border-radius:2px;padding:0 2px;font-weight:700}
+code{font-family:var(--mono);font-size:.86em;background:#fff;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+.regs{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-family:var(--mono);font-size:13px;margin:8px 0 0}
+.regs dt{color:var(--ink-soft)}
+.regs dd{margin:0}
+
+/* zones: restroom and waiting rooms */
+.zone{border:2px solid var(--line);border-radius:6px;background:#fff;padding:9px 11px;min-height:120px;transition:border-color .25s,background-color .25s}
+.zone h3{margin:0 0 6px;font-size:.82rem;color:var(--ink-soft)}
+.zone.occ{border-color:var(--ink)}
+.zone.vac{border-color:var(--good)}
+.zone.bad{border-color:var(--bad);background:#fff0f0}
+.zone .who{margin:2px 6px 2px 0}
+.trl{display:flex;align-items:center;gap:4px;margin:3px 0;font-size:.85rem}
+.trl small,.zone small{color:var(--ink-soft)}
+.sign{font-weight:700;font-size:1.05rem;margin-bottom:6px}
+.sign.vac{color:var(--good)}
+.sign.occ,.sign.bad{color:var(--bad)}
+.mem{display:flex;align-items:center;gap:12px;border:3px solid var(--ink);border-radius:8px;background:#fff;padding:8px 12px;justify-content:center}
+.mem b{font-family:var(--mono);font-size:2rem;line-height:1;transition:color .3s}
+.mem b.chg{color:var(--bad)}
+.mem span{font-size:.85rem;color:var(--ink-soft);font-family:var(--mono)}
+.meta{margin:8px 0 0;font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);min-height:2.6em}
+.waits{display:flex;flex-direction:column;gap:10px}
+.waits .zone{flex:1;border-style:dashed;background:var(--hatch)}
+.shelf{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
+.slot{width:58px;height:34px;border:2px solid var(--ink);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.85rem;font-weight:700;background:var(--hatch)}
+.slot.full{background:var(--t3s);border-color:var(--t3)}
+.slot.err{background:#ffc9c9;border-color:var(--bad);color:var(--bad)}
+
+.takeaway{margin:10px 0 0;padding:9px 12px;border-left:4px solid var(--good);background:#fff;font-size:.9rem}
+.takeaway.bad{border-left-color:var(--bad)}
+.note{margin:14px 0 0;padding:10px 12px;border-left:4px solid var(--ink);background:#fff;font-size:.9rem}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+.foot{margin-top:34px;font-size:.85rem;color:var(--ink-soft)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0;padding:0;list-style:none;font-size:.86rem;color:var(--ink-soft)}
+.legend li{display:flex;align-items:center;gap:7px}
+.sw{width:13px;height:13px;border:1.5px solid var(--ink);display:inline-block}
+
+@media (max-width: 1100px){ .main,.main.wide{grid-template-columns:1fr} }
+@media (max-width: 980px){
+  .top,.two,.three{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .card{grid-template-columns:1fr;gap:12px;min-height:0}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.75rem}
+  .tl-label{display:none}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>Locks and condition variables</h1>
+      <p class="intro">A lock is the restroom: one key, one room, and whoever holds the key is inside. A condition variable is the waiting room next door, with a bell: a thread sleeps there until another thread rings to say that what it was waiting for has happened. The tabs follow OSTEP Chapter 28 (Locks) and Chapter 30 (Condition Variables).</p>
+    </div>
+    <div class="controls">
+      <button id="btnRestart" type="button">Restart</button>
+      <button id="btnPrev" type="button">Back</button>
+      <button id="btnPlay" type="button">Play</button>
+      <button id="btnNext" type="button" class="primary">Next step</button>
+      <label class="speed">Speed
+        <select id="speed">
+          <option value="2600">Slow</option>
+          <option value="1500" selected>Normal</option>
+          <option value="700">Fast</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab1" data-t="1" aria-controls="panel1" aria-selected="true"><b>1. Locks</b><span>the restroom: who is allowed in</span></button>
+    <button type="button" role="tab" id="tab2" data-t="2" aria-controls="panel2" aria-selected="false"><b>2. Condition variables</b><span>the waiting room: when to go in</span></button>
+  </nav>
+
+  <!-- ================= PANEL 1: LOCKS ================= -->
+  <div class="tabpanel" id="panel1" role="tabpanel" aria-labelledby="tab1">
+    <div class="chapter"><h2>Locks</h2><span>one key, one room, one thread inside at a time</span></div>
+    <div class="rule"></div>
+
+    <section class="panel card" id="card1">
+      <div><p class="step-count"></p><h2></h2><p class="body"></p></div>
+      <pre class="calc"></pre>
+    </section>
+    <nav class="timeline" id="tl1" aria-label="Jump to a step"></nav>
+
+    <div class="main wide">
+      <section class="panel">
+        <h2>The restroom</h2>
+        <p class="sub">Two threads, T1 and T2, both want the critical section. The flag is the Occupied sign on the door.</p>
+        <div class="trow">
+          <div class="chips" id="lockChips">
+            <span>Lock</span>
+            <button type="button" class="chip on" data-m="plain">plain flag (broken)</button>
+            <button type="button" class="chip" data-m="tas">test-and-set (spin)</button>
+            <button type="button" class="chip" data-m="queue">queue (sleep)</button>
+          </div>
+        </div>
+        <div class="three">
+          <div class="zone"><h3>At the door</h3><div id="lkDoor"></div></div>
+          <div class="zone vac" id="lkRoom"><h3>The restroom</h3><div id="lkRoomBody"></div></div>
+          <div class="zone"><h3>The sign, in memory</h3>
+            <div class="mem"><span>flag =</span><b id="lkFlag">0</b></div>
+            <p class="meta" id="lkMeta"></p>
+          </div>
+        </div>
+        <div class="two" style="margin-top:14px">
+          <div>
+            <h3 style="margin-top:0;color:var(--t1)">Thread 1</h3>
+            <table class="code" id="lkCode1"></table>
+            <dl class="regs" id="lkRegs1"></dl>
+          </div>
+          <div>
+            <h3 style="margin-top:0;color:var(--t2)">Thread 2</h3>
+            <table class="code" id="lkCode2"></table>
+            <dl class="regs" id="lkRegs2"></dl>
+          </div>
+        </div>
+      </section>
+
+      <div class="side">
+        <section class="panel">
+          <h2>Three ways to guard the room</h2>
+          <p class="sub">Pick one with the chips on the left.</p>
+          <table class="tbl wrap" id="cmpTable">
+            <thead><tr><th>Lock</th><th>Keeps one thread in?</th><th>While a thread waits</th></tr></thead>
+            <tbody>
+              <tr data-m="plain"><td>Plain flag</td><td>No. Two threads can both see vacant</td><td>spins</td></tr>
+              <tr data-m="tas"><td>Test-and-set</td><td>Yes</td><td>spins, burning CPU on failed checks</td></tr>
+              <tr data-m="queue"><td>Queue with park</td><td>Yes</td><td>sleeps, using no CPU, but waking takes time</td></tr>
+            </tbody>
+          </table>
+        </section>
+        <section class="panel">
+          <h2>The words for it</h2>
+          <p class="sub" style="margin-bottom:6px">A lock gives <strong>mutual exclusion</strong>: while one thread is in the critical section, the others are kept out.</p>
+          <p class="sub" style="margin-bottom:6px">To build one, the check and the set must be <strong>atomic</strong>, one step the scheduler cannot split. Test-and-set is a hardware instruction that does exactly that.</p>
+          <p class="sub" style="margin-bottom:6px">A <strong>spin lock</strong> waits by looping. It is simple, and fine for very short critical sections on several CPUs. On one CPU it is wasteful, because the spinner holds the CPU that the lock holder needs.</p>
+          <p class="sub" style="margin-bottom:0">A <strong>sleeping lock</strong> parks the waiter in a queue and wakes it with unpark. The next tab is about the same idea used for a different job.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PANEL 2: CONDITION VARIABLES ================= -->
+  <div class="tabpanel" id="panel2" role="tabpanel" aria-labelledby="tab2" hidden>
+    <div class="chapter"><h2>Condition variables</h2><span>wait outside until the bell rings</span></div>
+    <div class="rule"></div>
+
+    <section class="panel card" id="card2">
+      <div><p class="step-count"></p><h2></h2><p class="body"></p></div>
+      <pre class="calc"></pre>
+    </section>
+    <nav class="timeline" id="tl2" aria-label="Jump to a step"></nav>
+
+    <div class="main wide">
+      <section class="panel">
+        <h2>The room and the waiting rooms</h2>
+        <p class="sub">A producer-consumer shelf with one slot. The key is the lock. A waiting room is a condition variable.</p>
+        <div class="trow">
+          <div class="chips" id="cvChips">
+            <span>Version</span>
+            <button type="button" class="chip on" data-m="if1">if, one condition variable</button>
+            <button type="button" class="chip" data-m="wh1">while, one condition variable</button>
+            <button type="button" class="chip" data-m="wh2">while, two condition variables</button>
+          </div>
+        </div>
+        <div class="three">
+          <div class="zone"><h3>Not in line</h3><div id="cvLobby"></div><h3 style="margin-top:10px">Awake, at the door</h3><div id="cvDoor"></div></div>
+          <div class="zone occ" id="cvRoom"><h3>The room (key = lock)</h3><div class="sign" id="cvKey"></div><div class="shelf"><span class="slot" id="cvSlot"></span><small id="cvShelf"></small></div><div id="cvIn"></div></div>
+          <div class="waits" id="cvWaits"></div>
+        </div>
+        <ul class="legend">
+          <li><span class="sw" style="background:var(--t1s)"></span>consumer (Tc1, Tc2)</li>
+          <li><span class="sw" style="background:var(--t3s)"></span>producer (Tp)</li>
+          <li><span class="sw" style="background:var(--hatch)"></span>waiting room</li>
+        </ul>
+        <p class="takeaway" id="cvTake"></p>
+      </section>
+
+      <div class="side">
+        <section class="panel">
+          <h2>The code in this version</h2>
+          <h3 style="margin-top:0">Consumer</h3>
+          <pre class="src" id="cvCodeC"></pre>
+          <h3 style="margin-top:0">Producer</h3>
+          <pre class="src" id="cvCodeP" style="margin-bottom:0"></pre>
+        </section>
+        <section class="panel">
+          <h2>Lock versus condition variable</h2>
+          <table class="tbl wrap">
+            <thead><tr><th></th><th>Lock</th><th>Condition variable</th></tr></thead>
+            <tbody>
+              <tr><td>Picture</td><td>restroom with one key</td><td>waiting room with a bell</td></tr>
+              <tr><td>Answers</td><td>who may be inside now?</td><td>has what I need happened yet?</td></tr>
+              <tr><td>A blocked thread</td><td>waits for the holder to unlock</td><td>sleeps until another thread signals</td></tr>
+              <tr><td>The key while blocked</td><td>never had it</td><td>wait() hangs it up while asleep, and takes it back before returning</td></tr>
+              <tr><td>Used with</td><td>on its own</td><td>always a lock, and a while loop that rechecks</td></tr>
+            </tbody>
+          </table>
+          <p class="sub" style="margin:10px 0 0">The bell is a hint, like a restaurant pager: by the time you reach the door, someone else may have taken the table. That is why a woken thread looks again.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <p class="kbd-hint">Keyboard: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to step, <kbd>Space</kbd> to play or pause.</p>
+  <p class="foot">Examples follow OSTEP, Chapter 28, <em>Locks</em>, and Chapter 30, <em>Condition Variables</em>.</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+/* =========================================================
+   Generic tour engine: one tour per tab
+   ========================================================= */
+const tours = {};
+function makeTour (n, steps, draw) {
+  const card = $('card' + n);
+  tours[n] = { steps, draw, cur: 0, card, tl: $('tl' + n) };
+  const groups = [];
+  steps.forEach((s, i) => {
+    const last = groups[groups.length - 1];
+    if (last && last.label === s.phase) last.count++;
+    else groups.push({ label: s.phase, color: s.color || '#172033', start: i, count: 1 });
+  });
+  tours[n].groups = groups;
+  tours[n].tl.innerHTML = groups.map(g => {
+    let b = '';
+    for (let i = g.start; i < g.start + g.count; i++) {
+      const t = steps[i].title.replace(/"/g, '&quot;');
+      b += `<button class="tl-step" type="button" data-i="${i}" aria-label="Step ${i + 1}: ${t}" title="Step ${i + 1}: ${t}"></button>`;
+    }
+    return `<div class="tl-group" style="flex:${g.count} 1 0;--g:${g.color}"><div class="tl-steps">${b}</div><div class="tl-label">${g.label}</div></div>`;
+  }).join('');
+  tours[n].tl.onclick = e => {
+    const b = e.target.closest('.tl-step');
+    if (b) { stop(); show(n, +b.dataset.i); }
+  };
+  show(n, 0, false);
+}
+
+function show (n, i, animate = true) {
+  const T = tours[n];
+  if (!T || i < 0 || i >= T.steps.length) return;
+  const root = document.documentElement;
+  if (!animate) root.classList.add('instant');
+  T.cur = i;
+  const s = T.steps[i];
+  T.card.className = 'panel card' + (s.tone ? ' ' + s.tone : '');
+  T.card.querySelector('.step-count').textContent = `Step ${i + 1} of ${T.steps.length}`;
+  T.card.querySelector('h2').innerHTML = esc(s.title) + (s.who ? ` <span class="who ${s.who[0]}">${s.who[1]}</span>` : '');
+  T.card.querySelector('.body').textContent = s.body;
+  T.card.querySelector('.calc').textContent = (s.calc || []).join('\n');
+  T.tl.querySelectorAll('.tl-step').forEach(b => {
+    const k = +b.dataset.i;
+    b.classList.toggle('done', k < i);
+    b.classList.toggle('now', k === i);
+    b.setAttribute('aria-current', k === i ? 'step' : 'false');
+  });
+  T.draw(s, i);
+  if (n === tab) syncButtons();
+  if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('instant')));
+}
+
+let timer = null;
+let tab = 1;
+function syncButtons () {
+  const T = tours[tab];
+  $('btnPrev').disabled = !T || T.cur === 0;
+  $('btnNext').disabled = !T || T.cur === T.steps.length - 1;
+}
+function stepBy (d) { const T = tours[tab]; if (T) show(tab, T.cur + d); }
+function play () {
+  stop();
+  const T = tours[tab];
+  if (!T) return;
+  if (T.cur >= T.steps.length - 1) show(tab, 0);
+  $('btnPlay').textContent = 'Pause';
+  const tick = () => {
+    const t = tours[tab];
+    if (!t || t.cur >= t.steps.length - 1) { stop(); return; }
+    show(tab, t.cur + 1);
+    timer = setTimeout(tick, +$('speed').value);
+  };
+  timer = setTimeout(tick, +$('speed').value);
+}
+function stop () { clearTimeout(timer); timer = null; $('btnPlay').textContent = 'Play'; }
+$('btnNext').onclick = () => { stop(); stepBy(1); };
+$('btnPrev').onclick = () => { stop(); stepBy(-1); };
+$('btnPlay').onclick = () => (timer ? stop() : play());
+$('btnRestart').onclick = () => { stop(); show(tab, 0); };
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select, input, #tabs')) return;
+  if (e.key === 'ArrowRight') { stop(); stepBy(1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stop(); stepBy(-1); e.preventDefault(); }
+  else if (e.key === ' ' && !e.target.closest('button')) { timer ? stop() : play(); e.preventDefault(); }
+  else if (e.key === 'Home') { stop(); show(tab, 0); }
+});
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+const NTABS = 2;
+function showTab (n) {
+  stop();
+  tab = n;
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', +b.dataset.t === n ? 'true' : 'false'));
+  for (let i = 1; i <= NTABS; i++) $('panel' + i).hidden = i !== n;
+  syncButtons();
+  if (history.replaceState) { try { history.replaceState(null, '', '#' + n); } catch (err) { /* ignore */ } }
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]');
+  if (b) showTab(+b.dataset.t);
+});
+$('tabs').addEventListener('keydown', e => {
+  const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+  if (!d) return;
+  e.preventDefault();
+  const n = ((tab - 1 + d + NTABS) % NTABS) + 1;
+  showTab(n); $('tab' + n).focus();
+});
+
+/* =========================================================
+   TAB 1: locks
+   ========================================================= */
+let lockMode = 'plain';
+const GREY = '#7d8b99';
+const LCODE = {
+  plain: ['while (flag == 1) ;      // check the sign', 'flag = 1;                 // flip it to occupied', '/* critical section */', 'flag = 0;                 // unlock'],
+  tas: ['while (TestAndSet(&flag, 1) == 1) ;   // check and set, as one step', '/* critical section */', 'flag = 0;                 // unlock'],
+  queue: ['lock: if free, take it; else join the queue and park() (sleep)', '/* critical section */', 'unlock: queue empty? flag = 0 : unpark(next)']
+};
+const LV = (flag, l1, s1, l2, s2, inside, x) => Object.assign({ flag, t: [{ l: l1, s: s1 }, { l: l2, s: s2 }], inside, waste: 0, queue: [], handoff: 0 }, x || {});
+const T1W = ['t1', 'thread 1'], T2W = ['t2', 'thread 2'];
+
+function stepsPlain () {
+  return [
+    { phase: 'the idea', color: GREY, title: 'A lock is a variable and a rule',
+      body: 'Think of a restroom with an Occupied sign. The sign is a variable, flag: 0 means vacant and 1 means occupied. A thread that wants the room checks the sign, and if the room is vacant it flips the sign and goes in. T1 and T2 are about to try.',
+      calc: ['flag = 0     (vacant)', '', 'lock:   wait until flag == 0, then flag = 1', 'unlock: flag = 0'],
+      view: LV(0, 0, 'about to run', 0, 'about to run', []) },
+    { phase: 'both check', color: 'var(--t1)', tone: 't1', who: T1W, title: 'T1 reads the flag and sees vacant',
+      body: 'T1 runs the while test. The flag is 0, so the loop ends. The next instruction will flip the sign, but T1 has not done that yet.',
+      calc: ['T1: flag == 1 ?   no', 'flag is still 0'],
+      view: LV(0, 1, 'running', 0, 'waiting for the CPU', []) },
+    { phase: 'both check', color: 'var(--t2)', tone: 't2', who: T2W, title: 'Interrupt: T2 reads the flag and also sees vacant',
+      body: 'The timer fires right after T1’s check. T2 runs the same test. The flag is still 0 because T1 has not set it, so T2 believes the room is empty too.',
+      calc: ['T2: flag == 1 ?   no', 'flag is still 0'],
+      view: LV(0, 1, 'paused', 1, 'running', []) },
+    { phase: 'both enter', color: 'var(--t1)', tone: 't1', who: T1W, title: 'T1 sets flag = 1 and walks in',
+      body: 'T1 resumes, flips the sign to occupied and enters the critical section.',
+      calc: ['T1: flag = 1', 'flag = 1     (occupied)', 'inside: T1'],
+      view: LV(1, 2, 'running', 1, 'paused', [1]) },
+    { phase: 'both enter', color: 'var(--t2)', tone: 'bad', who: T2W, title: 'T2 sets flag = 1 and walks in too',
+      body: 'T2 resumes from its own check. It already decided the room was empty, so it sets the flag, which is already 1, and enters. Both threads are now in the critical section.',
+      calc: ['T2: flag = 1', 'inside: T1 and T2', '', 'two threads in the room'],
+      view: LV(1, 2, 'paused', 2, 'running', [1, 2]) },
+    { phase: 'result', color: 'var(--bad)', tone: 'bad', title: 'The lock itself has a race',
+      body: 'Checking the sign and flipping it are two separate steps, and the scheduler can switch threads between them, just like the counter in Chapter 26. The fix is to make check-and-set one indivisible step. Choose test-and-set above to see it.',
+      calc: ['check, then set   -> two steps, can be split', 'check-and-set    -> one atomic step', '', 'we need the second one'],
+      view: LV(1, 2, 'paused', 2, 'running', [1, 2]) }
+  ];
+}
+function stepsTas () {
+  return [
+    { phase: 'the idea', color: GREY, title: 'Test-and-set checks and sets in one step',
+      body: 'The hardware offers an atomic instruction. TestAndSet(&flag, 1) returns the old value of the flag and stores 1, as a single step that no interrupt can split. An old value of 0 means you got the lock; an old value of 1 means someone else has it.',
+      calc: ['old = flag;  flag = 1;    // one atomic step', '', 'old == 0   ->  you got the lock', 'old == 1   ->  held, try again'],
+      view: LV(0, 0, 'about to run', 0, 'about to run', []) },
+    { phase: 'T1 takes it', color: 'var(--t1)', tone: 't1', who: T1W, title: 'T1 test-and-sets: old value 0, lock acquired',
+      body: 'The old value was 0, so T1 owns the lock, and the flag is now 1. Nothing could slip in between the check and the set.',
+      calc: ['T1: TestAndSet -> returns 0', 'flag = 1', 'inside: T1'],
+      view: LV(1, 1, 'running', 0, 'waiting for the CPU', [1]) },
+    { phase: 'T2 spins', color: 'var(--t2)', tone: 't2', who: T2W, title: 'T2 test-and-sets: old value 1, the room is occupied',
+      body: 'T2 stores 1, which changes nothing, and gets back the old value, 1. It cannot enter, so the while loop sends it round again.',
+      calc: ['T2: TestAndSet -> returns 1', 'flag = 1', '', 'failed checks: 1'],
+      view: LV(1, 1, 'paused', 0, 'spinning', [1], { waste: 1 }) },
+    { phase: 'T2 spins', color: 'var(--t2)', tone: 't2', who: T2W, title: 'T2 keeps spinning',
+      body: 'Every failed attempt does no useful work. On a single CPU it is worse: T2 can burn a whole time slice spinning while T1, the only thread that can release the lock, is not even running.',
+      calc: ['T2: TestAndSet -> returns 1', 'T2: TestAndSet -> returns 1', '', 'failed checks: 3'],
+      view: LV(1, 1, 'paused', 0, 'spinning', [1], { waste: 3 }) },
+    { phase: 'hand over', color: 'var(--t1)', tone: 't1', who: T1W, title: 'T1 leaves and sets flag = 0',
+      body: 'T1 finishes the critical section and hangs the sign back to vacant. The room is empty and T2 is still spinning at the door.',
+      calc: ['T1: flag = 0', 'inside: nobody'],
+      view: LV(0, 3, 'done', 0, 'spinning', [], { waste: 3 }) },
+    { phase: 'hand over', color: 'var(--t2)', tone: 't2', who: T2W, title: 'T2 test-and-sets: old value 0, lock acquired',
+      body: 'This time the old value is 0, so T2 gets the lock. Only one thread was ever in the room.',
+      calc: ['T2: TestAndSet -> returns 0', 'flag = 1', 'inside: T2'],
+      view: LV(1, 3, 'done', 1, 'running', [2], { waste: 3 }) },
+    { phase: 'result', color: 'var(--good)', tone: 'good', title: 'One thread at a time, at the price of 3 wasted checks',
+      body: 'T2 unlocks and both threads have finished. Mutual exclusion held. The cost of a spin lock is the CPU time spent on failed checks while waiting. The queue version avoids it by letting the waiter sleep.',
+      calc: ['T2: flag = 0', 'mutual exclusion:  held', 'wasted checks:     3'],
+      view: LV(0, 3, 'done', 3, 'done', [], { waste: 3 }) }
+  ];
+}
+function stepsQueue () {
+  return [
+    { phase: 'the idea', color: GREY, title: 'Sleep instead of spin',
+      body: 'A thread that finds the room occupied puts its name on a queue and parks, which means the OS puts it to sleep. The thread that unlocks wakes the next one. The real code guards the queue with a tiny spin lock held for a few instructions; it is left out here.',
+      calc: ['lock:   free?  take it', '        else add me to queue, park()', 'unlock: queue empty?  flag = 0', '        else unpark(next)'],
+      view: LV(0, 0, 'about to run', 0, 'about to run', []) },
+    { phase: 'T1 takes it', color: 'var(--t1)', tone: 't1', who: T1W, title: 'T1 finds the room free and takes it',
+      body: 'Nobody is inside, so T1 sets the flag to 1 and enters.',
+      calc: ['T1: lock  -> free, flag = 1', 'inside: T1'],
+      view: LV(1, 1, 'running', 0, 'waiting for the CPU', [1]) },
+    { phase: 'T2 sleeps', color: 'var(--t2)', tone: 't2', who: T2W, title: 'T2 finds the room occupied and goes to sleep',
+      body: 'T2 adds itself to the queue and parks. It stops using the CPU entirely.',
+      calc: ['T2: lock  -> busy', '    add T2 to queue', '    park()', '', 'failed checks: 0'],
+      view: LV(1, 1, 'paused', 0, 'asleep', [1], { queue: [2] }) },
+    { phase: 'T2 sleeps', color: 'var(--t2)', tone: 'os', title: 'While T1 works, T2 costs nothing',
+      body: 'T1 can use the whole CPU for its critical section. Compare this with the spin lock, where T2 was burning cycles the whole time.',
+      calc: ['T1: in the critical section', 'T2: asleep in the queue', '', 'failed checks: 0'],
+      view: LV(1, 1, 'running', 0, 'asleep', [1], { queue: [2] }) },
+    { phase: 'hand over', color: 'var(--t1)', tone: 't1', who: T1W, title: 'T1 unlocks and hands the key straight to T2',
+      body: 'The queue is not empty, so T1 does not set the flag to 0. It wakes T2 and leaves the flag at 1, so the key passes directly to T2 and no other thread can sneak in first.',
+      calc: ['T1: queue not empty', '    unpark(T2)', '    flag stays 1', '', 'key reserved for T2'],
+      view: LV(1, 3, 'done', 1, 'woken, not yet running', [], { handoff: 2 }) },
+    { phase: 'hand over', color: 'var(--t2)', tone: 't2', who: T2W, title: 'T2 wakes up already holding the lock',
+      body: 'T2 gets the CPU and carries on into the critical section. It never had to check the flag again.',
+      calc: ['T2: returns from park()', 'inside: T2'],
+      view: LV(1, 3, 'done', 1, 'running', [2]) },
+    { phase: 'result', color: 'var(--good)', tone: 'good', title: 'The same exclusion with no wasted checks',
+      body: 'T2 unlocks. The queue is empty, so the flag goes back to 0. The price of sleeping is that parking and waking take time, which is why a spin lock can still win when the critical section is very short.',
+      calc: ['T2: queue empty  ->  flag = 0', 'mutual exclusion:  held', 'wasted checks:     0'],
+      view: LV(0, 3, 'done', 3, 'done', [], { queue: [] }) }
+  ];
+}
+
+function buildTour1 () {
+  const steps = lockMode === 'plain' ? stepsPlain() : lockMode === 'tas' ? stepsTas() : stepsQueue();
+  makeTour(1, steps, drawLock);
+}
+function drawLock (s) {
+  const v = s.view, code = LCODE[lockMode];
+  const cls = ['t1', 't2'];
+  const both = v.inside.length === 2;
+  let door = '';
+  [1, 2].forEach(i => {
+    if (v.inside.includes(i)) return;
+    const st = v.t[i - 1].s;
+    const mark = st === 'spinning' ? ' ↻' : st === 'asleep' ? ' zzz' : '';
+    door += `<div class="trl"><span class="who ${cls[i - 1]}">T${i}</span><small>${st}${mark}</small></div>`;
+  });
+  $('lkDoor').innerHTML = door || '<small>nobody</small>';
+  let status, tone;
+  if (both) { status = 'BOTH INSIDE'; tone = 'bad'; }
+  else if (v.inside.length) { status = 'Occupied'; tone = 'occ'; }
+  else if (v.handoff) { status = 'Vacant, key reserved for T' + v.handoff; tone = 'vac'; }
+  else { status = 'Vacant'; tone = 'vac'; }
+  $('lkRoom').className = 'zone ' + tone;
+  $('lkRoomBody').innerHTML = `<div class="sign ${tone}">${status}</div>` + v.inside.map(i => `<span class="who ${cls[i - 1]}">T${i}</span>`).join('');
+  $('lkFlag').textContent = v.flag;
+  $('lkFlag').classList.toggle('chg', both);
+  $('lkMeta').textContent = lockMode === 'plain' ? 'one check, then one set' :
+    lockMode === 'tas' ? 'failed checks: ' + v.waste :
+    'failed checks: ' + v.waste + '\nqueue: ' + (v.queue.length ? v.queue.map(i => 'T' + i).join(', ') : 'empty');
+  [1, 2].forEach(i => {
+    const t = v.t[i - 1];
+    $('lkCode' + i).innerHTML = code.map((c, k) => {
+      const c2 = k === t.l && t.s !== 'done' ? 'cur' : k < t.l ? 'done' : '';
+      return `<tr class="${c2}"><td class="ln">${k + 1}</td><td class="src">${esc(c)}</td></tr>`;
+    }).join('');
+    $('lkRegs' + i).innerHTML = `<dt>state</dt><dd>${t.s}</dd>`;
+  });
+  document.querySelectorAll('#cmpTable tr[data-m]').forEach(r => r.classList.toggle('sel', r.dataset.m === lockMode));
+}
+$('lockChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  lockMode = b.dataset.m;
+  document.querySelectorAll('#lockChips .chip').forEach(c => c.classList.toggle('on', c === b));
+  stop(); buildTour1();
+});
+
+/* =========================================================
+   TAB 2: condition variables
+   ========================================================= */
+let cvMode = 'if1';
+const CVN = { if1: 1, wh1: 1, wh2: 2 };
+const CCODE = {
+  if1: 'lock(&m);\n<mark>if (count == 0)</mark>\n    wait(&cond, &m);\nget();\nsignal(&cond);\nunlock(&m);',
+  wh1: 'lock(&m);\n<mark>while (count == 0)</mark>\n    wait(&cond, &m);\nget();\nsignal(&cond);\nunlock(&m);',
+  wh2: 'lock(&m);\nwhile (count == 0)\n    wait(<mark>&fill</mark>, &m);\nget();\nsignal(<mark>&empty</mark>);\nunlock(&m);'
+};
+const PCODE = {
+  if1: 'lock(&m);\n<mark>if (count == 1)</mark>\n    wait(&cond, &m);\nput(i);\nsignal(&cond);\nunlock(&m);',
+  wh1: 'lock(&m);\n<mark>while (count == 1)</mark>\n    wait(&cond, &m);\nput(i);\nsignal(&cond);\nunlock(&m);',
+  wh2: 'lock(&m);\nwhile (count == 1)\n    wait(<mark>&empty</mark>, &m);\nput(i);\nsignal(<mark>&fill</mark>);\nunlock(&m);'
+};
+const TH = ['Tc1', 'Tc2', 'Tp'];
+const CW = n => n === 'Tp' ? ['t3', 'Tp'] : ['t1', n];
+const CTONE = n => n === 'Tp' ? 't3' : 't1';
+const CCOL = n => n === 'Tp' ? 'var(--t3)' : 'var(--t1)';
+const CV = (inn, door, w1, w2, n, res) => ({ inn, door, w1, w2, n, res: res || null });
+const lst = a => a.length ? a.join(', ') : 'nobody';
+function cvCalc (v, cvs) {
+  const c = [`count = ${v.n}   (shelf holds ${v.n} of 1)`, `key: ${v.inn ? 'held by ' + v.inn : 'on the hook'}`];
+  if (cvs === 1) c.push(`asleep: ${lst(v.w1)}`);
+  else { c.push(`asleep on fill:  ${lst(v.w1)}`); c.push(`asleep on empty: ${lst(v.w2)}`); }
+  c.push(`awake, at the door: ${lst(v.door)}`);
+  return c;
+}
+/* each step: [phase, color, who|null, tone, title, body, view] */
+const CVS = {
+  if1: [
+    ['setup', GREY, null, '', 'A one-slot shelf, two consumers, one producer',
+      'The room holds a shelf with one slot, guarded by the key. Consumers (Tc1, Tc2) need an item on the shelf. The producer (Tp) needs the slot empty. This version decides whether to wait with if, and has one shared waiting room.',
+      CV(null, [], [], [], 0)],
+    ['Tc1 waits', 'var(--t1)', 'Tc1', 't1', 'Tc1 takes the key and finds the shelf empty',
+      'Tc1 enters the room and looks at the shelf. There is nothing to consume, so it is about to call wait().',
+      CV('Tc1', [], [], [], 0)],
+    ['Tc1 waits', 'var(--t1)', 'Tc1', 't1', 'wait() hangs up the key and puts Tc1 to sleep',
+      'wait() does two things as one atomic step: it releases the lock and puts the caller to sleep in the waiting room. That is why Tp can get in next, even though Tc1 was in the room a moment ago.',
+      CV(null, [], ['Tc1'], [], 0)],
+    ['Tp fills', 'var(--t3)', 'Tp', 't3', 'Tp fills the shelf',
+      'Tp takes the key, sees an empty shelf, and puts an item on it.',
+      CV('Tp', [], ['Tc1'], [], 1)],
+    ['Tp fills', 'var(--t3)', 'Tp', 't3', 'Tp rings the bell and leaves',
+      'signal() wakes Tc1, but only as far as runnable: Tc1 has to get the key back first, and it has not run yet. The bell is a hint that the shelf was full a moment ago, not a promise that it still will be.',
+      CV(null, ['Tc1'], [], [], 1)],
+    ['the sneak', 'var(--t1)', 'Tc2', 't1', 'Tc2 gets the key first and takes the item',
+      'Tc2 was not waiting at all. It arrives, finds the shelf full, takes the item and leaves. The shelf is empty again, and Tc1 does not know.',
+      CV('Tc2', ['Tc1'], [], [], 0)],
+    ['the sneak', 'var(--bad)', 'Tc1', 'bad', 'Tc1 resumes and trusts the old hint',
+      'Tc1 gets the key and returns from wait(). Because the code used if, it does not look at the shelf again, and it calls get() on an empty shelf. That is the bug. The bell only hints that the state changed, so the condition must be rechecked with while.',
+      CV('Tc1', [], [], [], 0, 'bad')]
+  ],
+  wh1: [
+    ['setup', GREY, null, '', 'Same threads, now with while, but still one waiting room',
+      'Every thread now rechecks the condition after waking, using while. But there is still a single condition variable, so the consumers and the producer all sleep in the same waiting room.',
+      CV(null, [], [], [], 0)],
+    ['consumers sleep', 'var(--t1)', null, 't1', 'Both consumers find the shelf empty and sleep',
+      'Tc1 and Tc2 each take the key, find nothing to consume, and sleep in the one waiting room. Tc1 has been there the longest.',
+      CV(null, [], ['Tc1', 'Tc2'], [], 0)],
+    ['Tp fills', 'var(--t3)', 'Tp', 't3', 'Tp fills the shelf',
+      'Tp takes the key and puts an item on the shelf.',
+      CV('Tp', [], ['Tc1', 'Tc2'], [], 1)],
+    ['Tp fills', 'var(--t3)', 'Tp', 't3', 'The bell wakes Tc1, the longest sleeper',
+      'signal() wakes one sleeper, the one that has waited longest. That is Tc1, which heads for the door. Tp leaves the room.',
+      CV(null, ['Tc1'], ['Tc2'], [], 1)],
+    ['Tp waits', 'var(--t3)', 'Tp', 't3', 'Tp loops, finds the shelf full, and sleeps too',
+      'Tp tries to fill the shelf again, but it is full. Its wait() puts it in the same waiting room, behind Tc2.',
+      CV(null, ['Tc1'], ['Tc2', 'Tp'], [], 1)],
+    ['Tc1 consumes', 'var(--t1)', 'Tc1', 't1', 'Tc1 takes the item',
+      'Tc1 gets the key and rechecks with while. The shelf is full, so it passes, and it takes the item.',
+      CV('Tc1', [], ['Tc2', 'Tp'], [], 0)],
+    ['wrong wakeup', 'var(--bad)', 'Tc1', 't1', 'Tc1 rings the bell, and the wrong thread wakes',
+      'Tc1 signals, meaning "there is room on the shelf now". But the longest sleeper is Tc2, a consumer, so Tc2 wakes instead of Tp, the one thread that could use the room. Tp keeps sleeping.',
+      CV(null, ['Tc2'], ['Tp'], [], 0)],
+    ['wrong wakeup', 'var(--bad)', 'Tc1', 't1', 'Tc1 loops and goes back to sleep',
+      'Tc1 comes round again, finds the shelf empty, and sleeps in the shared waiting room.',
+      CV(null, ['Tc2'], ['Tp', 'Tc1'], [], 0)],
+    ['deadlock', 'var(--bad)', 'Tc2', 'bad', 'Tc2 rechecks, sleeps again, and everyone is asleep',
+      'Tc2 gets the key and rechecks: the shelf is empty, so it sleeps again. Tp, Tc1 and Tc2 are all asleep, and no awake thread is left to ring a bell. Nothing will ever happen again.',
+      CV(null, [], ['Tp', 'Tc1', 'Tc2'], [], 0, 'dead')]
+  ],
+  wh2: [
+    ['setup', GREY, null, '', 'Two condition variables, one for each question',
+      'Give each condition its own waiting room. Consumers sleep in the fill room, waiting for an item. The producer sleeps in the empty room, waiting for space. A bell for one room can only wake a thread that is waiting for exactly that.',
+      CV(null, [], [], [], 0)],
+    ['consumers sleep', 'var(--t1)', null, 't1', 'Both consumers sleep in the fill room',
+      'Tc1 and Tc2 find the shelf empty and wait on fill.',
+      CV(null, [], ['Tc1', 'Tc2'], [], 0)],
+    ['Tp fills', 'var(--t3)', 'Tp', 't3', 'Tp fills the shelf',
+      'Tp takes the key and puts an item on the shelf.',
+      CV('Tp', [], ['Tc1', 'Tc2'], [], 1)],
+    ['Tp fills', 'var(--t3)', 'Tp', 't3', 'Tp rings the fill bell',
+      'signal(&fill) wakes a sleeper in the fill room. Only consumers sleep there, so a consumer wakes.',
+      CV(null, ['Tc1'], ['Tc2'], [], 1)],
+    ['Tp waits', 'var(--t3)', 'Tp', 't3', 'Tp finds the shelf full and sleeps in the empty room',
+      'Tp loops and finds the shelf full. It waits on empty, a different room from the consumers.',
+      CV(null, ['Tc1'], ['Tc2'], ['Tp'], 1)],
+    ['Tc1 consumes', 'var(--t1)', 'Tc1', 't1', 'Tc1 takes the item',
+      'Tc1 gets the key, rechecks with while, and takes the item.',
+      CV('Tc1', [], ['Tc2'], ['Tp'], 0)],
+    ['right wakeup', 'var(--good)', 'Tc1', 't1', 'Tc1 rings the empty bell, and the producer wakes',
+      'signal(&empty) can only wake a sleeper in the empty room, and the only one there is Tp, exactly the thread that can use the free slot.',
+      CV(null, ['Tp'], ['Tc2'], [], 0)],
+    ['right wakeup', 'var(--good)', 'Tc1', 't1', 'Tc1 loops and sleeps in the fill room',
+      'Tc1 comes round again, finds the shelf empty, and waits on fill.',
+      CV(null, ['Tp'], ['Tc2', 'Tc1'], [], 0)],
+    ['Tp fills again', 'var(--t3)', 'Tp', 't3', 'Tp refills the shelf',
+      'Tp gets the key, rechecks (the shelf is empty), and puts an item on it.',
+      CV('Tp', [], ['Tc2', 'Tc1'], [], 1)],
+    ['Tp fills again', 'var(--t3)', null, 'good', 'Every bell reaches a thread that can use it',
+      'Tp rings the fill bell and a consumer wakes. Each signal woke the right kind of thread, and each thread rechecked its condition with while, so the program keeps making progress.',
+      CV(null, ['Tc2'], ['Tc1'], [], 1, 'ok')]
+  ]
+};
+const CVEND = {
+  if1: 'The bug: a woken thread must recheck the condition, because it may have changed before the thread got the key back. Use while.',
+  wh1: 'The bug: with one waiting room a signal can wake the wrong kind of thread. Give each condition its own condition variable.',
+  wh2: 'Correct: while rechecks the condition, and one condition variable per condition means a signal wakes a thread that can use it.'
+};
+function buildTour2 () {
+  const cvs = CVN[cvMode];
+  const steps = CVS[cvMode].map(([phase, color, who, tone, title, body, view]) => ({
+    phase, color, tone, title, body, view,
+    who: who ? CW(who) : null,
+    calc: cvCalc(view, cvs)
+  }));
+  $('cvCodeC').innerHTML = CCODE[cvMode];
+  $('cvCodeP').innerHTML = PCODE[cvMode];
+  makeTour(2, steps, drawCV);
+}
+function drawCV (s) {
+  const v = s.view, cvs = CVN[cvMode];
+  const pill = n => `<span class="who ${n === 'Tp' ? 't3' : 't1'}">${n}</span>`;
+  const list = a => a.length ? a.map(pill).join('') : '<small>nobody</small>';
+  const lobby = TH.filter(n => n !== v.inn && !v.door.includes(n) && !v.w1.includes(n) && !v.w2.includes(n));
+  $('cvLobby').innerHTML = list(lobby);
+  $('cvDoor').innerHTML = list(v.door);
+  $('cvKey').textContent = v.inn ? 'key held by ' + v.inn : 'key on the hook';
+  $('cvKey').className = 'sign ' + (v.inn ? 'occ' : 'vac');
+  $('cvIn').innerHTML = v.inn ? pill(v.inn) : '';
+  const slot = $('cvSlot');
+  slot.className = 'slot' + (v.res === 'bad' ? ' err' : v.n ? ' full' : '');
+  slot.textContent = v.res === 'bad' ? 'empty!' : v.n ? 'item' : '';
+  $('cvShelf').textContent = `shelf: ${v.n} of 1` + (v.res === 'bad' ? ' (get on empty)' : '');
+  $('cvRoom').className = 'zone ' + (v.res === 'bad' ? 'bad' : 'occ');
+  let w;
+  if (cvs === 1) w = `<div class="zone"><h3>Waiting room (one shared condition variable)</h3>${list(v.w1)}</div>`;
+  else w = `<div class="zone"><h3>fill room: waiting for an item</h3>${list(v.w1)}</div><div class="zone"><h3>empty room: waiting for space</h3>${list(v.w2)}</div>`;
+  $('cvWaits').innerHTML = w;
+  const tk = $('cvTake');
+  const final = tours[2] && s === tours[2].steps[tours[2].steps.length - 1];
+  tk.className = 'takeaway' + (v.res === 'bad' || v.res === 'dead' ? ' bad' : '');
+  tk.hidden = !(v.res && final);
+  tk.textContent = CVEND[cvMode];
+}
+$('cvChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  cvMode = b.dataset.m;
+  document.querySelectorAll('#cvChips .chip').forEach(c => c.classList.toggle('on', c === b));
+  stop(); buildTour2();
+});
+
+/* =========================================================
+   Start
+   ========================================================= */
+buildTour1();
+buildTour2();
+const startTab = +String(location.hash).replace('#', '');
+showTab(startTab >= 1 && startTab <= NTABS ? startTab : 1);
+</script>
+</body>
+</html>
