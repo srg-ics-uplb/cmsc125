@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semaphores</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#d3dbe2;
+  --bad:#c92a2a;
+  --good:#2b8a3e;
+  --mark:#ffd43b;
+  --t1:#1864ab;
+  --t1s:#d0ebff;
+  --t2:#9c36b5;
+  --t2s:#f3d9fa;
+  --t3:#e8590c;
+  --t3s:#ffe8cc;
+  --os:#495057;
+  --shared:#b2f2bb;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important}
+.page{max-width:1280px;margin:0 auto;padding:32px 28px 56px}
+
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:74ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+h3{font-size:.95rem;margin:14px 0 6px;font-weight:700}
+.sub{margin:0 0 12px;font-size:.88rem;color:var(--ink-soft)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.speed{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-soft)}
+select{padding:6px 8px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+
+.tabs{display:flex;gap:6px;margin:0 0 22px;padding:5px;background:var(--panel);border:2px solid var(--ink);border-radius:10px;overflow-x:auto}
+.tabs button{flex:1 1 0;min-width:190px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;border-radius:6px;background:transparent;padding:7px 12px;text-align:left;line-height:1.25}
+.tabs button b{font-size:.95rem;white-space:nowrap}
+.tabs button span{font-size:.78rem;color:var(--ink-soft);white-space:nowrap}
+.tabs button:hover{background:#fff}
+.tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabs button[aria-selected="true"] span{color:#c8d2e0}
+
+.chapter{margin:0 0 14px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.chapter h2{font-size:1.5rem;letter-spacing:-.01em}
+.chapter span{font-size:.9rem;color:var(--ink-soft)}
+.rule{height:3px;background:var(--ink);border-radius:2px;margin:0 0 18px}
+
+.card{border-width:3px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start;min-height:180px;margin-bottom:12px}
+.step-count{margin:0 0 2px;font-size:.9rem;color:var(--ink-soft)}
+.card h2{font-size:1.5rem;line-height:1.2;margin:0 0 8px}
+.card p.body{margin:0;max-width:64ch}
+.calc{margin:0;align-self:center;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.card.t1{border-color:var(--t1)}.card.t1 .calc{border-left-color:var(--t1)}
+.card.t2{border-color:var(--t2)}.card.t2 .calc{border-left-color:var(--t2)}
+.card.t3{border-color:var(--t3)}.card.t3 .calc{border-left-color:var(--t3)}
+.card.os{border-color:var(--os)}.card.os .calc{border-left-color:var(--os)}
+.card.bad{border-color:var(--bad)}.card.bad .calc{border-left-color:var(--bad)}
+.card.good{border-color:var(--good)}.card.good .calc{border-left-color:var(--good)}
+.who{display:inline-block;font-size:.8rem;font-weight:700;border-radius:999px;padding:1px 10px;border:2px solid var(--ink);margin-left:8px;vertical-align:middle}
+.who.t1{background:var(--t1s)}.who.t2{background:var(--t2s)}.who.t3{background:var(--t3s)}.who.os{background:#dee2e6}
+.who.bad{background:#ffc9c9}.who.good{background:var(--shared)}
+
+.timeline{display:flex;flex-wrap:wrap;gap:10px;row-gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
+.tl-group{min-width:40px;display:flex;flex-direction:column;gap:5px}
+.tl-steps{display:flex;gap:2px}
+.tl-step{flex:1;height:16px;padding:0;border:0;border-radius:2px;background:var(--g);opacity:.28;min-width:6px}
+.tl-step:hover{opacity:.6}
+.tl-step.done{opacity:1}
+.tl-step.now{opacity:1;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.tl-label{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:20px;align-items:start}
+.main.wide{grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr)}
+.side{display:flex;flex-direction:column;gap:20px;min-width:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}
+
+.trow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips > span{font-size:.88rem;color:var(--ink-soft)}
+.chip{font-size:.85rem;padding:3px 10px;border-width:1.5px;border-radius:999px}
+.chip.on,.chip.on:hover{background:var(--ink);color:#fff}
+
+/* generic tables */
+table.tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+.tbl th{font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--ink-soft);text-align:left;border-bottom:2px solid var(--ink);padding:4px 7px;white-space:nowrap}
+.tbl td{padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap;transition:background-color .3s}
+.tbl.wrap td{white-space:normal;font-family:var(--sans);font-size:.85rem;vertical-align:top}
+.tbl.wrap td:first-child{font-weight:700}
+.tbl tr.sel td{background:#fff3bf}
+
+/* code listings */
+table.code{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+.code td{padding:4px 7px;border-bottom:1px solid var(--line);transition:background-color .3s}
+.code td.ln{color:#9aa6b2;width:1%;white-space:nowrap}
+.code td.src{white-space:pre-wrap;overflow-wrap:anywhere}
+.code tr.cur td{background:#ffe8a3}
+.code tr.cur td.ln{box-shadow:inset 4px 0 0 var(--ink)}
+.code tr.done td{color:var(--ink-soft)}
+pre.src{font-family:var(--mono);font-size:13px;margin:0 0 10px;padding:9px 11px;background:#fff;border:1.5px solid var(--line);border-radius:5px;white-space:pre;overflow-x:auto}
+pre.src mark{background:var(--mark);color:var(--ink);border-radius:2px;padding:0 2px;font-weight:700}
+code{font-family:var(--mono);font-size:.86em;background:#fff;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+.regs{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-family:var(--mono);font-size:13px;margin:8px 0 0}
+.regs dt{color:var(--ink-soft)}
+.regs dd{margin:0}
+
+/* zones: restroom and waiting rooms */
+.zone{border:2px solid var(--line);border-radius:6px;background:#fff;padding:9px 11px;min-height:120px;transition:border-color .25s,background-color .25s}
+.zone h3{margin:0 0 6px;font-size:.82rem;color:var(--ink-soft)}
+.zone.occ{border-color:var(--ink)}
+.zone.vac{border-color:var(--good)}
+.zone.bad{border-color:var(--bad);background:#fff0f0}
+.zone .who{margin:2px 6px 2px 0}
+.trl{display:flex;align-items:center;gap:4px;margin:3px 0;font-size:.85rem}
+.trl small,.zone small{color:var(--ink-soft)}
+.sign{font-weight:700;font-size:1.05rem;margin-bottom:6px}
+.sign.vac{color:var(--good)}
+.sign.occ,.sign.bad{color:var(--bad)}
+.mem{display:flex;align-items:center;gap:12px;border:3px solid var(--ink);border-radius:8px;background:#fff;padding:8px 12px;justify-content:center}
+.mem b{font-family:var(--mono);font-size:2rem;line-height:1;transition:color .3s}
+.mem b.chg{color:var(--bad)}
+.mem span{font-size:.85rem;color:var(--ink-soft);font-family:var(--mono)}
+.meta{margin:8px 0 0;font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);min-height:2.6em}
+.waits{display:flex;flex-direction:column;gap:10px}
+.waits .zone{flex:1;border-style:dashed;background:var(--hatch)}
+.shelf{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
+.slot{width:58px;height:34px;border:2px solid var(--ink);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.85rem;font-weight:700;background:var(--hatch)}
+.slot.full{background:var(--t3s);border-color:var(--t3)}
+.slot.err{background:#ffc9c9;border-color:var(--bad);color:var(--bad)}
+
+.takeaway{margin:10px 0 0;padding:9px 12px;border-left:4px solid var(--good);background:#fff;font-size:.9rem}
+.takeaway.bad{border-left-color:var(--bad)}
+.note{margin:14px 0 0;padding:10px 12px;border-left:4px solid var(--ink);background:#fff;font-size:.9rem}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+.foot{margin-top:34px;font-size:.85rem;color:var(--ink-soft)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0;padding:0;list-style:none;font-size:.86rem;color:var(--ink-soft)}
+.legend li{display:flex;align-items:center;gap:7px}
+.sw{width:13px;height:13px;border:1.5px solid var(--ink);display:inline-block}
+
+@media (max-width: 1100px){ .main,.main.wide{grid-template-columns:1fr} }
+@media (max-width: 980px){
+  .top,.two,.three{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .card{grid-template-columns:1fr;gap:12px;min-height:0}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.75rem}
+  .tl-label{display:none}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+
+/* ---- semaphores additions ---- */
+:root{--t4:#0b7285;--t4s:#c5f6fa;--t5:#c2255c;--t5s:#ffdeeb}
+.card.t4{border-color:var(--t4)}.card.t4 .calc{border-left-color:var(--t4)}
+.card.t5{border-color:var(--t5)}.card.t5 .calc{border-left-color:var(--t5)}
+.who.t4{background:var(--t4s)}.who.t5{background:var(--t5s)}
+.mini{margin:16px 0 6px;font-size:.82rem;color:var(--ink-soft);font-weight:700}
+.sems{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.sem{border:3px solid var(--ink);border-radius:8px;background:#fff;padding:7px 10px;text-align:center;transition:border-color .25s,background-color .25s}
+.sem.neg{border-color:var(--bad);background:#fff0f0}
+.sem .sn{font-family:var(--mono);font-weight:700;font-size:.9rem}
+.sem .sn small{display:block;font-weight:400;color:var(--ink-soft);font-size:.72rem}
+.sem .val{font-family:var(--mono);font-size:2rem;font-weight:700;line-height:1.1}
+.sem.neg .val{color:var(--bad)}
+.sem .sq{font-size:.8rem;color:var(--ink-soft);min-height:1.7em}
+.sem .sh{font-size:.78rem;color:var(--ink-soft)}
+.sem .who,.trl .who{margin:1px 3px 1px 0}
+.st{font-size:.8rem;font-weight:400;color:var(--ink-soft);margin-left:6px}
+.code tr.blk td{background:#ffd8d8}
+.thrs{display:grid;gap:14px;align-items:start}
+.thrs.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.thrs.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.out{font-family:var(--mono);font-size:13.5px;background:var(--ink);color:#e9eef2;border-radius:6px;padding:10px 12px;min-height:72px;white-space:pre-wrap}
+.bufrow{display:flex;gap:10px;flex-wrap:wrap}
+.bslot{width:96px;text-align:center;font-size:.78rem;color:var(--ink-soft)}
+.bcell{height:44px;border:2px solid var(--ink);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.9rem;background:var(--hatch);color:var(--ink)}
+.bcell.full{background:var(--t3s);border-color:var(--t3)}
+.bcell.err{background:#ffc9c9;border-color:var(--bad);color:var(--bad)}
+.ptrs{min-height:22px;display:flex;gap:4px;justify-content:center;margin-top:3px}
+.ptr{font-family:var(--mono);font-size:.72rem;font-weight:700;padding:0 6px;border:1.5px solid var(--ink);border-radius:999px;background:#fff;color:var(--ink)}
+.ptr.f{background:var(--t1s)}.ptr.u{background:var(--t2s)}
+.rwrow{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
+.rwbox{flex:1;min-width:170px;border:2px solid var(--line);border-radius:6px;background:#fff;padding:8px 11px;font-size:.85rem}
+.rwbox small{color:var(--ink-soft)}
+svg.dine{display:block;width:100%;max-width:340px;height:auto;margin:0 auto;font-family:var(--mono)}
+.meta{margin:8px 0 0;font-size:.85rem;color:var(--ink-soft)}
+@media (max-width:980px){.thrs.c3{grid-template-columns:1fr}.thrs.c2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>Semaphores</h1>
+      <p class="intro">A semaphore is a counter of tokens. sem_wait takes a token, and sleeps if none is left; sem_post puts one back, or hands it straight to a sleeper. Start it at 1 and it is a lock, at 0 and it orders two threads, at N and it counts N free slots. The tabs follow OSTEP Chapter 31 from that one idea to the dining philosophers.</p>
+    </div>
+    <div class="controls">
+      <button id="btnRestart" type="button">Restart</button>
+      <button id="btnPrev" type="button">Back</button>
+      <button id="btnPlay" type="button">Play</button>
+      <button id="btnNext" type="button" class="primary">Next step</button>
+      <label class="speed">Speed
+        <select id="speed">
+          <option value="2600">Slow</option>
+          <option value="1500" selected>Normal</option>
+          <option value="700">Fast</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab1" data-t="1" aria-controls="panel1" aria-selected="true"><b>1. The basics</b><span>tokens, locks and ordering</span></button>
+    <button type="button" role="tab" id="tab2" data-t="2" aria-controls="panel2" aria-selected="false"><b>2. Bounded buffer</b><span>producers and consumers</span></button>
+    <button type="button" role="tab" id="tab3" data-t="3" aria-controls="panel3" aria-selected="false"><b>3. Reader-writer lock</b><span>many readers, one writer</span></button>
+    <button type="button" role="tab" id="tab4" data-t="4" aria-controls="panel4" aria-selected="false"><b>4. Dining philosophers</b><span>five threads, five forks</span></button>
+  </nav>
+
+  <div id="panels"></div>
+
+  <p class="kbd-hint">Keyboard: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to step, <kbd>Space</kbd> to play or pause.</p>
+  <p class="foot">Examples follow OSTEP, Chapter 31, <em>Semaphores</em>.</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+/* =========================================================
+   Generic tour engine: one tour per tab
+   ========================================================= */
+const tours = {};
+function makeTour (n, steps, draw) {
+  const card = $('card' + n);
+  tours[n] = { steps, draw, cur: 0, card, tl: $('tl' + n) };
+  const groups = [];
+  steps.forEach((s, i) => {
+    const last = groups[groups.length - 1];
+    if (last && last.label === s.phase) last.count++;
+    else groups.push({ label: s.phase, color: s.color || '#172033', start: i, count: 1 });
+  });
+  tours[n].groups = groups;
+  tours[n].tl.innerHTML = groups.map(g => {
+    let b = '';
+    for (let i = g.start; i < g.start + g.count; i++) {
+      const t = steps[i].title.replace(/"/g, '&quot;');
+      b += `<button class="tl-step" type="button" data-i="${i}" aria-label="Step ${i + 1}: ${t}" title="Step ${i + 1}: ${t}"></button>`;
+    }
+    return `<div class="tl-group" style="flex:${g.count} 1 0;--g:${g.color}"><div class="tl-steps">${b}</div><div class="tl-label">${g.label}</div></div>`;
+  }).join('');
+  tours[n].tl.onclick = e => {
+    const b = e.target.closest('.tl-step');
+    if (b) { stop(); show(n, +b.dataset.i); }
+  };
+  show(n, 0, false);
+}
+
+function show (n, i, animate = true) {
+  const T = tours[n];
+  if (!T || i < 0 || i >= T.steps.length) return;
+  const root = document.documentElement;
+  if (!animate) root.classList.add('instant');
+  T.cur = i;
+  const s = T.steps[i];
+  T.card.className = 'panel card' + (s.tone ? ' ' + s.tone : '');
+  T.card.querySelector('.step-count').textContent = `Step ${i + 1} of ${T.steps.length}`;
+  T.card.querySelector('h2').innerHTML = esc(s.title) + (s.who ? ` <span class="who ${s.who[0]}">${s.who[1]}</span>` : '');
+  T.card.querySelector('.body').textContent = s.body;
+  T.card.querySelector('.calc').textContent = (s.calc || []).join('\n');
+  T.tl.querySelectorAll('.tl-step').forEach(b => {
+    const k = +b.dataset.i;
+    b.classList.toggle('done', k < i);
+    b.classList.toggle('now', k === i);
+    b.setAttribute('aria-current', k === i ? 'step' : 'false');
+  });
+  T.draw(s, i);
+  if (n === tab) syncButtons();
+  if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('instant')));
+}
+
+let timer = null;
+let tab = 1;
+function syncButtons () {
+  const T = tours[tab];
+  $('btnPrev').disabled = !T || T.cur === 0;
+  $('btnNext').disabled = !T || T.cur === T.steps.length - 1;
+}
+function stepBy (d) { const T = tours[tab]; if (T) show(tab, T.cur + d); }
+function play () {
+  stop();
+  const T = tours[tab];
+  if (!T) return;
+  if (T.cur >= T.steps.length - 1) show(tab, 0);
+  $('btnPlay').textContent = 'Pause';
+  const tick = () => {
+    const t = tours[tab];
+    if (!t || t.cur >= t.steps.length - 1) { stop(); return; }
+    show(tab, t.cur + 1);
+    timer = setTimeout(tick, +$('speed').value);
+  };
+  timer = setTimeout(tick, +$('speed').value);
+}
+function stop () { clearTimeout(timer); timer = null; $('btnPlay').textContent = 'Play'; }
+$('btnNext').onclick = () => { stop(); stepBy(1); };
+$('btnPrev').onclick = () => { stop(); stepBy(-1); };
+$('btnPlay').onclick = () => (timer ? stop() : play());
+$('btnRestart').onclick = () => { stop(); show(tab, 0); };
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select, input, #tabs')) return;
+  if (e.key === 'ArrowRight') { stop(); stepBy(1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stop(); stepBy(-1); e.preventDefault(); }
+  else if (e.key === ' ' && !e.target.closest('button')) { timer ? stop() : play(); e.preventDefault(); }
+  else if (e.key === 'Home') { stop(); show(tab, 0); }
+});
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+const NTABS = 4;
+function showTab (n) {
+  stop();
+  tab = n;
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', +b.dataset.t === n ? 'true' : 'false'));
+  for (let i = 1; i <= NTABS; i++) $('panel' + i).hidden = i !== n;
+  syncButtons();
+  if (history.replaceState) { try { history.replaceState(null, '', '#' + n); } catch (err) { /* ignore */ } }
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]');
+  if (b) showTab(+b.dataset.t);
+});
+$('tabs').addEventListener('keydown', e => {
+  const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+  if (!d) return;
+  e.preventDefault();
+  const n = ((tab - 1 + d + NTABS) % NTABS) + 1;
+  showTab(n); $('tab' + n).focus();
+});
+
+
+/* =========================================================
+   Semaphore simulator
+   ========================================================= */
+const GREY = '#7d8b99';
+const W = (s, o) => Object.assign({ k: 'wait', s }, o || {});
+const P = (s, o) => Object.assign({ k: 'post', s }, o || {});
+const D = (txt, fx, o) => Object.assign({ k: 'do', txt, fx }, o || {});
+function insText (i) {
+  let t;
+  if (i.k === 'wait') t = `sem_wait(&${i.s});`;
+  else if (i.k === 'post') t = i.txt || `sem_post(&${i.s});`;
+  else t = i.txt;
+  return i.cx ? `if (${i.cx}) ` + t : t;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+function newVM (sc) {
+  const vm = { sems: {}, queues: {}, holder: {}, sh: clone(sc.init || {}),
+    th: sc.threads.map(t => ({ name: t.name, pc: 0, st: 'ready', on: null, ran: false, woken: false })),
+    last: null, deadlock: false };
+  Object.keys(sc.sems).forEach(k => { vm.sems[k] = sc.sems[k]; vm.queues[k] = []; vm.holder[k] = null; });
+  return vm;
+}
+function exec (vm, sc, tn) {
+  const ti = sc.threads.findIndex(t => t.name === tn), t = vm.th[ti], prog = sc.threads[ti].prog;
+  if (t.st !== 'ready') throw new Error(tn + ' cannot run: ' + t.st);
+  const ins = prog[t.pc];
+  const res = { t: tn, ins, ops: [], blocked: false, skipped: false, note: '', bad: false };
+  t.woken = false; t.ran = true; vm.last = tn; t.pc++;
+  if (ins.c && !ins.c(vm.sh)) res.skipped = true;
+  else if (ins.k === 'wait') {
+    const s = ins.s, old = vm.sems[s];
+    vm.sems[s]--;
+    res.ops.push({ s, old, nw: vm.sems[s] });
+    if (vm.sems[s] < 0) { t.st = 'blocked'; t.on = s; vm.queues[s].push(tn); res.blocked = true; }
+    else vm.holder[s] = tn;
+  } else if (ins.k === 'post') {
+    (Array.isArray(ins.s) ? ins.s : [ins.s]).forEach(s => {
+      const old = vm.sems[s];
+      vm.sems[s]++;
+      const op = { s, old, nw: vm.sems[s], woke: null };
+      if (vm.queues[s].length) {
+        const wn = vm.queues[s].shift();
+        const wi = sc.threads.findIndex(x => x.name === wn), w = vm.th[wi];
+        w.st = 'ready'; w.on = null; w.woken = true; vm.holder[s] = wn; op.woke = wn;
+        if (w.pc >= sc.threads[wi].prog.length) w.st = 'done';
+      } else vm.holder[s] = null;
+      res.ops.push(op);
+    });
+  } else if (ins.k === 'do') {
+    const r = ins.fx && ins.fx(vm.sh, tn, vm);
+    if (typeof r === 'string') res.note = r;
+    else if (r) { res.note = r.note || ''; res.bad = !!r.bad; }
+  }
+  if (!res.skipped && ins.after) ins.after(vm.sh, tn);
+  if (t.st !== 'blocked' && t.pc >= prog.length) t.st = 'done';
+  const live = vm.th.filter(x => x.st !== 'done');
+  vm.deadlock = live.length > 0 && live.every(x => x.st === 'blocked');
+  return res;
+}
+function narrate (res) {
+  const ins = res.ins, tn = res.t;
+  const title = `${tn}: ${insText(ins)}` + (res.skipped ? ' (skipped)' : '');
+  let body = '';
+  if (res.skipped) body = 'The if-condition is false this time, so the line does nothing.';
+  else {
+    if (ins.c) body = 'The if-condition is true, so the line runs. ';
+    if (ins.k === 'wait') {
+      const o = res.ops[0];
+      body += `${o.s} goes from ${o.old} to ${o.nw}. ` + (res.blocked
+        ? `That is below zero, so ${tn} goes to sleep in the queue for ${o.s}. It carries on after this line once another thread posts.`
+        : `That is not below zero, so ${tn} carries on.`);
+    } else if (ins.k === 'post') {
+      body += res.ops.map(o => `${o.s} goes from ${o.old} to ${o.nw}. ` + (o.woke ? `${o.woke} was asleep on ${o.s}, so it is woken and becomes ready to run.` : 'Nobody was waiting.')).join(' ');
+    } else body += `${tn} runs this line. ` + res.note;
+  }
+  return { title, body: body.trim() };
+}
+function calcLines (vm, sc) {
+  const L = Object.keys(vm.sems).map(k => `${k} = ${vm.sems[k]}`);
+  const x = sc.calc ? sc.calc(vm.sh, vm) : [];
+  return x.length ? L.concat([''], x) : L;
+}
+function buildSteps (sc) {
+  const vm = newVM(sc), steps = [];
+  steps.push({ phase: 'setup', color: GREY, tone: '', who: null, title: sc.intro.title, body: sc.intro.body, calc: calcLines(vm, sc), view: clone(vm) });
+  sc.sched.forEach(e => {
+    const idx = sc.threads.findIndex(t => t.name === e.t), cl = 't' + (idx + 1);
+    const res = exec(vm, sc, e.t), nar = narrate(res);
+    steps.push({ phase: e.phase || e.t, color: `var(--${cl})`, tone: e.tone || (res.bad ? 'bad' : cl), who: [cl, e.t],
+      title: nar.title, body: nar.body + (e.note ? ' ' + e.note : ''), calc: calcLines(vm, sc), view: clone(vm) });
+  });
+  const o = sc.outro, tone = o.tone === 'auto' ? (vm.deadlock ? 'bad' : 'good') : o.tone;
+  steps.push({ phase: 'result', color: tone === 'bad' ? 'var(--bad)' : 'var(--good)', tone, who: null, title: o.title, body: o.body, calc: calcLines(vm, sc), view: clone(vm), final: true });
+  return steps;
+}
+
+/* =========================================================
+   Scenarios, tabs 1 and 2
+   ========================================================= */
+const SCEN = { 1: {}, 2: {}, 3: {}, 4: {} };
+const ORDER = { 1: ['lock', 'order1', 'order2'], 2: ['race', 'dead', 'ok'], 3: ['share', 'starve'], 4: ['dead', 'fix'] };
+
+/* ---- tab 1 ---- */
+const lockProg = () => [W('m'), D('counter = counter + 1;', sh => { sh.counter++; return `counter becomes ${sh.counter}.`; }), P('m')];
+SCEN[1].lock = {
+  label: 'lock: starts at 1', view: 'counter', sharedTitle: 'Shared counter',
+  sems: { m: 1 }, init: { counter: 50 },
+  calc: sh => [`counter = ${sh.counter}`],
+  threads: [{ name: 'T1', prog: lockProg() }, { name: 'T2', prog: lockProg() }],
+  intro: { title: 'A semaphore is a counter of tokens',
+    body: 'Think of the restroom key again, but as tokens on a hook. The semaphore m starts at 1: one token. sem_wait takes a token, and sleeps if none is left to take. sem_post hangs a token back, or hands it straight to a sleeper. T1 and T2 will each add 1 to a shared counter that starts at 50.' },
+  sched: [
+    { t: 'T1', note: 'T1 now owns the lock.' },
+    { t: 'T2', note: 'The minus sign means one thread is asleep. T2 waits for T1 to give the token back.' },
+    { t: 'T1', note: 'T2 cannot touch the counter while T1 is in here.' },
+    { t: 'T1', note: 'The token goes straight to T2, so m stays at 0 instead of going back to 1.' },
+    { t: 'T2' },
+    { t: 'T2', note: 'The token is back on the hook: m is 1 again.' }
+  ],
+  outro: { tone: 'good', title: 'Starting at 1 gave us a lock: the counter is 52',
+    body: 'Each thread did its update alone, so no increment was lost, unlike the race in Chapter 26. A semaphore that starts at 1 is called a binary semaphore. Its value is 1 when the lock is free, 0 when it is held, and negative when it is held and threads are asleep.' }
+};
+const parentP = () => [D('printf("parent: begin");', sh => { sh.out.push('parent: begin'); return 'It prints "parent: begin".'; }),
+  W('s'), D('printf("parent: end");', sh => { sh.out.push('parent: end'); return 'It prints "parent: end".'; })];
+const childP = () => [D('printf("child");', sh => { sh.out.push('child'); return 'It prints "child".'; }), P('s')];
+SCEN[1].order1 = {
+  label: 'order: parent waits first', view: 'out', sharedTitle: 'Output so far',
+  sems: { s: 0 }, init: { out: [] },
+  calc: sh => ['output lines: ' + sh.out.length],
+  threads: [{ name: 'parent', prog: parentP() }, { name: 'child', prog: childP() }],
+  intro: { title: 'Starting at 0 turns a semaphore into an ordering tool',
+    body: 'The parent must not finish until its child has run. The semaphore s starts at 0: no tokens at all. The parent calls sem_wait(&s) and the child calls sem_post(&s) when it is done. The interesting question is what happens in each order. Here the parent reaches its wait first.' },
+  sched: [
+    { t: 'parent', note: 'The child exists now, but it has not run yet.' },
+    { t: 'parent', note: 'There is no token to take, so the parent sleeps until the child posts.' },
+    { t: 'child' },
+    { t: 'child', note: 'The post wakes the parent.' },
+    { t: 'parent' }
+  ],
+  outro: { tone: 'good', title: 'The parent finished after the child',
+    body: 'The parent printed its last line only after the child printed. The sleeping and the waking both came from the semaphore, with no flag and no condition variable.' }
+};
+SCEN[1].order2 = {
+  label: 'order: child posts first', view: 'out', sharedTitle: 'Output so far',
+  sems: { s: 0 }, init: { out: [] },
+  calc: sh => ['output lines: ' + sh.out.length],
+  threads: [{ name: 'parent', prog: parentP() }, { name: 'child', prog: childP() }],
+  intro: { title: 'Same program, the other order',
+    body: 'Now the child runs to completion before the parent ever reaches its wait. Will the post be lost, as a signal with nobody asleep would be on a condition variable?' },
+  sched: [
+    { t: 'parent' },
+    { t: 'child' },
+    { t: 'child', note: 'The post is remembered. s is now 1, a token waiting on the hook.' },
+    { t: 'parent', note: 'The parent finds a token and does not sleep at all.' },
+    { t: 'parent' }
+  ],
+  outro: { tone: 'good', title: 'A post is never lost',
+    body: 'A signal on a condition variable is lost if nobody is asleep, so it needs a separate state variable and a while loop. A semaphore keeps the count in its own value, so the order of wait and post does not matter.' }
+};
+
+/* ---- tab 2 ---- */
+const MAX = 2;
+const bufInit = () => ({ buf: [null, null], fill: 0, use: 0, lost: [], got: [], bad: false, badSlot: -1 });
+const putA = v => D(`buffer[fill] = ${v};`, sh => {
+  const old = sh.buf[sh.fill];
+  sh.buf[sh.fill] = v;
+  if (old !== null) { sh.lost.push(old); sh.bad = true; sh.badSlot = sh.fill; return { note: `Slot ${sh.fill} still held item ${old}, so item ${old} is overwritten and lost.`, bad: true }; }
+  return `Item ${v} goes into slot ${sh.fill}.`;
+});
+const putB = () => D('fill = (fill + 1) % MAX;', sh => { sh.fill = (sh.fill + 1) % MAX; return `fill moves to ${sh.fill}.`; });
+const getA = () => D('tmp = buffer[use];', sh => {
+  const x = sh.buf[sh.use];
+  sh.buf[sh.use] = null;
+  if (x === null) { sh.bad = true; return { note: `Slot ${sh.use} is empty, so the consumer reads garbage.`, bad: true }; }
+  sh.got.push(x);
+  return `The consumer reads item ${x} from slot ${sh.use}.`;
+});
+const getB = () => D('use = (use + 1) % MAX;', sh => { sh.use = (sh.use + 1) % MAX; return `use moves to ${sh.use}.`; });
+const bufCalc = sh => [`buffer = [${sh.buf.map(x => x === null ? '_' : x).join(', ')}]`, `fill = ${sh.fill}, use = ${sh.use}`];
+const mk = (o) => Object.assign({ view: 'buffer', sharedTitle: 'The buffer (MAX = 2)', init: bufInit(), calc: bufCalc }, o);
+
+SCEN[2].race = mk({
+  label: 'no mutex (race)', sems: { empty: MAX, full: 0 },
+  threads: [
+    { name: 'P1', prog: [W('empty'), putA(1), putB(), P('full')] },
+    { name: 'P2', prog: [W('empty'), putA(2), putB(), P('full')] }
+  ],
+  codeA: 'sem_wait(&amp;empty);\nput(i);\nsem_post(&amp;full);',
+  codeB: 'sem_wait(&amp;full);\nget();\nsem_post(&amp;empty);',
+  intro: { title: 'Two counting semaphores, and nothing protecting the buffer',
+    body: 'The buffer has MAX = 2 slots. empty counts free slots and starts at 2. full counts filled slots and starts at 0. Two producers, P1 and P2, each put one item. Nothing stops both from being inside put() at once, and put() takes two steps: write buffer[fill], then advance fill.' },
+  sched: [
+    { t: 'P1', note: 'There is room for two, so both producers get through.' },
+    { t: 'P2' },
+    { t: 'P1', note: 'P1 is interrupted before it advances fill.' },
+    { t: 'P2' },
+    { t: 'P1' },
+    { t: 'P2', note: 'fill wraps round to 0, as if P2 had used slot 1.' },
+    { t: 'P1' },
+    { t: 'P2' }
+  ],
+  outro: { tone: 'bad', title: 'full says 2, but the buffer holds only one item',
+    body: 'Item 1 was overwritten and slot 1 was never filled, yet full = 2 promises the consumer two items. The counting was right. The problem is that put() is itself a critical section and needs mutual exclusion. Add a mutex, but think about where.' }
+});
+SCEN[2].dead = mk({
+  label: 'mutex outside (deadlock)', sems: { empty: MAX, full: 0, mutex: 1 },
+  threads: [
+    { name: 'P', prog: [W('mutex'), W('empty'), putA(1), putB(), P('full'), P('mutex')] },
+    { name: 'C', prog: [W('mutex'), W('full'), getA(), getB(), P('empty'), P('mutex')] }
+  ],
+  codeA: '<mark>sem_wait(&amp;mutex);</mark>\nsem_wait(&amp;empty);\nput(i);\nsem_post(&amp;full);\n<mark>sem_post(&amp;mutex);</mark>',
+  codeB: '<mark>sem_wait(&amp;mutex);</mark>\nsem_wait(&amp;full);\nget();\nsem_post(&amp;empty);\n<mark>sem_post(&amp;mutex);</mark>',
+  intro: { title: 'Wrapping the whole body in the mutex',
+    body: 'The obvious fix is to take the mutex first and release it last. Try it with one producer P and one consumer C, where the consumer happens to arrive first.' },
+  sched: [
+    { t: 'C', note: 'C owns the mutex.' },
+    { t: 'C', note: 'There is nothing to consume, so C sleeps, and it is still holding the mutex.' },
+    { t: 'P', note: 'P needs the mutex to put an item, but C has it.' }
+  ],
+  outro: { tone: 'auto', title: 'Deadlock: each thread waits for the other',
+    body: 'C holds the mutex and sleeps until P posts full. P cannot post full, because it sleeps until C posts the mutex. Neither can ever move. A thread must never sleep while holding the mutex: the mutex belongs only around the buffer access.' }
+});
+const prodOk = v => [W('empty'), W('mutex'), putA(v), putB(), P('mutex'), P('full')];
+SCEN[2].ok = mk({
+  label: 'mutex inside (correct)', sems: { empty: MAX, full: 0, mutex: 1 },
+  threads: [
+    { name: 'P1', prog: prodOk(1) }, { name: 'P2', prog: prodOk(2) },
+    { name: 'C', prog: [W('full'), W('mutex'), getA(), getB(), P('mutex'), P('empty')] }
+  ],
+  codeA: 'sem_wait(&amp;empty);\n<mark>sem_wait(&amp;mutex);</mark>\nput(i);\n<mark>sem_post(&amp;mutex);</mark>\nsem_post(&amp;full);',
+  codeB: 'sem_wait(&amp;full);\n<mark>sem_wait(&amp;mutex);</mark>\nget();\n<mark>sem_post(&amp;mutex);</mark>\nsem_post(&amp;empty);',
+  intro: { title: 'Wait for the resource first, then take the mutex',
+    body: 'Each thread now waits for what it needs (empty or full) before taking the mutex, which covers only the buffer update. This is the schedule that broke the first version: two producers and a consumer.' },
+  sched: [
+    { t: 'P1' }, { t: 'P2' },
+    { t: 'P1', note: 'P1 is the only thread allowed to touch fill right now.' },
+    { t: 'P2', note: 'P2 has a slot reserved, but must wait its turn at the buffer.' },
+    { t: 'P1' }, { t: 'P1' },
+    { t: 'P1', note: 'P1 hands the mutex to P2.' },
+    { t: 'P1' },
+    { t: 'P2', note: 'fill is now 1, so P2 uses the other slot.' },
+    { t: 'P2' }, { t: 'P2' }, { t: 'P2' },
+    { t: 'C', note: 'Two items are available, so C does not sleep.' },
+    { t: 'C' }, { t: 'C' }, { t: 'C' }, { t: 'C' }, { t: 'C' }
+  ],
+  outro: { tone: 'good', title: 'Both items stored, and the consumer took the first',
+    body: 'empty and full only count slots and items. The mutex makes put() and get() atomic. Together they give no lost item and no deadlock, because nobody sleeps while holding the mutex.' }
+});
+
+/* =========================================================
+   Scenarios, tabs 3 and 4
+   ========================================================= */
+/* ---- tab 3: reader-writer lock ---- */
+const rdProg = () => [
+  W('lock'),
+  D('readers++;', sh => { sh.readers++; return `readers is now ${sh.readers}.`; }),
+  W('writelock', { c: sh => sh.readers === 1, cx: 'readers == 1' }),
+  P('lock'),
+  D('/* read the data */', (sh, tn) => { sh.reading.push(tn); return `${tn} reads. Readers inside: ${sh.reading.join(', ')}.`; }),
+  W('lock'),
+  D('readers--;', (sh, tn) => { sh.readers--; sh.reading = sh.reading.filter(x => x !== tn); return `${tn} is done reading. readers is now ${sh.readers}.`; }),
+  P('writelock', { c: sh => sh.readers === 0, cx: 'readers == 0' }),
+  P('lock')
+];
+const wrProg = () => [
+  W('writelock'),
+  D('/* write the data */', (sh, tn) => { sh.writer = tn; return `${tn} has the data to itself.`; }),
+  P('writelock', { after: sh => { sh.writer = null; } })
+];
+const rwBase = {
+  view: 'rw', sharedTitle: 'The data', sems: { lock: 1, writelock: 1 },
+  init: { readers: 0, reading: [], writer: null },
+  calc: sh => [`readers = ${sh.readers}`, `reading: ${sh.reading.length ? sh.reading.join(', ') : 'nobody'}`],
+  threads: null
+};
+const rwThreads = () => [{ name: 'R1', prog: rdProg() }, { name: 'R2', prog: rdProg() }, { name: 'W', prog: wrProg() }];
+SCEN[3].share = Object.assign({}, rwBase, {
+  label: 'readers share, then the writer', threads: rwThreads(),
+  intro: { title: 'Many readers, or one writer',
+    body: 'A reader-writer lock lets any number of readers into the data together, but a writer needs it alone. It uses two semaphores. lock protects the readers counter. writelock is the real gate: the first reader takes it for the whole group, and the last reader gives it back. R1 and R2 read, and W writes.' },
+  sched: [
+    { t: 'R1' }, { t: 'R1' },
+    { t: 'R1', note: 'R1 is the first reader, so it takes writelock for the whole group of readers.' },
+    { t: 'R1' },
+    { t: 'R2' }, { t: 'R2' },
+    { t: 'R2', note: 'R2 is not the first reader, so it walks straight in. Readers share.' },
+    { t: 'R2' },
+    { t: 'R1' },
+    { t: 'R2', note: 'Both readers are inside the data at once.' },
+    { t: 'W', note: 'W must wait until every reader has left.' },
+    { t: 'R1' }, { t: 'R1' },
+    { t: 'R1', note: 'R1 is not the last reader out, so it leaves writelock alone.' },
+    { t: 'R1' },
+    { t: 'R2' }, { t: 'R2' },
+    { t: 'R2', note: 'R2 is the last reader out, so it hands writelock to W.' },
+    { t: 'R2' },
+    { t: 'W' }, { t: 'W' }
+  ],
+  outro: { tone: 'good', title: 'Readers shared, and the writer got in alone',
+    body: 'Two readers overlapped, which a plain lock would not allow, and the writer was kept out until the last reader left. The price is fairness: see the next scenario.' }
+});
+SCEN[3].starve = Object.assign({}, rwBase, {
+  label: 'a writer can starve', threads: rwThreads(),
+  intro: { title: 'Can readers keep the writer out forever?',
+    body: 'Same lock, different order. R1 gets in, then the writer arrives and has to sleep. Then R2 arrives. Does R2 queue behind the writer, or walk in?' },
+  sched: [
+    { t: 'R1' }, { t: 'R1' }, { t: 'R1' }, { t: 'R1' },
+    { t: 'R1', note: 'R1 is reading.' },
+    { t: 'W', note: 'writelock is held on behalf of the readers, so W sleeps.' },
+    { t: 'R2' }, { t: 'R2' },
+    { t: 'R2', note: 'R2 only looks at the readers counter. It never checks whether a writer is waiting, so it joins the readers.' },
+    { t: 'R2' },
+    { t: 'R2', note: 'Two readers are inside, and W is still asleep.' },
+    { t: 'R1' }, { t: 'R1' },
+    { t: 'R1', note: 'One reader is still inside, so readers did not reach 0.' },
+    { t: 'R1' }
+  ],
+  outro: { tone: 'bad', title: 'The writer is still asleep',
+    body: 'R2 is reading and W is still waiting for writelock. If a new reader always arrives before the last one leaves, readers never reaches 0 and W starves. Fixing that takes extra machinery, because this simple lock favours readers.' }
+});
+
+/* ---- tab 4: dining philosophers ---- */
+const phil = (p, rev) => {
+  const L = p, R = (p + 1) % 5, a = rev ? R : L, b = rev ? L : R;
+  return [W('f' + a), W('f' + b), D('eat();', (sh, tn) => `${tn} eats with both forks.`), P(['f' + L, 'f' + R], { txt: 'put_forks();' })];
+};
+const dineBase = () => ({
+  view: 'dining', sharedTitle: 'The table', compact: true,
+  sems: { f0: 1, f1: 1, f2: 1, f3: 1, f4: 1 }, init: {},
+  codeA: null
+});
+SCEN[4].dead = Object.assign(dineBase(), {
+  label: 'everyone grabs left (deadlock)',
+  threads: [0, 1, 2, 3, 4].map(p => ({ name: 'p' + p, prog: phil(p, false) })),
+  codeA: 'get_forks(p):\n  sem_wait(&amp;forks[left(p)]);\n  sem_wait(&amp;forks[right(p)]);',
+  intro: { title: 'Five philosophers, five forks',
+    body: 'Each philosopher needs the fork on the left and the fork on the right to eat. Each fork is a semaphore that starts at 1. Philosopher p picks up fork p first, then fork (p + 1) mod 5, and every philosopher does exactly the same. What if they all reach for their left fork at the same moment?' },
+  sched: [
+    { t: 'p0' }, { t: 'p1' }, { t: 'p2' }, { t: 'p3' },
+    { t: 'p4', note: 'Every fork is now in someone’s left hand.' },
+    { t: 'p0', note: 'f1 is p1’s left fork, so p0 sleeps while holding f0.' },
+    { t: 'p1' }, { t: 'p2' }, { t: 'p3' },
+    { t: 'p4', note: 'Everyone is asleep holding one fork.' }
+  ],
+  outro: { tone: 'auto', title: 'Deadlock: a circle of philosophers each waiting for the next',
+    body: 'p0 waits for p1, p1 for p2, p2 for p3, p3 for p4, and p4 for p0. Nobody puts a fork down, so nobody ever eats. This is a circular wait, the same shape as the bounded-buffer deadlock but with five threads.' }
+});
+SCEN[4].fix = Object.assign(dineBase(), {
+  label: 'philosopher 4 reversed (works)',
+  threads: [0, 1, 2, 3, 4].map(p => ({ name: 'p' + p, prog: phil(p, p === 4) })),
+  codeA: 'get_forks(p):\n  if (p == 4) {\n    <mark>sem_wait(&amp;forks[right(p)]);\n    sem_wait(&amp;forks[left(p)]);</mark>\n  } else {\n    sem_wait(&amp;forks[left(p)]);\n    sem_wait(&amp;forks[right(p)]);\n  }',
+  intro: { title: 'Break the circle: one philosopher reaches the other way',
+    body: 'Make philosopher 4 pick up the right fork (f0) first and the left fork (f4) second. The other four are unchanged. Now no cycle of waits can form. Watch what p4 does when the others take their left forks.' },
+  sched: [
+    { t: 'p0' }, { t: 'p1' }, { t: 'p2' }, { t: 'p3' },
+    { t: 'p4', note: 'p4 wants f0 first, and p0 has it, so p4 sleeps holding nothing.' },
+    { t: 'p3', note: 'f4 is free, because p4 is not holding it. p3 now has both forks.' },
+    { t: 'p3' },
+    { t: 'p3', note: 'Both forks go back on the table.' },
+    { t: 'p2' }, { t: 'p2' }, { t: 'p2' },
+    { t: 'p1' }, { t: 'p1' }, { t: 'p1' },
+    { t: 'p0' }, { t: 'p0' },
+    { t: 'p0', note: 'p0 hands f0 to p4, who was asleep waiting for it.' },
+    { t: 'p4', note: 'f4 is free, so p4 does not have to wait again.' },
+    { t: 'p4' }, { t: 'p4' }
+  ],
+  outro: { tone: 'good', title: 'Everyone ate',
+    body: 'p4 slept at the start, but p3, p2, p1 and p0 each ate in turn, and p4 ate last. No circle of waiting could form, because p4 asks for its forks in the opposite order. Breaking the dependency cycle is the classic fix.' }
+});
+
+/* =========================================================
+   Rendering
+   ========================================================= */
+const CUR = {};
+const tIdx = (sc, name) => sc.threads.findIndex(t => t.name === name);
+const pill = (sc, name) => `<span class="who t${tIdx(sc, name) + 1}">${name}</span>`;
+function stateOf (v, i) {
+  const t = v.th[i];
+  if (t.st === 'done') return 'done';
+  if (t.st === 'blocked') return 'asleep on ' + t.on;
+  if (t.woken) return 'woken, ready to run';
+  if (v.last === t.name) return 'running';
+  if (!t.ran) return 'not started';
+  return 'ready';
+}
+function drawSems (n, v, sc) {
+  $('sems' + n).innerHTML = Object.keys(sc.sems).map(k => {
+    const val = v.sems[k], q = v.queues[k];
+    const held = sc.sems[k] === 1 ? (v.holder[k] ? 'held by ' + v.holder[k] : (val < 1 ? 'held' : 'free')) : '';
+    return `<div class="sem${val < 0 ? ' neg' : ''}"><div class="sn">${k}<small>starts at ${sc.sems[k]}</small></div><div class="val">${val}</div>` +
+      `<div class="sq">${q.length ? 'asleep: ' + q.map(x => pill(sc, x)).join('') : 'no sleepers'}</div>` +
+      (held ? `<div class="sh">${held}</div>` : '') + '</div>';
+  }).join('');
+}
+function drawThreads (n, v, sc) {
+  if (sc.compact) {
+    $('thr' + n).innerHTML = sc.threads.map((t, i) => {
+      const th = v.th[i];
+      let nx = '';
+      if (th.st === 'ready' && th.pc < t.prog.length) nx = ' — next: ' + esc(insText(t.prog[th.pc]));
+      return `<div class="trl">${pill(sc, t.name)}<span class="st">${stateOf(v, i)}${nx}</span></div>`;
+    }).join('');
+    return;
+  }
+  $('thr' + n).innerHTML = `<div class="thrs c${sc.threads.length}">` + sc.threads.map((t, i) => {
+    const th = v.th[i];
+    const blk = th.st === 'blocked' ? th.pc - 1 : -1;
+    const rows = t.prog.map((ins, k) => {
+      const c = k === blk ? 'blk' : (th.st !== 'done' && th.st !== 'blocked' && k === th.pc) ? 'cur' : k < th.pc ? 'done' : '';
+      return `<tr class="${c}"><td class="ln">${k + 1}</td><td class="src">${esc(insText(ins))}</td></tr>`;
+    }).join('');
+    return `<div><h3 style="margin-top:0">${pill(sc, t.name)}<span class="st">${stateOf(v, i)}</span></h3><table class="code">${rows}</table></div>`;
+  }).join('') + '</div>';
+}
+const PCOL = ['#1864ab', '#9c36b5', '#e8590c', '#0b7285', '#c2255c'];
+const PLT = ['#d0ebff', '#f3d9fa', '#ffe8cc', '#c5f6fa', '#ffdeeb'];
+const RENDER = {
+  counter: v => `<div class="mem"><span>counter =</span><b>${v.sh.counter}</b></div><p class="meta">Two threads each add 1 to a counter that started at 50, so the answer should be 52.</p>`,
+  out: v => `<div class="out">${v.sh.out.length ? v.sh.out.map(esc).join('\n') : '&nbsp;'}</div>`,
+  buffer: v => {
+    const sh = v.sh;
+    const slots = sh.buf.map((x, i) =>
+      `<div class="bslot">slot ${i}<div class="bcell${x === null ? '' : ' full'}${sh.badSlot === i && sh.bad ? ' err' : ''}">${x === null ? '' : 'item ' + x}</div>` +
+      `<div class="ptrs">${sh.fill === i ? '<span class="ptr f">fill</span>' : ''}${sh.use === i ? '<span class="ptr u">use</span>' : ''}</div></div>`).join('');
+    const notes = [];
+    if (sh.lost.length) notes.push(`<b style="color:var(--bad)">lost: item ${sh.lost.join(', item ')}</b>`);
+    if (sh.got.length) notes.push('taken by the consumer: item ' + sh.got.join(', item '));
+    return `<div class="bufrow">${slots}</div><p class="meta">put() writes buffer[fill], then advances fill. get() reads buffer[use], then advances use.${notes.length ? '<br>' + notes.join(' &nbsp;|&nbsp; ') : ''}</p>`;
+  },
+  rw: (v, sc) => {
+    const who = v.sh.writer ? [v.sh.writer] : v.sh.reading;
+    const label = v.sh.writer ? 'being written' : v.sh.reading.length ? 'being read' : 'idle';
+    return `<div class="rwrow"><div class="mem"><span>readers =</span><b>${v.sh.readers}</b></div>` +
+      `<div class="rwbox"><small>inside the data (${label})</small><div>${who.length ? who.map(x => pill(sc, x)).join('') : '<small>nobody</small>'}</div></div></div>`;
+  },
+  dining: (v, sc) => {
+    const cx = 150, cy = 150, PR = 108, FR = 60, rad = d => d * Math.PI / 180;
+    let h = '<svg class="dine" viewBox="0 0 300 300" role="img" aria-label="Five philosophers around a table"><defs><pattern id="hatchD" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#f4f7f9"/><rect width="1" height="7" fill="#c9d3db"/></pattern></defs>';
+    h += `<circle cx="${cx}" cy="${cy}" r="78" fill="url(#hatchD)" stroke="#172033" stroke-width="2"/>`;
+    const pos = p => { const a = rad(-90 + 72 * p); return [cx + PR * Math.cos(a), cy + PR * Math.sin(a)]; };
+    for (let i = 0; i < 5; i++) {
+      const a = rad(-90 + 72 * i - 36), hn = v.holder['f' + i], hi = hn ? tIdx(sc, hn) : -1;
+      const x1 = cx + (FR - 16) * Math.cos(a), y1 = cy + (FR - 16) * Math.sin(a), x2 = cx + (FR + 14) * Math.cos(a), y2 = cy + (FR + 14) * Math.sin(a);
+      if (hi >= 0) { const [px, py] = pos(hi); h += `<line x1="${x2}" y1="${y2}" x2="${px}" y2="${py}" stroke="${PCOL[hi]}" stroke-width="2" stroke-dasharray="3 3"/>`; }
+      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hi >= 0 ? PCOL[hi] : '#8a96a3'}" stroke-width="6" stroke-linecap="round"/>`;
+      h += `<text x="${cx + (FR - 30) * Math.cos(a)}" y="${cy + (FR - 30) * Math.sin(a) + 3}" font-size="9" text-anchor="middle" fill="#4d596b">f${i}</text>`;
+    }
+    sc.threads.forEach((t, i) => {
+      const th = v.th[i], [x, y] = pos(i);
+      const eating = th.pc === 3 && th.st !== 'done', blocked = th.st === 'blocked', done = th.st === 'done';
+      const held = Object.keys(v.holder).filter(k => v.holder[k] === t.name).length;
+      const fill = eating ? '#b2f2bb' : blocked ? '#ffc9c9' : done ? '#e9ecef' : PLT[i];
+      const stroke = eating ? '#2b8a3e' : blocked ? '#c92a2a' : done ? '#8a96a3' : PCOL[i];
+      const label = eating ? 'eating' : blocked ? 'asleep' : done ? 'done' : th.pc === 0 ? 'thinking' : held ? held + ' fork' + (held > 1 ? 's' : '') : 'hungry';
+      h += `<circle cx="${x}" cy="${y}" r="26" fill="${fill}" stroke="${stroke}" stroke-width="3"/>`;
+      h += `<text x="${x}" y="${y - 1}" font-size="12" font-weight="700" text-anchor="middle" fill="#172033">${t.name}</text>`;
+      h += `<text x="${x}" y="${y + 11}" font-size="8" text-anchor="middle" fill="#4d596b">${label}</text>`;
+    });
+    return h + '</svg><p class="meta">A fork takes the colour of the philosopher holding it. Grey forks are free.</p>';
+  }
+};
+function drawSem (n, s) {
+  const sc = CUR[n].sc, v = s.view;
+  drawSems(n, v, sc);
+  $('shtitle' + n).textContent = sc.sharedTitle;
+  $('shared' + n).innerHTML = RENDER[sc.view](v, sc);
+  drawThreads(n, v, sc);
+}
+
+/* =========================================================
+   Panels
+   ========================================================= */
+const PANELS = {
+  1: { h: 'The basics', sub: 'a counter of tokens, a queue of sleepers', panel: 'Tokens on a hook',
+    psub: 'A semaphore is a number plus a queue. A negative number says how many threads are asleep on it.', chipLabel: 'Scenario',
+    side: `<section class="panel"><h2>The two calls</h2>
+<pre class="src">sem_wait(s):  s = s - 1
+              if (s &lt; 0) sleep in s's queue
+
+sem_post(s):  s = s + 1
+              if (someone is asleep) wake one</pre>
+<p class="sub" style="margin:0">Both calls are atomic. The starting value, passed to sem_init, decides what the semaphore is for.</p></section>
+<section class="panel"><h2>The starting value is the job</h2>
+<table class="tbl wrap"><thead><tr><th>Start</th><th>Use</th></tr></thead><tbody>
+<tr><td>1</td><td>A lock. One token, so one thread inside (a binary semaphore).</td></tr>
+<tr><td>0</td><td>Ordering. Nothing can pass until another thread has posted.</td></tr>
+<tr><td>N</td><td>Counting. N copies of a resource, such as N free slots in a buffer.</td></tr></tbody></table></section>
+<section class="panel"><h2>Tokens, not bells</h2>
+<p class="sub" style="margin:0">A condition variable's bell is lost if nobody is asleep, which is why it needs a separate variable and a while loop. A semaphore keeps the count in its own value, so one tool does the job of both the lock and the condition variable.</p></section>` },
+  2: { h: 'The bounded buffer', sub: 'producers and consumers share a fixed number of slots', panel: 'The shelf and the semaphores',
+    psub: 'empty counts free slots, full counts filled slots, and a mutex guards the buffer indices.', chipLabel: 'Version',
+    side: `<section class="panel"><h2>The code in this version</h2>
+<h3 style="margin-top:0">Producer</h3><pre class="src" id="codeA2"></pre>
+<h3 style="margin-top:0">Consumer</h3><pre class="src" id="codeB2"></pre>
+<h3 style="margin-top:0">Inside put and get</h3>
+<pre class="src" style="margin-bottom:0">put(v):  buffer[fill] = v;
+         fill = (fill + 1) % MAX;
+get():   tmp = buffer[use];
+         use = (use + 1) % MAX;</pre></section>
+<section class="panel"><h2>Two kinds of semaphore in one program</h2>
+<p class="sub" style="margin:0 0 6px"><strong>empty</strong> (starts at MAX) and <strong>full</strong> (starts at 0) count slots and items. They make a thread sleep until there is something for it to do.</p>
+<p class="sub" style="margin:0"><strong>mutex</strong> (starts at 1) is a lock. It makes put() and get() atomic. The rule that falls out: wait for the resource first, take the mutex second, and never sleep while holding it.</p></section>` },
+  3: { h: 'The reader-writer lock', sub: 'many readers at once, or one writer alone', panel: 'The data and its two gates',
+    psub: 'lock guards the readers counter. writelock keeps writers out while any reader is inside.', chipLabel: 'Scenario',
+    side: `<section class="panel"><h2>The code</h2>
+<h3 style="margin-top:0">Readers</h3>
+<pre class="src">acquire_readlock():
+  sem_wait(&amp;lock);
+  readers++;
+  if (readers == 1)
+    sem_wait(&amp;writelock);
+  sem_post(&amp;lock);
+
+release_readlock():
+  sem_wait(&amp;lock);
+  readers--;
+  if (readers == 0)
+    sem_post(&amp;writelock);
+  sem_post(&amp;lock);</pre>
+<h3 style="margin-top:0">Writers</h3>
+<pre class="src" style="margin-bottom:0">acquire_writelock(): sem_wait(&amp;writelock);
+release_writelock(): sem_post(&amp;writelock);</pre></section>
+<section class="panel"><h2>Who may be inside together</h2>
+<table class="tbl wrap"><thead><tr><th>Pair</th><th>Together?</th></tr></thead><tbody>
+<tr><td>reader and reader</td><td>Yes. Only the first one takes writelock.</td></tr>
+<tr><td>reader and writer</td><td>No. The writer sleeps on writelock.</td></tr>
+<tr><td>writer and writer</td><td>No. writelock is a lock.</td></tr></tbody></table>
+<p class="sub" style="margin:10px 0 0">The first reader locks writers out for the whole group, and the last reader lets them back in. That is also why a steady stream of readers can starve a writer.</p></section>` },
+  4: { h: 'The dining philosophers', sub: 'five threads, five forks, one possible circle of waiting', panel: 'The table',
+    psub: 'Each fork is a semaphore starting at 1. A philosopher needs both neighbouring forks to eat.', chipLabel: 'Version',
+    side: `<section class="panel"><h2>The code in this version</h2>
+<pre class="src" id="codeA4"></pre>
+<pre class="src" style="margin-bottom:0">int left(int p)  { return p; }
+int right(int p) { return (p + 1) % 5; }
+
+put_forks(p):
+  sem_post(&amp;forks[left(p)]);
+  sem_post(&amp;forks[right(p)]);</pre></section>
+<section class="panel"><h2>What makes it deadlock</h2>
+<p class="sub" style="margin:0 0 6px">Each philosopher holds one fork and waits for the next, and the last waits for the first: a circular wait.</p>
+<p class="sub" style="margin:0">Break the circle and the deadlock cannot happen. Here that means one philosopher asks for the forks in the opposite order. Nobody can end up holding the fork that the next one in a closed ring needs.</p></section>` }
+};
+function panelHTML (n, c) {
+  return `<div class="tabpanel" id="panel${n}" role="tabpanel" aria-labelledby="tab${n}"${n > 1 ? ' hidden' : ''}>
+<div class="chapter"><h2>${c.h}</h2><span>${c.sub}</span></div><div class="rule"></div>
+<section class="panel card" id="card${n}"><div><p class="step-count"></p><h2></h2><p class="body"></p></div><pre class="calc"></pre></section>
+<nav class="timeline" id="tl${n}" aria-label="Jump to a step"></nav>
+<div class="main wide"><section class="panel"><h2>${c.panel}</h2><p class="sub">${c.psub}</p>
+<div class="trow"><div class="chips" id="chips${n}"><span>${c.chipLabel}</span></div></div>
+<h3 class="mini">Semaphores</h3><div class="sems" id="sems${n}"></div>
+<h3 class="mini" id="shtitle${n}"></h3><div id="shared${n}"></div>
+<h3 class="mini">Threads</h3><div id="thr${n}"></div></section>
+<div class="side">${c.side}</div></div></div>`;
+}
+function buildTour (n) {
+  const sc = SCEN[n][CUR[n].key];
+  CUR[n].sc = sc;
+  ['A', 'B'].forEach(x => { const el = $('code' + x + n); if (el) el.innerHTML = sc['code' + x] || ''; });
+  makeTour(n, buildSteps(sc), s => drawSem(n, s));
+}
+$('panels').innerHTML = [1, 2, 3, 4].map(n => panelHTML(n, PANELS[n])).join('');
+[1, 2, 3, 4].forEach(n => {
+  CUR[n] = { key: ORDER[n][0], sc: null };
+  const box = $('chips' + n);
+  ORDER[n].forEach((k, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip' + (i === 0 ? ' on' : ''); b.dataset.k = k; b.textContent = SCEN[n][k].label;
+    box.appendChild(b);
+  });
+  box.addEventListener('click', e => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    CUR[n].key = b.dataset.k;
+    box.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+    stop(); buildTour(n);
+  });
+  buildTour(n);
+});
+const startTab = +String(location.hash).replace('#', '');
+showTab(startTab >= 1 && startTab <= NTABS ? startTab : 1);
+</script>
+</body>
+</html>
