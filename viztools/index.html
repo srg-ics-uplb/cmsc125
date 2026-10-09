@@ -741,6 +741,55 @@ footer a{color:var(--ink);text-underline-offset:3px}
         </a>
       </li>
       <li>
+        <a class="tool" href="https://srg-ics-uplb.github.io/cmsc125/viztools/producer-consumer/">
+          <svg class="thumb" viewBox="0 0 220 120" aria-hidden="true">
+            <defs>
+              <pattern id="hatchPC" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="6" height="6" fill="#f4f7f9"/><rect width="1" height="6" fill="#c9d3db"/>
+              </pattern>
+            </defs>
+            <!-- producer, buffer of three slots, consumer -->
+            <text x="107" y="22" font-family="ui-monospace,Menlo,monospace" font-size="8" font-weight="700" fill="#4d596b" text-anchor="middle">count = 2</text>
+            <rect x="10" y="36" width="30" height="32" fill="#c77700" stroke="#172033" stroke-width="1.5"/>
+            <text x="25" y="56" font-family="ui-monospace,Menlo,monospace" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">P</text>
+            <path d="M42 52 L52 52" stroke="#172033" stroke-width="2"/><path d="M50 47 L56 52 L50 57 Z" fill="#172033"/>
+            <g stroke="#172033" stroke-width="1.5">
+              <rect x="56" y="36" width="34" height="32" fill="#fdebc8"/>
+              <rect x="92" y="36" width="34" height="32" fill="#fdebc8"/>
+              <rect x="128" y="36" width="34" height="32" fill="url(#hatchPC)"/>
+            </g>
+            <rect x="56" y="36" width="4" height="32" fill="#e98b00"/>
+            <rect x="92" y="36" width="4" height="32" fill="#e98b00"/>
+            <path d="M164 52 L174 52" stroke="#172033" stroke-width="2"/><path d="M172 47 L178 52 L172 57 Z" fill="#172033"/>
+            <rect x="178" y="36" width="30" height="32" fill="#0b7285" stroke="#172033" stroke-width="1.5"/>
+            <text x="193" y="56" font-family="ui-monospace,Menlo,monospace" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">C</text>
+            <!-- fill and use pointers -->
+            <g font-family="ui-monospace,Menlo,monospace" font-size="7" font-weight="700" fill="#172033" text-anchor="middle">
+              <rect x="63" y="72" width="20" height="11" rx="5.5" fill="#d0ebff" stroke="#172033" stroke-width="1"/><text x="73" y="80">use</text>
+              <rect x="135" y="72" width="20" height="11" rx="5.5" fill="#f3d9fa" stroke="#172033" stroke-width="1"/><text x="145" y="80">fill</text>
+            </g>
+            <!-- the two waiting rooms -->
+            <g stroke="#172033" stroke-width="1.5" stroke-dasharray="4 3">
+              <rect x="26" y="92" width="76" height="20" fill="url(#hatchPC)"/>
+              <rect x="116" y="92" width="76" height="20" fill="url(#hatchPC)"/>
+            </g>
+            <g stroke="#172033" stroke-width="1">
+              <rect x="32" y="97" width="10" height="10" fill="#c77700"/>
+              <rect x="122" y="97" width="10" height="10" fill="#0b7285"/>
+            </g>
+            <g font-family="ui-monospace,Menlo,monospace" font-size="7" font-weight="700" fill="#4d596b">
+              <text x="48" y="105">empty room</text>
+              <text x="138" y="105">fill room</text>
+            </g>
+          </svg>
+          <div>
+            <p class="tool-title">Producer-consumer: four implementations, two of them broken</p>
+            <p class="tool-desc">Trace the book's broken versions to the exact line where a woken thread trusts a stale hint or a signal wakes the wrong thread, then see the two-condition-variable fix and the multi-slot buffer that avoids most of the sleeping.</p>
+            <span class="chapter"><b>Chapter 30</b>, Condition Variables</span>
+          </div>
+        </a>
+      </li>
+      <li>
         <a class="tool" href="https://srg-ics-uplb.github.io/cmsc125/viztools/semaphores/">
           <svg class="thumb" viewBox="0 0 220 120" aria-hidden="true">
             <!-- the semaphore: a counter with sleepers queued under it -->
