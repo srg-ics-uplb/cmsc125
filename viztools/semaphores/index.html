@@ -57,7 +57,7 @@ select{padding:6px 8px}
 .panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
 
 .tabs{display:flex;gap:6px;margin:0 0 22px;padding:5px;background:var(--panel);border:2px solid var(--ink);border-radius:10px;overflow-x:auto}
-.tabs button{flex:1 1 0;min-width:190px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;border-radius:6px;background:transparent;padding:7px 12px;text-align:left;line-height:1.25}
+.tabs button{flex:1 1 0;min-width:170px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;border-radius:6px;background:transparent;padding:7px 12px;text-align:left;line-height:1.25}
 .tabs button b{font-size:.95rem;white-space:nowrap}
 .tabs button span{font-size:.78rem;color:var(--ink-soft);white-space:nowrap}
 .tabs button:hover{background:#fff}
@@ -190,6 +190,14 @@ kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);bord
 .sem.neg .val{color:var(--bad)}
 .sem .sq{font-size:.8rem;color:var(--ink-soft);min-height:1.7em}
 .sem .sh{font-size:.78rem;color:var(--ink-soft)}
+.scene{margin:4px 0 6px}
+.scene .zone{min-height:132px}
+.scene .keys{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:36px;margin:2px 0 6px}
+.scene .none{border:2px dashed var(--line);border-radius:6px;padding:4px 10px;font-size:.8rem;color:var(--ink-soft)}
+.scene svg{flex:none}
+.scene .cap{font-size:.82rem;color:var(--ink-soft);font-family:var(--mono)}
+.scene .in{display:inline-flex;align-items:center;margin:2px 6px 2px 0}
+.scene .in .who{margin:0 2px 0 0}
 .sem .who,.trl .who{margin:1px 3px 1px 0}
 .st{font-size:.8rem;font-weight:400;color:var(--ink-soft);margin-left:6px}
 .code tr.blk td{background:#ffd8d8}
@@ -237,16 +245,17 @@ svg.dine{display:block;width:100%;max-width:340px;height:auto;margin:0 auto;font
   </header>
 
   <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
-    <button type="button" role="tab" id="tab1" data-t="1" aria-controls="panel1" aria-selected="true"><b>1. The basics</b><span>tokens, locks and ordering</span></button>
-    <button type="button" role="tab" id="tab2" data-t="2" aria-controls="panel2" aria-selected="false"><b>2. Bounded buffer</b><span>producers and consumers</span></button>
-    <button type="button" role="tab" id="tab3" data-t="3" aria-controls="panel3" aria-selected="false"><b>3. Reader-writer lock</b><span>many readers, one writer</span></button>
-    <button type="button" role="tab" id="tab4" data-t="4" aria-controls="panel4" aria-selected="false"><b>4. Dining philosophers</b><span>five threads, five forks</span></button>
+    <button type="button" role="tab" id="tab1" data-t="1" aria-controls="panel1" aria-selected="true"><b>1. The basics</b><span>restroom and waiting room</span></button>
+    <button type="button" role="tab" id="tab6" data-t="6" aria-controls="panel6" aria-selected="false"><b>2. Condition variables</b><span>the waiting room, with a bell</span></button>
+    <button type="button" role="tab" id="tab2" data-t="2" aria-controls="panel2" aria-selected="false"><b>3. Bounded buffer</b><span>producers and consumers</span></button>
+    <button type="button" role="tab" id="tab3" data-t="3" aria-controls="panel3" aria-selected="false"><b>4. Reader-writer lock</b><span>many readers, one writer</span></button>
+    <button type="button" role="tab" id="tab4" data-t="4" aria-controls="panel4" aria-selected="false"><b>5. Dining philosophers</b><span>five threads, five forks</span></button>
   </nav>
 
   <div id="panels"></div>
 
   <p class="kbd-hint">Keyboard: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to step, <kbd>Space</kbd> to play or pause.</p>
-  <p class="foot">Examples follow OSTEP, Chapter 31, <em>Semaphores</em>.</p>
+  <p class="foot">Examples follow OSTEP, Chapter 31, <em>Semaphores</em>. The restroom and waiting-room pictures come from Chapters 28 and 30.</p>
 </div>
 
 <script>
@@ -343,14 +352,15 @@ document.addEventListener('keydown', e => {
 /* =========================================================
    Tabs
    ========================================================= */
-const NTABS = 4;
+const TABORDER = [1, 6, 2, 3, 4];
+const NTABS = TABORDER.length;
 function showTab (n) {
   stop();
   tab = n;
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', +b.dataset.t === n ? 'true' : 'false'));
-  for (let i = 1; i <= NTABS; i++) $('panel' + i).hidden = i !== n;
+  TABORDER.forEach(i => { $('panel' + i).hidden = i !== n; });
   syncButtons();
-  if (history.replaceState) { try { history.replaceState(null, '', '#' + n); } catch (err) { /* ignore */ } }
+  if (history.replaceState) { try { history.replaceState(null, '', '#' + (TABORDER.indexOf(n) + 1)); } catch (err) { /* ignore */ } }
 }
 $('tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-t]');
@@ -360,7 +370,7 @@ $('tabs').addEventListener('keydown', e => {
   const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
   if (!d) return;
   e.preventDefault();
-  const n = ((tab - 1 + d + NTABS) % NTABS) + 1;
+  const n = TABORDER[(TABORDER.indexOf(tab) + d + NTABS) % NTABS];
   showTab(n); $('tab' + n).focus();
 });
 
@@ -464,8 +474,8 @@ function buildSteps (sc) {
 /* =========================================================
    Scenarios, tabs 1 and 2
    ========================================================= */
-const SCEN = { 1: {}, 2: {}, 3: {}, 4: {} };
-const ORDER = { 1: ['lock', 'order1', 'order2'], 2: ['race', 'dead', 'ok'], 3: ['share', 'starve'], 4: ['dead', 'fix'] };
+const SCEN = { 1: {}, 2: {}, 3: {}, 4: {}, 6: {} };
+const ORDER = { 1: ['lock', 'order1', 'order2'], 2: ['race', 'dead', 'ok'], 3: ['share', 'starve'], 4: ['dead', 'fix'], 6: ['wait1', 'ring1', 'twice', 'all'] };
 
 /* ---- tab 1 ---- */
 const lockProg = () => [W('m'), D('counter = counter + 1;', sh => { sh.counter++; return `counter becomes ${sh.counter}.`; }), P('m')];
@@ -475,7 +485,7 @@ SCEN[1].lock = {
   calc: sh => [`counter = ${sh.counter}`],
   threads: [{ name: 'T1', prog: lockProg() }, { name: 'T2', prog: lockProg() }],
   intro: { title: 'A semaphore is a counter of tokens',
-    body: 'Think of the restroom key again, but as tokens on a hook. The semaphore m starts at 1: one token. sem_wait takes a token, and sleeps if none is left to take. sem_post hangs a token back, or hands it straight to a sleeper. T1 and T2 will each add 1 to a shared counter that starts at 50.' },
+    body: 'Think of the restroom key again, but hung on a hook by the door. The semaphore m starts at 1: one key. sem_wait takes a token, and sleeps if none is left to take. sem_post hangs a token back, or hands it straight to a sleeper. T1 and T2 will each add 1 to a shared counter that starts at 50.' },
   sched: [
     { t: 'T1', note: 'T1 now owns the lock.' },
     { t: 'T2', note: 'The minus sign means one thread is asleep. T2 waits for T1 to give the token back.' },
@@ -496,7 +506,7 @@ SCEN[1].order1 = {
   calc: sh => ['output lines: ' + sh.out.length],
   threads: [{ name: 'parent', prog: parentP() }, { name: 'child', prog: childP() }],
   intro: { title: 'Starting at 0 turns a semaphore into an ordering tool',
-    body: 'The parent must not finish until its child has run. The semaphore s starts at 0: no tokens at all. The parent calls sem_wait(&s) and the child calls sem_post(&s) when it is done. The interesting question is what happens in each order. Here the parent reaches its wait first.' },
+    body: 'The parent must not finish until its child has run. The semaphore s starts at 0: no tokens at all. The parent calls sem_wait(&s) and the child calls sem_post(&s) when it is done. The interesting question is what happens in each order. In the picture this is the waiting room of Chapter 30, with a bell box that remembers rings. Here the parent reaches its wait first.' },
   sched: [
     { t: 'parent', note: 'The child exists now, but it has not run yet.' },
     { t: 'parent', note: 'There is no token to take, so the parent sleeps until the child posts.' },
@@ -735,6 +745,95 @@ SCEN[4].fix = Object.assign(dineBase(), {
     body: 'p4 slept at the start, but p3, p2, p1 and p0 each ate in turn, and p4 ate last. No circle of waiting could form, because p4 asks for its forks in the opposite order. Breaking the dependency cycle is the classic fix.' }
 });
 
+
+/* =========================================================
+   Scenarios, tabs 5 and 6: the room pictures
+   ========================================================= */
+const inRange = (a, b, only) => (v, sc) => sc.threads.filter((t, i) => (!only || only.includes(t.name)) && v.th[i].st !== 'blocked' && v.th[i].pc >= a && v.th[i].pc < b).map(t => t.name);
+const keyCap = (k, val) => val > 0 ? `${k} = ${val}: ${val} key${val > 1 ? 's' : ''} on the hook` : val === 0 ? `${k} = 0: no key, nobody waiting` : `${k} = ${val}: no key, ${-val} waiting`;
+const bellCap = (k, val) => val > 0 ? `${k} = ${val}: ${val} ring${val > 1 ? 's' : ''} remembered` : val === 0 ? `${k} = 0: no rings, nobody waiting` : `${k} = ${val}: ${-val} waiting for a ring`;
+const roomCfg = { icon: 'key', lineTitle: 'Waiting in line', lineHint: 'the first in line gets the next key', hookTitle: 'The key hook', none: 'no keys left', cap: keyCap,
+  room: 'The restroom', sub: 'one at a time', keyIcon: true, inside: inRange(1, 3), sign: n => n ? 'Occupied' : 'Vacant' };
+const bellCfg = { icon: 'bell', lineTitle: 'The waiting room', lineHint: 'asleep until a bell rings', hookTitle: 'The bell box', none: 'no rings remembered', cap: bellCap,
+  room: 'Out of the waiting room', sub: 'carrying on', keyIcon: false, calm: true, sign: n => n ? n + ' through' : 'nobody through yet' };
+
+
+/* ---- tab 1: add the pictures ---- */
+SCEN[1].lock.scene = roomCfg;
+SCEN[1].order1.scene = Object.assign({}, bellCfg, { inside: inRange(2, 99, ['parent']) });
+SCEN[1].order2.scene = Object.assign({}, bellCfg, { inside: inRange(2, 99, ['parent']) });
+
+/* ---- tab 6: a condition variable's job, done by a semaphore ---- */
+const parentW = () => [D('printf("parent: begin");', sh => { sh.out.push('parent: begin'); return 'It prints "parent: begin".'; }),
+  W('s'), D('printf("parent: end");', sh => { sh.out.push('parent: end'); return 'It prints "parent: end".'; })];
+const childW = () => [D('printf("child");', sh => { sh.out.push('child'); return 'It prints "child".'; }), P('s')];
+const parentThrough = inRange(2, 99, ['parent']);
+const bellBase = { view: 'out', sharedTitle: 'Output so far', init: { out: [] }, calc: sh => ['output lines: ' + sh.out.length], scene: Object.assign({}, bellCfg, { inside: parentThrough }) };
+SCEN[6].wait1 = Object.assign({}, bellBase, {
+  label: 'parent waits first', sems: { s: 0 },
+  threads: [{ name: 'parent', prog: parentW() }, { name: 'child', prog: childW() }],
+  intro: { title: 'The same job as a condition variable, with no lock',
+    body: 'In Chapter 30 the parent waits for its child in the waiting room and the child rings the bell. A semaphore s that starts at 0 plays both parts. sem_wait(&s) is "go and sit in the waiting room until a bell rings", and sem_post(&s) is "ring the bell". There is no lock and no done flag to go with it. Here the parent reaches the waiting room first.' },
+  sched: [
+    { t: 'parent', note: 'The child exists but has not run yet.' },
+    { t: 'parent', note: 'No bell has rung, so the parent sits down in the waiting room and sleeps.' },
+    { t: 'child' },
+    { t: 'child', note: 'The bell rings and the parent is woken at once.' },
+    { t: 'parent' }
+  ],
+  outro: { tone: 'good', title: 'The parent finished after the child',
+    body: 'This is what cond_wait and cond_signal did in Chapter 30: sleep until someone rings. The difference shows up in the next scenario.' }
+});
+SCEN[6].ring1 = Object.assign({}, bellBase, {
+  label: 'bell rings first', sems: { s: 0 },
+  threads: [{ name: 'parent', prog: parentW() }, { name: 'child', prog: childW() }],
+  intro: { title: 'The bell rings before anyone is in the waiting room',
+    body: 'With a condition variable, a signal sent to an empty waiting room is lost, which is why the Chapter 30 code needs a done flag and a while loop. What happens to a semaphore post that nobody hears?' },
+  sched: [
+    { t: 'parent' },
+    { t: 'child' },
+    { t: 'child', note: 'Nobody is in the waiting room. The ring is not lost: the bell box remembers it, and s is 1.' },
+    { t: 'parent', note: 'The parent finds a remembered ring, so it never sits down at all.' },
+    { t: 'parent' }
+  ],
+  outro: { tone: 'good', title: 'The ring was remembered',
+    body: 'The count inside the semaphore does the work of the done flag. That is why no while loop is needed here: the thing the thread checks is the same thing that wakes it.' }
+});
+const carryOn = () => D('/* carry on */', (sh, tn) => { sh.out.push(tn + ' carries on'); return tn + ' carries on.'; });
+SCEN[6].twice = Object.assign({}, bellBase, {
+  label: 'two rings in advance', sems: { s: 0 },
+  scene: Object.assign({}, bellCfg, { inside: inRange(1, 99, ['W1', 'W2']) }),
+  threads: [{ name: 'W1', prog: [W('s'), carryOn()] }, { name: 'W2', prog: [W('s'), carryOn()] }, { name: 'R', prog: [P('s'), P('s')] }],
+  intro: { title: 'Rings add up',
+    body: 'R rings the bell twice before either waiter has arrived. A condition variable would lose both signals. Do the semaphore’s remembered rings add up?' },
+  sched: [
+    { t: 'R', note: 'Nobody is waiting, so the ring is remembered.' },
+    { t: 'R', note: 'The second ring is remembered too: s is 2.' },
+    { t: 'W1', note: 'W1 uses up one remembered ring and does not sleep.' },
+    { t: 'W2', note: 'W2 uses up the other.' },
+    { t: 'W1' }, { t: 'W2' }
+  ],
+  outro: { tone: 'good', title: 'Two rings, two waiters, nobody slept',
+    body: 'Each remembered ring let exactly one waiter through. A condition variable has no memory and a semaphore has a count, and that count is the whole difference between them.' }
+});
+SCEN[6].all = Object.assign({}, bellBase, {
+  label: 'waking three waiters', sems: { s: 0 },
+  scene: Object.assign({}, bellCfg, { inside: inRange(1, 99, ['W1', 'W2', 'W3']) }),
+  threads: [{ name: 'W1', prog: [W('s'), carryOn()] }, { name: 'W2', prog: [W('s'), carryOn()] }, { name: 'W3', prog: [W('s'), carryOn()] }, { name: 'R', prog: [P('s'), P('s'), P('s')] }],
+  intro: { title: 'There is no broadcast: one ring wakes one waiter',
+    body: 'A condition variable has cond_broadcast, which wakes everyone in the waiting room at once. A semaphore post wakes only one. Three threads sit in the waiting room, and R has to wake them all.' },
+  sched: [
+    { t: 'W1' }, { t: 'W2' },
+    { t: 'W3', note: 'Three threads are asleep, and s is -3.' },
+    { t: 'R', note: 'One ring wakes W1, who has waited longest.' },
+    { t: 'R', note: 'The second ring wakes W2. W3 is still asleep.' },
+    { t: 'R', note: 'It takes a third ring to wake W3.' },
+    { t: 'W1' }, { t: 'W2' }, { t: 'W3' }
+  ],
+  outro: { tone: 'good', title: 'Three waiters took three rings',
+    body: 'To wake N waiters you must post N times, and you need to know N. A condition variable’s broadcast does not need to know. Chapter 31 builds a semaphore out of a lock and a condition variable; building a condition variable out of semaphores is the trickier direction.' }
+});
+
 /* =========================================================
    Rendering
    ========================================================= */
@@ -826,8 +925,24 @@ const RENDER = {
     return h + '</svg><p class="meta">A fork takes the colour of the philosopher holding it. Grey forks are free.</p>';
   }
 };
+const KEY_SVG = '<svg class="key" viewBox="0 0 40 20" width="34" height="17" aria-hidden="true"><circle cx="9" cy="10" r="7" fill="#ffd43b" stroke="#172033" stroke-width="2"/><circle cx="9" cy="10" r="2" fill="#fff" stroke="#172033" stroke-width="1"/><path d="M16 10h21M30 10v6M35 10v5" stroke="#172033" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>';
+const BELL_SVG = '<svg class="bell" viewBox="0 0 30 28" width="26" height="24" aria-hidden="true"><path d="M15 3a2 2 0 0 1 2 2v1c3.5 1 6 4 6 8v4l3 3H4l3-3v-4c0-4 2.5-7 6-8V5a2 2 0 0 1 2-2z" fill="#ffd43b" stroke="#172033" stroke-width="2" stroke-linejoin="round"/><circle cx="15" cy="24" r="2.4" fill="#172033"/></svg>';
+function drawScene (n, v, sc) {
+  const el = $('scene' + n), c = sc.scene;
+  if (!el) return;
+  const k = Object.keys(sc.sems)[0], val = v.sems[k], q = v.queues[k];
+  const icon = c.icon === 'bell' ? BELL_SVG : KEY_SVG;
+  const inside = c.inside(v, sc), tokens = Math.max(val, 0);
+  el.innerHTML =
+    `<div class="zone"><h3>${c.lineTitle}</h3><div>${q.length ? q.map(x => pill(sc, x)).join('') : '<small>nobody waiting</small>'}</div>` +
+    `<small>${q.length ? c.lineHint : ''}</small></div>` +
+    `<div class="zone"><h3>${c.hookTitle}</h3><div class="keys">${tokens ? Array(tokens).fill(icon).join('') : '<span class="none">' + c.none + '</span>'}</div><div class="cap">${c.cap(k, val)}</div></div>` +
+    `<div class="zone ${inside.length && !c.calm ? 'occ' : 'vac'}"><h3>${c.room} <small>(${c.sub})</small></h3><div class="sign ${inside.length && !c.calm ? 'occ' : 'vac'}">${c.sign(inside.length)}</div>` +
+    `<div>${inside.map(x => `<span class="in">${pill(sc, x)}${c.keyIcon ? KEY_SVG : ''}</span>`).join('')}</div></div>`;
+}
 function drawSem (n, s) {
   const sc = CUR[n].sc, v = s.view;
+  if (sc.scene) drawScene(n, v, sc);
   drawSems(n, v, sc);
   $('shtitle' + n).textContent = sc.sharedTitle;
   $('shared' + n).innerHTML = RENDER[sc.view](v, sc);
@@ -838,8 +953,8 @@ function drawSem (n, s) {
    Panels
    ========================================================= */
 const PANELS = {
-  1: { h: 'The basics', sub: 'a counter of tokens, a queue of sleepers', panel: 'Tokens on a hook',
-    psub: 'A semaphore is a number plus a queue. A negative number says how many threads are asleep on it.', chipLabel: 'Scenario',
+  1: { h: 'The basics', sub: 'a counter of tokens, a queue of sleepers', panel: 'The restroom and the waiting room',
+    psub: 'A semaphore is a number plus a queue. In the lock scenario the number is keys on a hook by the restroom door. In the ordering scenarios it is rings of a bell that a waiting room remembers. A negative number says how many threads are asleep in line.', chipLabel: 'Scenario',
     side: `<section class="panel"><h2>The two calls</h2>
 <pre class="src">sem_wait(s):  s = s - 1
               if (s &lt; 0) sleep in s's queue
@@ -848,10 +963,10 @@ sem_post(s):  s = s + 1
               if (someone is asleep) wake one</pre>
 <p class="sub" style="margin:0">Both calls are atomic. The starting value, passed to sem_init, decides what the semaphore is for.</p></section>
 <section class="panel"><h2>The starting value is the job</h2>
-<table class="tbl wrap"><thead><tr><th>Start</th><th>Use</th></tr></thead><tbody>
-<tr><td>1</td><td>A lock. One token, so one thread inside (a binary semaphore).</td></tr>
-<tr><td>0</td><td>Ordering. Nothing can pass until another thread has posted.</td></tr>
-<tr><td>N</td><td>Counting. N copies of a resource, such as N free slots in a buffer.</td></tr></tbody></table></section>
+<table class="tbl wrap"><thead><tr><th>Start</th><th>Use</th><th>The picture</th></tr></thead><tbody>
+<tr><td>1</td><td>A lock. One token, so one thread inside (a binary semaphore).</td><td>One key on the hook: the restroom.</td></tr>
+<tr><td>0</td><td>Ordering. Nothing can pass until another thread has posted.</td><td>An empty bell box: the waiting room.</td></tr>
+<tr><td>N</td><td>Counting. N copies of a resource, such as N free slots in a buffer.</td><td>N keys on the hook.</td></tr></tbody></table></section>
 <section class="panel"><h2>Tokens, not bells</h2>
 <p class="sub" style="margin:0">A condition variable's bell is lost if nobody is asleep, which is why it needs a separate variable and a while loop. A semaphore keeps the count in its own value, so one tool does the job of both the lock and the condition variable.</p></section>` },
   2: { h: 'The bounded buffer', sub: 'producers and consumers share a fixed number of slots', panel: 'The shelf and the semaphores',
@@ -905,7 +1020,20 @@ put_forks(p):
   sem_post(&amp;forks[right(p)]);</pre></section>
 <section class="panel"><h2>What makes it deadlock</h2>
 <p class="sub" style="margin:0 0 6px">Each philosopher holds one fork and waits for the next, and the last waits for the first: a circular wait.</p>
-<p class="sub" style="margin:0">Break the circle and the deadlock cannot happen. Here that means one philosopher asks for the forks in the opposite order. Nobody can end up holding the fork that the next one in a closed ring needs.</p></section>` }
+<p class="sub" style="margin:0">Break the circle and the deadlock cannot happen. Here that means one philosopher asks for the forks in the opposite order. Nobody can end up holding the fork that the next one in a closed ring needs.</p></section>` },
+  6: { h: 'A semaphore in the waiting room', sub: 'the waiting room of Chapter 30, with a bell that remembers', panel: 'The waiting room and the bell box',
+    psub: 'sem_wait sits a thread down in the waiting room until a bell rings. sem_post rings the bell. Unlike a condition variable, the bell box remembers rings that nobody was there to hear.', chipLabel: 'Scenario',
+    side: `<section class="panel"><h2>Condition variable and semaphore</h2>
+<table class="tbl wrap"><thead><tr><th></th><th>Condition variable</th><th>Semaphore</th></tr></thead><tbody>
+<tr><td>Wait</td><td>Sleep in the waiting room, giving up the lock</td><td>Sleep in the waiting room</td></tr>
+<tr><td>Ring with nobody there</td><td>Lost</td><td>Remembered as a count</td></tr>
+<tr><td>Wake everyone</td><td>cond_broadcast</td><td>One post per waiter</td></tr>
+<tr><td>Recheck after waking</td><td>Yes: use a while loop</td><td>No: the count is the state</td></tr>
+<tr><td>Needs a lock</td><td>Yes, always</td><td>No</td></tr></tbody></table></section>
+<section class="panel"><h2>The bell is a hint, or it is a count</h2>
+<p class="sub" style="margin:0 0 6px">The Chapter 30 bell only says "something changed". The thread must go back and look at the shared state, which is why it needs the while loop and the lock around it.</p>
+<p class="sub" style="margin:0 0 6px">A semaphore folds the state into the bell itself. The number of remembered rings is the thing the thread would have looked at, so the check and the wake-up cannot disagree.</p>
+<p class="sub" style="margin:0">It is not a drop-in replacement. A real cond_wait also gives up a lock while it sleeps and retakes it on waking, and a semaphore cannot do that by itself.</p></section>` }
 };
 function panelHTML (n, c) {
   return `<div class="tabpanel" id="panel${n}" role="tabpanel" aria-labelledby="tab${n}"${n > 1 ? ' hidden' : ''}>
@@ -914,6 +1042,7 @@ function panelHTML (n, c) {
 <nav class="timeline" id="tl${n}" aria-label="Jump to a step"></nav>
 <div class="main wide"><section class="panel"><h2>${c.panel}</h2><p class="sub">${c.psub}</p>
 <div class="trow"><div class="chips" id="chips${n}"><span>${c.chipLabel}</span></div></div>
+${n === 1 || n === 6 ? `<div class="three scene" id="scene${n}"></div>` : ''}
 <h3 class="mini">Semaphores</h3><div class="sems" id="sems${n}"></div>
 <h3 class="mini" id="shtitle${n}"></h3><div id="shared${n}"></div>
 <h3 class="mini">Threads</h3><div id="thr${n}"></div></section>
@@ -925,8 +1054,8 @@ function buildTour (n) {
   ['A', 'B'].forEach(x => { const el = $('code' + x + n); if (el) el.innerHTML = sc['code' + x] || ''; });
   makeTour(n, buildSteps(sc), s => drawSem(n, s));
 }
-$('panels').innerHTML = [1, 2, 3, 4].map(n => panelHTML(n, PANELS[n])).join('');
-[1, 2, 3, 4].forEach(n => {
+$('panels').innerHTML = TABORDER.map(n => panelHTML(n, PANELS[n])).join('');
+TABORDER.forEach(n => {
   CUR[n] = { key: ORDER[n][0], sc: null };
   const box = $('chips' + n);
   ORDER[n].forEach((k, i) => {
@@ -944,7 +1073,7 @@ $('panels').innerHTML = [1, 2, 3, 4].map(n => panelHTML(n, PANELS[n])).join('');
   buildTour(n);
 });
 const startTab = +String(location.hash).replace('#', '');
-showTab(startTab >= 1 && startTab <= NTABS ? startTab : 1);
+showTab(startTab >= 1 && startTab <= NTABS ? TABORDER[startTab - 1] : 1);
 </script>
 </body>
 </html>
