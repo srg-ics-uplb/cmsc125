@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Producer-consumer with condition variables</title>
+<style>
+:root{
+  --paper:#e9eef2;
+  --grid:#dae2e8;
+  --ink:#172033;
+  --ink-soft:#4d596b;
+  --panel:#f8fafb;
+  --line:#d3dbe2;
+  --bad:#c92a2a;
+  --good:#2b8a3e;
+  --mark:#ffd43b;
+  --t1:#1864ab;
+  --t1s:#d0ebff;
+  --t2:#9c36b5;
+  --t2s:#f3d9fa;
+  --t3:#e8590c;
+  --t3s:#ffe8cc;
+  --os:#495057;
+  --shared:#b2f2bb;
+  --hatch:repeating-linear-gradient(135deg,#f4f7f9 0 7px,#dfe6ec 7px 8px);
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+}
+[hidden]{display:none !important}
+.instant *{transition:none !important}
+.page{max-width:1280px;margin:0 auto;padding:32px 28px 56px}
+
+.top{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;margin-bottom:20px}
+h1{font-size:2.35rem;line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.01em}
+.intro{margin:0;max-width:74ch;color:var(--ink-soft)}
+h2{font-size:1.05rem;margin:0 0 4px;font-weight:700}
+h3{font-size:.95rem;margin:14px 0 6px;font-weight:700}
+.sub{margin:0 0 12px;font-size:.88rem;color:var(--ink-soft)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+button,select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:6px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled){background:#fff}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:#fff}
+button.primary:hover:not(:disabled){background:#2c3a57}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.speed{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--ink-soft)}
+select{padding:6px 8px}
+.panel{background:var(--panel);border:2px solid var(--ink);border-radius:8px;padding:16px 18px;min-width:0}
+
+.tabs{display:flex;gap:6px;margin:0 0 22px;padding:5px;background:var(--panel);border:2px solid var(--ink);border-radius:10px;overflow-x:auto}
+.tabs button{flex:1 1 0;min-width:190px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:0;border-radius:6px;background:transparent;padding:7px 12px;text-align:left;line-height:1.25}
+.tabs button b{font-size:.95rem;white-space:nowrap}
+.tabs button span{font-size:.78rem;color:var(--ink-soft);white-space:nowrap}
+.tabs button:hover{background:#fff}
+.tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.tabs button[aria-selected="true"] span{color:#c8d2e0}
+
+.chapter{margin:0 0 14px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.chapter h2{font-size:1.5rem;letter-spacing:-.01em}
+.chapter span{font-size:.9rem;color:var(--ink-soft)}
+.rule{height:3px;background:var(--ink);border-radius:2px;margin:0 0 18px}
+
+.card{border-width:3px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start;min-height:180px;margin-bottom:12px}
+.step-count{margin:0 0 2px;font-size:.9rem;color:var(--ink-soft)}
+.card h2{font-size:1.5rem;line-height:1.2;margin:0 0 8px}
+.card p.body{margin:0;max-width:64ch}
+.calc{margin:0;align-self:center;padding:10px 12px;background:#fff;border-left:4px solid var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.card.t1{border-color:var(--t1)}.card.t1 .calc{border-left-color:var(--t1)}
+.card.t2{border-color:var(--t2)}.card.t2 .calc{border-left-color:var(--t2)}
+.card.t3{border-color:var(--t3)}.card.t3 .calc{border-left-color:var(--t3)}
+.card.os{border-color:var(--os)}.card.os .calc{border-left-color:var(--os)}
+.card.bad{border-color:var(--bad)}.card.bad .calc{border-left-color:var(--bad)}
+.card.good{border-color:var(--good)}.card.good .calc{border-left-color:var(--good)}
+.who{display:inline-block;font-size:.8rem;font-weight:700;border-radius:999px;padding:1px 10px;border:2px solid var(--ink);margin-left:8px;vertical-align:middle}
+.who.t1{background:var(--t1s)}.who.t2{background:var(--t2s)}.who.t3{background:var(--t3s)}.who.os{background:#dee2e6}
+.who.bad{background:#ffc9c9}.who.good{background:var(--shared)}
+
+.timeline{display:flex;flex-wrap:wrap;gap:10px;row-gap:10px;margin:0 0 22px;padding:12px 14px 8px;background:var(--panel);border:2px solid var(--ink);border-radius:8px}
+.tl-group{min-width:40px;display:flex;flex-direction:column;gap:5px}
+.tl-steps{display:flex;gap:2px}
+.tl-step{flex:1;height:16px;padding:0;border:0;border-radius:2px;background:var(--g);opacity:.28;min-width:6px}
+.tl-step:hover{opacity:.6}
+.tl-step.done{opacity:1}
+.tl-step.now{opacity:1;box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.tl-label{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:20px;align-items:start}
+.main.wide{grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr)}
+.side{display:flex;flex-direction:column;gap:20px;min-width:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}
+
+.trow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips > span{font-size:.88rem;color:var(--ink-soft)}
+.chip{font-size:.85rem;padding:3px 10px;border-width:1.5px;border-radius:999px}
+.chip.on,.chip.on:hover{background:var(--ink);color:#fff}
+
+/* generic tables */
+table.tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+.tbl th{font-family:var(--sans);font-size:.75rem;font-weight:600;color:var(--ink-soft);text-align:left;border-bottom:2px solid var(--ink);padding:4px 7px;white-space:nowrap}
+.tbl td{padding:5px 7px;border-bottom:1px solid var(--line);white-space:nowrap;transition:background-color .3s}
+.tbl.wrap td{white-space:normal;font-family:var(--sans);font-size:.85rem;vertical-align:top}
+.tbl.wrap td:first-child{font-weight:700}
+.tbl tr.sel td{background:#fff3bf}
+
+/* code listings */
+table.code{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+.code td{padding:4px 7px;border-bottom:1px solid var(--line);transition:background-color .3s}
+.code td.ln{color:#9aa6b2;width:1%;white-space:nowrap}
+.code td.src{white-space:pre-wrap;overflow-wrap:anywhere}
+.code tr.cur td{background:#ffe8a3}
+.code tr.cur td.ln{box-shadow:inset 4px 0 0 var(--ink)}
+.code tr.done td{color:var(--ink-soft)}
+pre.src{font-family:var(--mono);font-size:13px;margin:0 0 10px;padding:9px 11px;background:#fff;border:1.5px solid var(--line);border-radius:5px;white-space:pre;overflow-x:auto}
+pre.src mark{background:var(--mark);color:var(--ink);border-radius:2px;padding:0 2px;font-weight:700}
+code{font-family:var(--mono);font-size:.86em;background:#fff;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+.regs{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-family:var(--mono);font-size:13px;margin:8px 0 0}
+.regs dt{color:var(--ink-soft)}
+.regs dd{margin:0}
+
+/* zones: restroom and waiting rooms */
+.zone{border:2px solid var(--line);border-radius:6px;background:#fff;padding:9px 11px;min-height:120px;transition:border-color .25s,background-color .25s}
+.zone h3{margin:0 0 6px;font-size:.82rem;color:var(--ink-soft)}
+.zone.occ{border-color:var(--ink)}
+.zone.vac{border-color:var(--good)}
+.zone.bad{border-color:var(--bad);background:#fff0f0}
+.zone .who{margin:2px 6px 2px 0}
+.trl{display:flex;align-items:center;gap:4px;margin:3px 0;font-size:.85rem}
+.trl small,.zone small{color:var(--ink-soft)}
+.sign{font-weight:700;font-size:1.05rem;margin-bottom:6px}
+.sign.vac{color:var(--good)}
+.sign.occ,.sign.bad{color:var(--bad)}
+.mem{display:flex;align-items:center;gap:12px;border:3px solid var(--ink);border-radius:8px;background:#fff;padding:8px 12px;justify-content:center}
+.mem b{font-family:var(--mono);font-size:2rem;line-height:1;transition:color .3s}
+.mem b.chg{color:var(--bad)}
+.mem span{font-size:.85rem;color:var(--ink-soft);font-family:var(--mono)}
+.meta{margin:8px 0 0;font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);min-height:2.6em}
+.waits{display:flex;flex-direction:column;gap:10px}
+.waits .zone{flex:1;border-style:dashed;background:var(--hatch)}
+.shelf{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
+.slot{width:58px;height:34px;border:2px solid var(--ink);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.85rem;font-weight:700;background:var(--hatch)}
+.slot.full{background:var(--t3s);border-color:var(--t3)}
+.slot.err{background:#ffc9c9;border-color:var(--bad);color:var(--bad)}
+
+.takeaway{margin:10px 0 0;padding:9px 12px;border-left:4px solid var(--good);background:#fff;font-size:.9rem}
+.takeaway.bad{border-left-color:var(--bad)}
+.note{margin:14px 0 0;padding:10px 12px;border-left:4px solid var(--ink);background:#fff;font-size:.9rem}
+.kbd-hint{margin:14px 0 0;font-size:.85rem;color:var(--ink-soft)}
+kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--ink-soft);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:#fff}
+.foot{margin-top:34px;font-size:.85rem;color:var(--ink-soft)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:10px 0 0;padding:0;list-style:none;font-size:.86rem;color:var(--ink-soft)}
+.legend li{display:flex;align-items:center;gap:7px}
+.sw{width:13px;height:13px;border:1.5px solid var(--ink);display:inline-block}
+
+@media (max-width: 1100px){ .main,.main.wide{grid-template-columns:1fr} }
+@media (max-width: 980px){
+  .top,.two,.three{grid-template-columns:1fr}
+  .controls{justify-content:flex-start}
+  .card{grid-template-columns:1fr;gap:12px;min-height:0}
+}
+@media (max-width: 640px){
+  .page{padding:20px 14px 36px}
+  h1{font-size:1.75rem}
+  .tl-label{display:none}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+
+/* ---- semaphores additions ---- */
+:root{--t4:#0b7285;--t4s:#c5f6fa;--t5:#c2255c;--t5s:#ffdeeb}
+.card.t4{border-color:var(--t4)}.card.t4 .calc{border-left-color:var(--t4)}
+.card.t5{border-color:var(--t5)}.card.t5 .calc{border-left-color:var(--t5)}
+.who.t4{background:var(--t4s)}.who.t5{background:var(--t5s)}
+.mini{margin:16px 0 6px;font-size:.82rem;color:var(--ink-soft);font-weight:700}
+.sems{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.sem{border:3px solid var(--ink);border-radius:8px;background:#fff;padding:7px 10px;text-align:center;transition:border-color .25s,background-color .25s}
+.sem.neg{border-color:var(--bad);background:#fff0f0}
+.sem .sn{font-family:var(--mono);font-weight:700;font-size:.9rem}
+.sem .sn small{display:block;font-weight:400;color:var(--ink-soft);font-size:.72rem}
+.sem .val{font-family:var(--mono);font-size:2rem;font-weight:700;line-height:1.1}
+.sem.neg .val{color:var(--bad)}
+.sem .sq{font-size:.8rem;color:var(--ink-soft);min-height:1.7em}
+.sem .sh{font-size:.78rem;color:var(--ink-soft)}
+.sem .who,.trl .who{margin:1px 3px 1px 0}
+.st{font-size:.8rem;font-weight:400;color:var(--ink-soft);margin-left:6px}
+.code tr.blk td{background:#ffd8d8}
+.thrs{display:grid;gap:14px;align-items:start}
+.thrs.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.thrs.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.out{font-family:var(--mono);font-size:13.5px;background:var(--ink);color:#e9eef2;border-radius:6px;padding:10px 12px;min-height:72px;white-space:pre-wrap}
+.bufrow{display:flex;gap:10px;flex-wrap:wrap}
+.bslot{width:96px;text-align:center;font-size:.78rem;color:var(--ink-soft)}
+.bcell{height:44px;border:2px solid var(--ink);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.9rem;background:var(--hatch);color:var(--ink)}
+.bcell.full{background:var(--t3s);border-color:var(--t3)}
+.bcell.err{background:#ffc9c9;border-color:var(--bad);color:var(--bad)}
+.ptrs{min-height:22px;display:flex;gap:4px;justify-content:center;margin-top:3px}
+.ptr{font-family:var(--mono);font-size:.72rem;font-weight:700;padding:0 6px;border:1.5px solid var(--ink);border-radius:999px;background:#fff;color:var(--ink)}
+.ptr.f{background:var(--t1s)}.ptr.u{background:var(--t2s)}
+.rwrow{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
+.rwbox{flex:1;min-width:170px;border:2px solid var(--line);border-radius:6px;background:#fff;padding:8px 11px;font-size:.85rem}
+.rwbox small{color:var(--ink-soft)}
+svg.dine{display:block;width:100%;max-width:340px;height:auto;margin:0 auto;font-family:var(--mono)}
+.meta{margin:8px 0 0;font-size:.85rem;color:var(--ink-soft)}
+@media (max-width:980px){.thrs.c3{grid-template-columns:1fr}.thrs.c2{grid-template-columns:1fr}}
+
+/* ---- producer-consumer additions ---- */
+.rooms{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr) minmax(0,1.1fr);gap:12px;align-items:stretch}
+.rooms .zone{min-height:150px}
+.waits .zone.bad{border-color:var(--bad);background:#fff0f0}
+.tracebox{max-height:250px;overflow:auto;border:1.5px solid var(--line);border-radius:6px;background:#fff}
+.tracebox .tbl th{position:sticky;top:0;background:#fff}
+.tbl tr.now td{background:#fff3bf}
+.tbl tr.bad td{background:#ffd8d8;color:var(--bad)}
+.tbl td.num{text-align:left}
+.tbl td.lnl{font-weight:700}
+.code tr.wake td{background:#e9fac8}
+.code td.ln{padding-right:2px}
+.zone .trl{flex-wrap:wrap}
+.zone .mem{padding:5px 10px;margin-top:8px}
+.zone .mem b{font-size:1.6rem}
+.zone .mem b.chg{color:var(--bad)}
+.bufrow{margin-top:2px}
+@media (max-width:980px){.rooms{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div>
+      <h1>The producer-consumer problem</h1>
+      <p class="intro">A producer puts items into a shared buffer and consumers take them out. Each side has to wait when the buffer is wrong for it: full for the producer, empty for the consumer. The tabs follow the four implementations in OSTEP Chapter 30 in order: two that are broken in different ways, then two that work. The line labels p1 to p6 and c1 to c6 are the ones the book uses in its traces.</p>
+    </div>
+    <div class="controls">
+      <button id="btnRestart" type="button">Restart</button>
+      <button id="btnPrev" type="button">Back</button>
+      <button id="btnPlay" type="button">Play</button>
+      <button id="btnNext" type="button" class="primary">Next step</button>
+      <label class="speed">Speed
+        <select id="speed">
+          <option value="2600">Slow</option>
+          <option value="1500" selected>Normal</option>
+          <option value="700">Fast</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Implementations">
+    <button type="button" role="tab" id="tab1" data-t="1" aria-controls="panel1" aria-selected="true"><b>1. if, one CV</b><span>broken: wakes into an empty buffer</span></button>
+    <button type="button" role="tab" id="tab2" data-t="2" aria-controls="panel2" aria-selected="false"><b>2. while, one CV</b><span>broken: wakes the wrong thread</span></button>
+    <button type="button" role="tab" id="tab3" data-t="3" aria-controls="panel3" aria-selected="false"><b>3. while, two CVs</b><span>works, one slot</span></button>
+    <button type="button" role="tab" id="tab4" data-t="4" aria-controls="panel4" aria-selected="false"><b>4. Multi-slot buffer</b><span>the chapter's final version</span></button>
+  </nav>
+
+  <div id="panels"></div>
+
+  <p class="kbd-hint">Keyboard: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to step, <kbd>Space</kbd> to play or pause.</p>
+  <p class="foot">Code and traces follow OSTEP, Chapter 30, <em>Condition Variables</em>. CV means condition variable.</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+/* =========================================================
+   Generic tour engine: one tour per tab
+   ========================================================= */
+const tours = {};
+function makeTour (n, steps, draw) {
+  const card = $('card' + n);
+  tours[n] = { steps, draw, cur: 0, card, tl: $('tl' + n) };
+  const groups = [];
+  steps.forEach((s, i) => {
+    const last = groups[groups.length - 1];
+    if (last && last.label === s.phase) last.count++;
+    else groups.push({ label: s.phase, color: s.color || '#172033', start: i, count: 1 });
+  });
+  tours[n].groups = groups;
+  tours[n].tl.innerHTML = groups.map(g => {
+    let b = '';
+    for (let i = g.start; i < g.start + g.count; i++) {
+      const t = steps[i].title.replace(/"/g, '&quot;');
+      b += `<button class="tl-step" type="button" data-i="${i}" aria-label="Step ${i + 1}: ${t}" title="Step ${i + 1}: ${t}"></button>`;
+    }
+    return `<div class="tl-group" style="flex:${g.count} 1 0;--g:${g.color}"><div class="tl-steps">${b}</div><div class="tl-label">${g.label}</div></div>`;
+  }).join('');
+  tours[n].tl.onclick = e => {
+    const b = e.target.closest('.tl-step');
+    if (b) { stop(); show(n, +b.dataset.i); }
+  };
+  show(n, 0, false);
+}
+
+function show (n, i, animate = true) {
+  const T = tours[n];
+  if (!T || i < 0 || i >= T.steps.length) return;
+  const root = document.documentElement;
+  if (!animate) root.classList.add('instant');
+  T.cur = i;
+  const s = T.steps[i];
+  T.card.className = 'panel card' + (s.tone ? ' ' + s.tone : '');
+  T.card.querySelector('.step-count').textContent = `Step ${i + 1} of ${T.steps.length}`;
+  T.card.querySelector('h2').innerHTML = esc(s.title) + (s.who ? ` <span class="who ${s.who[0]}">${s.who[1]}</span>` : '');
+  T.card.querySelector('.body').textContent = s.body;
+  T.card.querySelector('.calc').textContent = (s.calc || []).join('\n');
+  T.tl.querySelectorAll('.tl-step').forEach(b => {
+    const k = +b.dataset.i;
+    b.classList.toggle('done', k < i);
+    b.classList.toggle('now', k === i);
+    b.setAttribute('aria-current', k === i ? 'step' : 'false');
+  });
+  T.draw(s, i);
+  if (n === tab) syncButtons();
+  if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('instant')));
+}
+
+let timer = null;
+let tab = 1;
+function syncButtons () {
+  const T = tours[tab];
+  $('btnPrev').disabled = !T || T.cur === 0;
+  $('btnNext').disabled = !T || T.cur === T.steps.length - 1;
+}
+function stepBy (d) { const T = tours[tab]; if (T) show(tab, T.cur + d); }
+function play () {
+  stop();
+  const T = tours[tab];
+  if (!T) return;
+  if (T.cur >= T.steps.length - 1) show(tab, 0);
+  $('btnPlay').textContent = 'Pause';
+  const tick = () => {
+    const t = tours[tab];
+    if (!t || t.cur >= t.steps.length - 1) { stop(); return; }
+    show(tab, t.cur + 1);
+    timer = setTimeout(tick, +$('speed').value);
+  };
+  timer = setTimeout(tick, +$('speed').value);
+}
+function stop () { clearTimeout(timer); timer = null; $('btnPlay').textContent = 'Play'; }
+$('btnNext').onclick = () => { stop(); stepBy(1); };
+$('btnPrev').onclick = () => { stop(); stepBy(-1); };
+$('btnPlay').onclick = () => (timer ? stop() : play());
+$('btnRestart').onclick = () => { stop(); show(tab, 0); };
+document.addEventListener('keydown', e => {
+  if (e.target.closest('select, input, #tabs')) return;
+  if (e.key === 'ArrowRight') { stop(); stepBy(1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stop(); stepBy(-1); e.preventDefault(); }
+  else if (e.key === ' ' && !e.target.closest('button')) { timer ? stop() : play(); e.preventDefault(); }
+  else if (e.key === 'Home') { stop(); show(tab, 0); }
+});
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+const NTABS = 4;
+function showTab (n) {
+  stop();
+  tab = n;
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', +b.dataset.t === n ? 'true' : 'false'));
+  for (let i = 1; i <= NTABS; i++) $('panel' + i).hidden = i !== n;
+  syncButtons();
+  if (history.replaceState) { try { history.replaceState(null, '', '#' + n); } catch (err) { /* ignore */ } }
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]');
+  if (b) showTab(+b.dataset.t);
+});
+$('tabs').addEventListener('keydown', e => {
+  const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+  if (!d) return;
+  e.preventDefault();
+  const n = ((tab - 1 + d + NTABS) % NTABS) + 1;
+  showTab(n); $('tab' + n).focus();
+});
+
+
+
+/* =========================================================
+   Condition-variable simulator
+   ========================================================= */
+const GREY = '#7d8b99';
+const clone = o => JSON.parse(JSON.stringify(o));
+const tIdx = (sc, n) => sc.threads.findIndex(t => t.name === n);
+const lblOf = (sc, ti, pc) => sc.threads[ti].role + (pc + 1);
+const roomName = cv => cv === 'cond' ? 'the waiting room' : `the ${cv} room`;
+
+/* instruction builders: one per source line */
+const iLock = () => ({ k: 'lock', txt: 'lock(&m);' });
+const iUnlock = () => ({ k: 'unlock', txt: 'unlock(&m);' });
+const iTest = (kw, cond, c, no, why) => ({ k: 'test', txt: `${kw} (${cond})`, c, no, why });
+const iWait = (cv, back) => ({ k: 'wait', cv, back, txt: `wait(&${cv}, &m);`, ind: 1 });
+const iSig = cv => ({ k: 'signal', cv, txt: `signal(&${cv});` });
+const iDo = (txt, fx) => ({ k: 'do', txt, fx });
+
+const putFx = (sh, t) => {
+  if (sh.count >= sh.max) return { bad: true, note: 'puts into a full buffer and overwrites an item.', short: 'put on full!' };
+  const v = t.iter, slot = sh.fill;
+  sh.buf[slot] = v; sh.fill = (sh.fill + 1) % sh.max; sh.count++;
+  return { note: `puts item ${v} into slot ${slot}.` + (sh.max > 1 ? ` fill moves to ${sh.fill}.` : ''), short: `put item ${v}` };
+};
+const getFx = (sh, t) => {
+  if (sh.count === 0) { sh.failed = true; return { bad: true, note: 'calls get() on an empty buffer, so the assertion fails.', short: 'get() on empty!' }; }
+  const slot = sh.use, v = sh.buf[slot];
+  sh.buf[slot] = null; sh.use = (sh.use + 1) % sh.max; sh.count--; sh.got.push(v);
+  return { note: `takes item ${v} out of slot ${slot}.` + (sh.max > 1 ? ` use moves to ${sh.use}.` : ''), short: `got item ${v}` };
+};
+
+function newVM (sc) {
+  const vm = { m: { holder: null, q: [] }, cv: {}, sh: clone(sc.init), sleeps: 0, log: [], last: null, deadlock: false, failed: false,
+    th: sc.threads.map(t => ({ name: t.name, pc: 0, iter: 0, st: 'ready', on: null, reacq: false, woken: false, ran: false, recheck: false })) };
+  sc.cvs.forEach(c => { vm.cv[c] = { q: [] }; });
+  return vm;
+}
+/* hang the key back up; hand it to the first thread waiting at the door */
+function release (vm, sc) {
+  vm.m.holder = null;
+  if (!vm.m.q.length) return null;
+  const wn = vm.m.q.shift(), wi = tIdx(sc, wn), w = vm.th[wi], prog = sc.threads[wi].prog;
+  vm.m.holder = wn; w.st = 'ready'; w.woken = true;
+  if (w.reacq) { const ins = prog[w.pc]; w.reacq = false; w.pc = ins.back; w.recheck = prog[ins.back].k === 'test'; }
+  else w.pc++;
+  return wn;
+}
+function exec (vm, sc, tn) {
+  const ti = tIdx(sc, tn), t = vm.th[ti], prog = sc.threads[ti].prog;
+  if (t.st !== 'ready') throw new Error(tn + ' cannot run: ' + t.st);
+  const res = { t: tn, ln: lblOf(sc, ti, t.pc), ins: prog[t.pc], kind: prog[t.pc].k, bad: false, short: '' };
+  t.woken = false; t.ran = true; vm.last = tn;
+  const ins = res.ins;
+  if (t.reacq) {
+    res.kind = 'reacq';
+    if (vm.m.holder === null) { vm.m.holder = tn; t.reacq = false; t.pc = ins.back; t.recheck = prog[ins.back].k === 'test'; res.recheck = t.recheck; res.short = 'wakes, retakes key'; }
+    else { t.st = 'lockwait'; vm.m.q.push(tn); res.blocked = true; res.holder = vm.m.holder; res.short = 'woken, key is taken'; }
+  } else if (ins.k === 'lock') {
+    if (vm.m.holder === null) { vm.m.holder = tn; t.pc++; res.short = 'takes key'; }
+    else { t.st = 'lockwait'; vm.m.q.push(tn); res.blocked = true; res.holder = vm.m.holder; res.short = 'key is taken, waits'; }
+  } else if (ins.k === 'unlock') {
+    res.handoff = release(vm, sc); t.pc++;
+    res.short = res.handoff ? 'releases key to ' + res.handoff : 'releases key';
+  } else if (ins.k === 'test') {
+    res.yes = ins.c(vm.sh, t); res.recheck = t.recheck; t.recheck = false;
+    t.pc = res.yes ? t.pc + 1 : ins.no;
+    res.short = res.yes ? 'must wait' : 'no need to wait';
+  } else if (ins.k === 'wait') {
+    res.handoff = release(vm, sc);
+    t.st = 'asleep'; t.on = ins.cv; t.reacq = true; vm.cv[ins.cv].q.push(tn); vm.sleeps++;
+    res.short = 'sleeps' + (ins.cv === 'cond' ? '' : ' on ' + ins.cv);
+  } else if (ins.k === 'signal') {
+    const q = vm.cv[ins.cv].q; res.qlen = q.length;
+    if (q.length) {
+      const sn = q.shift(), s = vm.th[tIdx(sc, sn)];
+      s.st = 'ready'; s.on = null; s.woken = true; res.woke = sn; res.short = 'wakes ' + sn;
+    } else res.short = 'nobody asleep';
+    t.pc++;
+  } else {
+    const r = ins.fx(vm.sh, t, vm) || {};
+    res.note = r.note || ''; res.short = r.short || ''; res.bad = !!r.bad;
+    if (r.bad) vm.failed = true;
+    t.pc++;
+  }
+  /* end of a pass through the loop body */
+  if (t.st === 'ready' && !t.reacq && t.pc >= prog.length) {
+    t.iter++;
+    if (t.iter < sc.threads[ti].loops) t.pc = 0; else t.st = 'done';
+  }
+  vm.log.push({ t: tn, ln: res.ln, count: vm.sh.count, short: res.short, bad: res.bad });
+  const live = vm.th.filter(x => x.st !== 'done');
+  vm.deadlock = live.length > 0 && live.every(x => x.st === 'asleep' || x.st === 'lockwait');
+  return res;
+}
+function narrate (res, vm) {
+  const t = res.t, ins = res.ins;
+  const title = `${t} ${res.ln}: ` + (res.kind === 'reacq' ? 'returns from wait()' : ins.txt);
+  let b;
+  if (res.kind === 'lock') b = res.blocked ? `The key is held by ${res.holder}, so ${t} waits at the door.` : `${t} takes the key and enters the room.`;
+  else if (res.kind === 'unlock') b = `${t} hangs the key back up.` + (res.handoff ? ` ${res.handoff} was waiting at the door, so it gets the key.` : '');
+  else if (res.kind === 'test') b = (res.recheck ? 'Because this is a while loop, the condition is checked again after waking. ' : '') + `count is ${vm.sh.count}. ` + (res.yes ? ins.why[0] : ins.why[1]).replace(/\$T/g, t);
+  else if (res.kind === 'wait') b = `wait() does two things as one atomic step: it hangs the key back up and puts ${t} to sleep in ${roomName(ins.cv)}.` + (res.handoff ? ` ${res.handoff} was waiting at the door and gets the key.` : '');
+  else if (res.kind === 'reacq') b = res.blocked
+    ? `${t} was woken, but the key is held by ${res.holder}, so it waits at the door, still inside wait().`
+    : `${t} wakes up. Before wait() can return it has to take the key again, and the key is free. ` + (res.recheck ? 'It goes back to the while test to look at the buffer again.' : 'With an if, it goes straight on without looking at the buffer again.');
+  else if (res.kind === 'signal') b = res.woke
+    ? `${t} rings the bell for ${roomName(ins.cv)}. ${res.woke} ${res.qlen > 1 ? 'has slept there longest' : 'is the only sleeper there'}, so it wakes up, but it only becomes ready: it must take the key again before it can go on.`
+    : `${t} rings the bell for ${roomName(ins.cv)}, but nobody is asleep there, so the signal does nothing.`;
+  else b = `${t} ${res.note}`;
+  return { title, body: b };
+}
+function calcLines (vm, sc) {
+  const L = [`count = ${vm.sh.count}   (buffer holds ${vm.sh.max})`, `key: ${vm.m.holder ? 'held by ' + vm.m.holder : 'on the hook'}`];
+  sc.cvs.forEach(c => L.push(`${c === 'cond' ? 'asleep' : 'asleep on ' + c}: ${vm.cv[c].q.join(', ') || 'nobody'}`));
+  L.push(`sleeps so far: ${vm.sleeps}`);
+  return L;
+}
+function buildSteps (sc) {
+  const vm = newVM(sc), steps = [];
+  steps.push({ phase: 'setup', color: GREY, tone: '', who: null, title: sc.intro.title, body: sc.intro.body, calc: calcLines(vm, sc), view: clone(vm) });
+  let ph = null;
+  sc.sched.forEach(e => {
+    if (e.ph !== undefined) ph = e.ph;
+    const ti = tIdx(sc, e.t), cl = 't' + (ti + 1), n = e.n || 1, nar = [];
+    let bad = false;
+    for (let k = 0; k < n; k++) { const r = exec(vm, sc, e.t); nar.push({ r, ...narrate(r, vm) }); if (r.bad) bad = true; }
+    const title = e.title || (n === 1 ? nar[0].title : `${e.t}: ${nar[0].r.ln} to ${nar[n - 1].r.ln}`);
+    const body = (e.body || nar.map(x => x.body).join(' ')) + (e.note ? ' ' + e.note : '');
+    steps.push({ phase: ph || e.t, color: `var(--${cl})`, tone: bad ? 'bad' : cl, who: [cl, e.t], title, body, calc: calcLines(vm, sc), view: clone(vm) });
+  });
+  const o = sc.outro;
+  steps.push({ phase: 'result', color: o.tone === 'bad' ? 'var(--bad)' : 'var(--good)', tone: o.tone, who: null, title: o.title, body: o.body, calc: calcLines(vm, sc), view: clone(vm), final: true });
+  return steps;
+}
+
+/* =========================================================
+   The four implementations
+   ========================================================= */
+const x = (t, note, ph, extra) => Object.assign({ t, note, ph }, extra || {});
+function mkProgs (cfg) {
+  const back = cfg.kw === 'while' ? 1 : 3, M = cfg.max;
+  const cons = [iLock(),
+    iTest(cfg.kw, 'count == 0', sh => sh.count === 0, 3, ['The buffer is empty, so $T must wait.', 'The buffer has an item, so $T skips the wait.']),
+    iWait(cfg.cWait, back), iDo('tmp = get();', getFx), iSig(cfg.cSig), iUnlock()];
+  const prod = [iLock(),
+    iTest(cfg.kw, `count == ${M === 1 ? 1 : 'MAX'}`, sh => sh.count === sh.max, 3, ['The buffer is full, so $T must wait for room.', 'There is room, so $T skips the wait.']),
+    iWait(cfg.pWait, back), iDo('put(i);', putFx), iSig(cfg.pSig), iUnlock()];
+  return { cons, prod };
+}
+function scen (cfg, o) {
+  const P = mkProgs(cfg), L = o.loops;
+  return Object.assign({
+    cvs: cfg.cvs, max: cfg.max, init: { count: 0, buf: Array(cfg.max).fill(null), fill: 0, use: 0, max: cfg.max, got: [] },
+    threads: [{ name: 'Tc1', role: 'c', prog: P.cons, loops: L[0] }, { name: 'Tc2', role: 'c', prog: P.cons, loops: L[1] }, { name: 'Tp', role: 'p', prog: P.prod, loops: L[2] }]
+  }, o);
+}
+const SC = {};
+
+/* ---- 1: if, one condition variable ---- */
+SC[1] = scen({ kw: 'if', cvs: ['cond'], max: 1, cWait: 'cond', cSig: 'cond', pWait: 'cond', pSig: 'cond' }, {
+  loops: [1, 1, 2],
+  intro: { title: 'Version 1: one condition variable and an if',
+    body: 'The first attempt in the chapter. The buffer holds one item. A producer waits while it is full and a consumer waits while it is empty, each testing with an if, and all three threads share one condition variable, cond. Two consumers (Tc1, Tc2) and one producer (Tp, making two items) will run. With a single consumer this works, so watch what the second one does.' },
+  sched: [
+    x('Tc1', null, 'Tc1 finds it empty'), x('Tc1'), x('Tc1', 'While Tc1 sleeps, the key is free for anyone else.'),
+    x('Tp', null, 'Tp fills the buffer'), x('Tp'), x('Tp'), x('Tp', 'Tc1 is now ready to run, but it has not run yet and it does not hold the key.'), x('Tp'),
+    x('Tp', null, 'Tp loops and sleeps'), x('Tp'), x('Tp', 'Tc1 is awake but waiting to run, and Tp is asleep.'),
+    x('Tc2', 'Tc2 was not waiting for anything. It arrives while Tc1 is still waiting to run.', 'Tc2 sneaks in'), x('Tc2'), x('Tc2'),
+    x('Tc2'), x('Tc2'),
+    x('Tc1', 'Tc1 was woken a while ago. Tc2 has emptied the buffer since then, and Tc1 has no way of knowing.', 'Tc1 trusts the hint'), x('Tc1')
+  ],
+  outro: { tone: 'bad', title: 'Tc1 called get() on an empty buffer',
+    body: 'Tp’s signal told Tc1 only that the buffer had been full at that moment. A signal is a hint that the state changed, not a promise about the state when the woken thread finally runs; this is called Mesa semantics. Tc2 got the key first and took the item, and Tc1, trusting the old hint, did not look again. The fix is to recheck with a while loop.' }
+});
+
+/* ---- 2: while, one condition variable ---- */
+SC[2] = scen({ kw: 'while', cvs: ['cond'], max: 1, cWait: 'cond', cSig: 'cond', pWait: 'cond', pSig: 'cond' }, {
+  loops: [2, 1, 2],
+  intro: { title: 'Version 2: while instead of if',
+    body: 'The fix for the first bug. Every thread now tests with a while, so after waking it goes back and looks at the buffer again. There is still only one condition variable, shared by producer and consumers. Same threads as before, except that Tc1 makes two passes, and this time both consumers go to sleep first.' },
+  sched: [
+    x('Tc1', null, 'Tc1 sleeps'), x('Tc1'), x('Tc1'),
+    x('Tc2', null, 'Tc2 sleeps'), x('Tc2'), x('Tc2', 'Tc1 and Tc2 are now both asleep in the one waiting room. Tc1 has been there longest.'),
+    x('Tp', null, 'Tp fills the buffer'), x('Tp'), x('Tp'), x('Tp', 'Tc2 stays asleep.'), x('Tp'),
+    x('Tp', null, 'Tp sleeps'), x('Tp'), x('Tp', 'Tp joins the same waiting room, behind Tc2.'),
+    x('Tc1', null, 'Tc1 consumes'), x('Tc1'), x('Tc1'),
+    x('Tc1', 'Tc1 meant to wake Tp, but a signal cannot choose the kind of thread. Tp stays asleep.'), x('Tc1'),
+    x('Tc1', null, 'Tc1 sleeps again'), x('Tc1'), x('Tc1', 'Tp and Tc1 are asleep now.'),
+    x('Tc2', 'Tc1\u2019s signal meant "there is room", which is no use to a consumer.', 'Tc2 rechecks'), x('Tc2'), x('Tc2', 'Tp, Tc1 and Tc2 are all asleep, and nobody is left to call signal().')
+  ],
+  outro: { tone: 'bad', title: 'Deadlock: all three threads are asleep',
+    body: 'The while loop fixed the first bug: Tc2 looked again, saw an empty buffer, and correctly went back to sleep. But with one condition variable the signal from Tc1 woke the wrong kind of thread. Tp is asleep waiting for room, both consumers are asleep waiting for an item, and nobody can signal. The fix is two condition variables, so that consumers wake producers and producers wake consumers.' }
+});
+
+/* ---- 3: while, two condition variables ---- */
+SC[3] = scen({ kw: 'while', cvs: ['empty', 'fill'], max: 1, cWait: 'fill', cSig: 'empty', pWait: 'empty', pSig: 'fill' }, {
+  loops: [1, 1, 2],
+  intro: { title: 'Version 3: two condition variables',
+    body: 'Give each condition its own waiting room. Consumers sleep in the fill room, waiting for an item, and the producer sleeps in the empty room, waiting for room. A consumer signals empty and a producer signals fill, so a signal can only wake the kind of thread that can use it. This is the same set of threads as the previous tab.' },
+  sched: [
+    x('Tc1', null, 'Tc1 sleeps'), x('Tc1'), x('Tc1', 'Consumers sleep in the fill room: they are waiting for an item.'),
+    x('Tc2', null, 'Tc2 sleeps'), x('Tc2'), x('Tc2'),
+    x('Tp', null, 'Tp fills the buffer'), x('Tp'), x('Tp'), x('Tp'), x('Tp'),
+    x('Tp', null, 'Tp sleeps'), x('Tp'), x('Tp', 'This is a different room from the consumers\u2019.'),
+    x('Tc1', null, 'Tc1 consumes'), x('Tc1'), x('Tc1'),
+    x('Tc1', 'Only Tp sleeps in the empty room: exactly the thread that can use the freed slot.'), x('Tc1'),
+    x('Tp', null, 'Tp refills'), x('Tp'), x('Tp'), x('Tp'), x('Tp'),
+    x('Tc2', null, 'Tc2 consumes'), x('Tc2'), x('Tc2'), x('Tc2', 'That is harmless: nobody needed it.'), x('Tc2')
+  ],
+  outro: { tone: 'good', title: 'Both items moved, and no signal woke the wrong thread',
+    body: 'The while loops make every woken thread look again, and the two condition variables make every signal reach a thread that can use it. The remaining cost is the single slot: after each item the producer has to sleep and be woken, so two items took three sleeps. The final version adds slots.' }
+});
+
+/* ---- 4: multi-slot buffer ---- */
+SC[4] = scen({ kw: 'while', cvs: ['empty', 'fill'], max: 3, cWait: 'fill', cSig: 'empty', pWait: 'empty', pSig: 'fill' }, {
+  loops: [2, 2, 4],
+  intro: { title: 'Version 4: a buffer with MAX slots',
+    body: 'The final version. The buffer has MAX = 3 slots, with a fill pointer and a use pointer that wrap around. A producer now sleeps only when all slots are full (count == MAX) and a consumer only when all are empty (count == 0). The condition variables and while loops are as before. Tp will make four items, and Tc1 and Tc2 will take two each.' },
+  sched: [
+    x('Tp', null, 'Tp runs ahead', { n: 5, title: 'Tp: p1 to p6, makes item 0',
+      body: 'Tp takes the key, sees room (count is 0, not 3), puts item 0 into slot 0, rings the fill bell (nobody is asleep, so nothing happens) and hangs the key back up. count is now 1.' }),
+    x('Tp', null, undefined, { n: 5, title: 'Tp: p1 to p6, makes item 1',
+      body: 'The same again, with no sleeping. Item 1 goes into slot 1 and count is now 2. With one slot, the producer would already have had to wait.' }),
+    x('Tp', null, undefined, { n: 5, title: 'Tp: p1 to p6, makes item 2',
+      body: 'Item 2 goes into slot 2, and fill wraps back round to 0. count is now 3: the buffer is full.' }),
+    x('Tp', null, 'Tp sleeps'), x('Tp'), x('Tp', 'This is the producer’s first sleep.'),
+    x('Tc1', null, 'Tc1 consumes'), x('Tc1'), x('Tc1'),
+    x('Tc1', 'A slot has just been freed, and Tp is waiting for one.'), x('Tc1'),
+    x('Tc1', null, undefined, { n: 5, title: 'Tc1: c1 to c6, takes item 1',
+      body: 'Tc1 goes round again. count is 2, so it does not wait. It takes item 1 out of slot 1 and use moves to 2. Tp is already awake, so signal(&empty) finds nobody asleep. count is now 1.' }),
+    x('Tp', null, 'Tp finishes', { n: 5, title: 'Tp: wakes, then p2 to p6, makes item 3',
+      body: 'Tp wakes, retakes the key and returns from wait(), then rechecks: count is 1, so there is room. Item 3 goes into slot 0, which Tc1 freed earlier, and count is 2. That was Tp’s last item.' }),
+    x('Tc2', null, 'Tc2 consumes', { n: 5, title: 'Tc2: c1 to c6, takes item 2',
+      body: 'Tc2 finds items waiting, so it never sleeps. It takes item 2 out of slot 2 and use wraps round to 0. count is now 1.' }),
+    x('Tc2', null, undefined, { n: 5, title: 'Tc2: c1 to c6, takes item 3',
+      body: 'Tc2 takes item 3 out of slot 0. The buffer is empty again, and all four items have been consumed in the order they were made.' })
+  ],
+  outro: { tone: 'good', title: 'Four items moved with a single sleep',
+    body: 'Because the buffer had room, the producer made three items in a row without sleeping, and consumers found items waiting and never slept at all. With one slot, every item costs a sleep and a wake-up on each side. Fewer sleeps means fewer context switches, which is the point of the final version.' }
+});
+
+/* =========================================================
+   Rendering
+   ========================================================= */
+const pillOf = (sc, n) => `<span class="who t${tIdx(sc, n) + 1}">${n}</span>`;
+function stateOf (v, i) {
+  const t = v.th[i];
+  if (t.st === 'done') return 'done';
+  if (t.st === 'asleep') return 'asleep';
+  if (t.st === 'lockwait') return 'waiting for the key';
+  if (t.st === 'ready' && t.reacq) return 'woken, needs key';
+  if (v.m.holder === t.name) return v.last === t.name ? 'running, holds the key' : 'holds the key';
+  if (v.last === t.name) return 'running';
+  return t.ran ? 'ready' : 'not started';
+}
+const CVTITLE = { cond: 'Waiting room (one shared condition variable)', fill: 'fill room: waiting for an item', empty: 'empty room: waiting for room' };
+function drawView (n, s) {
+  const sc = SC[n], v = s.view, hold = v.m.holder;
+  const door = [], lobby = [];
+  v.th.forEach(t => {
+    if (t.name === hold || t.st === 'asleep') return;
+    if (t.st === 'lockwait' || (t.st === 'ready' && t.reacq)) door.push(t); else lobby.push(t);
+  });
+  const doorH = door.length ? door.map(t => `<div class="trl">${pillOf(sc, t.name)}<small>${t.st === 'lockwait' ? 'waiting for the key' : 'woken, needs the key'}</small></div>`).join('') : '<small>nobody</small>';
+  const lobbyH = lobby.length ? lobby.map(t => `<div class="trl">${pillOf(sc, t.name)}<small>${t.st === 'done' ? 'finished' : t.ran ? '' : 'not started'}</small></div>`).join('') : '<small>nobody</small>';
+  const sleepers = Object.keys(v.cv).map(c => {
+    const q = v.cv[c].q;
+    return `<div class="zone${v.deadlock ? ' bad' : ''}"><h3>${CVTITLE[c]}</h3>${q.length ? q.map(nm => pillOf(sc, nm)).join('') : '<small>nobody</small>'}${q.length > 1 ? '<br><small>front of the line wakes first</small>' : ''}</div>`;
+  }).join('');
+  $('rooms' + n).innerHTML =
+    `<div class="zone"><h3>Not in line</h3>${lobbyH}<h3 style="margin-top:10px">Awake, at the door</h3>${doorH}</div>` +
+    `<div class="zone ${hold ? 'occ' : 'vac'}"><h3>The room</h3><div class="sign ${hold ? 'occ' : 'vac'}">${hold ? 'key held by' : 'key on the hook'}</div>${hold ? pillOf(sc, hold) : ''}` +
+    `<div class="mem"><span>count =</span><b${v.failed ? ' class="chg"' : ''}>${v.sh.count}</b></div></div>` +
+    `<div class="waits">${sleepers}</div>`;
+  /* the buffer */
+  const sh = v.sh;
+  $('buf' + n).innerHTML = `<div class="bufrow">` + sh.buf.map((val, i) =>
+    `<div class="bslot">slot ${i}<div class="bcell${val === null ? '' : ' full'}${v.failed && i === sh.use ? ' err' : ''}">${v.failed && i === sh.use ? 'empty!' : val === null ? '' : 'item ' + val}</div>` +
+    `<div class="ptrs">${sh.max > 1 && sh.fill === i ? '<span class="ptr f">fill</span>' : ''}${sh.max > 1 && sh.use === i ? '<span class="ptr u">use</span>' : ''}</div></div>`).join('') +
+    `</div><p class="meta">${sh.max > 1 ? 'put() writes buffer[fill] and advances fill; get() reads buffer[use] and advances use, both wrapping at MAX. ' : ''}${sh.got.length ? 'Taken by consumers, in order: item ' + sh.got.join(', item ') + '.' : 'Nothing has been consumed yet.'}</p>`;
+  /* the threads */
+  $('thr' + n).innerHTML = '<div class="thrs c3">' + sc.threads.map((t, i) => {
+    const th = v.th[i];
+    const rows = t.prog.map((ins, k) => {
+      let c = '';
+      if (th.st === 'asleep' || th.st === 'lockwait') { if (k === th.pc) c = 'blk'; }
+      else if (th.st !== 'done' && k === th.pc) c = th.reacq ? 'wake' : 'cur';
+      return `<tr class="${c}"><td class="ln">${t.role}${k + 1}</td><td class="src">${ins.ind ? '    ' : ''}${esc(ins.txt)}</td></tr>`;
+    }).join('');
+    return `<div><h3 style="margin-top:0">${pillOf(sc, t.name)}<span class="st">${stateOf(v, i)}</span></h3><table class="code">${rows}</table>` +
+      `<p class="meta" style="margin-top:4px">pass ${Math.min(th.iter + 1, t.loops)} of ${t.loops}</p></div>`;
+  }).join('') + '</div>';
+  /* the trace, in the style of the book's thread-trace tables */
+  const last = v.log.length - 1;
+  $('trace' + n).innerHTML = '<table class="tbl"><thead><tr><th>#</th><th>Thread</th><th>Line</th><th>count</th><th>What happened</th></tr></thead><tbody>' +
+    (v.log.length ? v.log.map((r, i) => `<tr class="${r.bad ? 'bad' : i === last ? 'now' : ''}"><td class="num">${i + 1}</td><td>${r.t}</td><td class="lnl">${r.ln}</td><td class="num">${r.count}</td><td>${esc(r.short)}</td></tr>`).join('') : '<tr><td colspan="5" style="color:var(--ink-soft)">Nothing has run yet.</td></tr>') + '</tbody></table>';
+  const tb = $('trace' + n); tb.scrollTop = tb.scrollHeight;
+}
+
+/* =========================================================
+   Panels
+   ========================================================= */
+const VERS = [
+  ['1', 'if', '1 (cond)', '1 slot', 'broken: get() on an empty buffer'],
+  ['2', 'while', '1 (cond)', '1 slot', 'broken: every thread asleep'],
+  ['3', 'while', '2 (empty, fill)', '1 slot', 'works, one item at a time'],
+  ['4', 'while', '2 (empty, fill)', 'MAX slots', 'works, with fewer sleeps']
+];
+const cmpTable = sel => `<table class="tbl wrap"><thead><tr><th>#</th><th>Test</th><th>CVs</th><th>Buffer</th><th>Outcome</th></tr></thead><tbody>` +
+  VERS.map((r, i) => `<tr class="${i + 1 === sel ? 'sel' : ''}">${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
+const ONESLOT = `<pre class="src" style="margin-bottom:0">int buffer;
+int count = 0;
+
+void put(int value) {
+    assert(count == 0);
+    count = 1;
+    buffer = value;
+}
+int get() {
+    assert(count == 1);
+    count = 0;
+    return buffer;
+}</pre>`;
+const RULES = `<section class="panel"><h2>Rules the chapter ends with</h2>
+<p class="sub" style="margin:0 0 6px"><strong>Always use a while loop</strong> to check the condition. A signal is only a hint, so look again after waking.</p>
+<p class="sub" style="margin:0 0 6px"><strong>Hold the lock</strong> when you call wait or signal.</p>
+<p class="sub" style="margin:0"><strong>One condition variable per condition.</strong> Then a signal always reaches a thread that can use it.</p></section>`;
+const PAN = {
+  1: { h: 'Version 1: if, one condition variable', sub: 'a woken consumer trusts a stale hint',
+    side: `<section class="panel"><h2>What this version does</h2>
+<p class="sub" style="margin:0">One mutex, one condition variable, and a buffer of one slot. Each side tests with an <code>if</code> and sleeps if the buffer is wrong for it. With one producer and one consumer that works. A second consumer breaks it.</p></section>
+<section class="panel"><h2>Signals are hints</h2>
+<p class="sub" style="margin:0">signal() only moves a sleeper from asleep to ready. It does not hand over the key, and it does not promise that the buffer will still look as the signaler left it. Other threads can run in between. This is called Mesa semantics, and nearly every system uses it.</p></section>
+<section class="panel"><h2>The buffer code</h2>${ONESLOT}</section>
+<section class="panel"><h2>The four versions</h2>${cmpTable(1)}</section>` },
+  2: { h: 'Version 2: while, one condition variable', sub: 'the recheck works, but a signal wakes the wrong kind of thread',
+    side: `<section class="panel"><h2>What changed from version 1</h2>
+<p class="sub" style="margin:0">Every <code>if</code> became a <code>while</code>. After wait() returns, the thread jumps back to the test and looks at the buffer again. That fixes the first bug: Tc2 now looks, sees nothing, and sleeps again.</p></section>
+<section class="panel"><h2>The new problem</h2>
+<p class="sub" style="margin:0">With one condition variable a signal cannot say which thread it is for. A consumer's signal is meant for the producer, and a producer's for a consumer, but the longest sleeper wakes whichever kind it is. If it is the wrong kind, it goes back to sleep and nobody is left to wake the right one.</p></section>
+<section class="panel"><h2>The buffer code</h2>${ONESLOT}</section>
+<section class="panel"><h2>The four versions</h2>${cmpTable(2)}</section>` },
+  3: { h: 'Version 3: while, two condition variables', sub: 'every signal reaches a thread that can use it',
+    side: `<section class="panel"><h2>What changed from version 2</h2>
+<p class="sub" style="margin:0 0 6px">Two condition variables, one per condition:</p>
+<table class="tbl wrap"><thead><tr><th>CV</th><th>Sleepers</th><th>Rung by</th></tr></thead><tbody>
+<tr><td>fill</td><td>consumers, waiting for an item</td><td>the producer, after put()</td></tr>
+<tr><td>empty</td><td>the producer, waiting for room</td><td>a consumer, after get()</td></tr></tbody></table></section>
+<section class="panel"><h2>What is still not ideal</h2>
+<p class="sub" style="margin:0">The buffer holds one item, so producer and consumers must hand off after every single item, and each hand-off is a sleep and a wake-up. The next tab adds slots.</p></section>
+${RULES}
+<section class="panel"><h2>The buffer code</h2>${ONESLOT}</section>
+<section class="panel"><h2>The four versions</h2>${cmpTable(3)}</section>` },
+  4: { h: 'Version 4: a multi-slot buffer', sub: 'the producer sleeps only when every slot is full',
+    side: `<section class="panel"><h2>What changed from version 3</h2>
+<p class="sub" style="margin:0 0 8px">Only the buffer and the two tests. put() writes at fill and get() reads at use, and each pointer wraps at MAX. The producer waits when <code>count == MAX</code>, a consumer when <code>count == 0</code>.</p>
+<pre class="src" style="margin-bottom:0">int buffer[MAX];
+int fill_ptr = 0, use_ptr = 0, count = 0;
+
+void put(int value) {
+    buffer[fill_ptr] = value;
+    fill_ptr = (fill_ptr + 1) % MAX;
+    count++;
+}
+int get() {
+    int tmp = buffer[use_ptr];
+    use_ptr = (use_ptr + 1) % MAX;
+    count--;
+    return tmp;
+}</pre></section>
+<section class="panel"><h2>Why this is better</h2>
+<p class="sub" style="margin:0">Producers and consumers no longer have to alternate. Each can run ahead until the buffer is full or empty, so there are fewer sleeps and fewer context switches. Look at the sleep count in the step card.</p></section>
+${RULES}
+<section class="panel"><h2>The four versions</h2>${cmpTable(4)}</section>` }
+};
+function panelHTML (n, c) {
+  return `<div class="tabpanel" id="panel${n}" role="tabpanel" aria-labelledby="tab${n}"${n > 1 ? ' hidden' : ''}>
+<div class="chapter"><h2>${c.h}</h2><span>${c.sub}</span></div><div class="rule"></div>
+<section class="panel card" id="card${n}"><div><p class="step-count"></p><h2></h2><p class="body"></p></div><pre class="calc"></pre></section>
+<nav class="timeline" id="tl${n}" aria-label="Jump to a step"></nav>
+<div class="main wide"><section class="panel"><h2>The room and the waiting rooms</h2>
+<p class="sub">The key is the mutex. A waiting room is a condition variable: threads sleep there until another thread rings its bell.</p>
+<div class="rooms" id="rooms${n}"></div>
+<h3 class="mini">The buffer</h3><div id="buf${n}"></div>
+<h3 class="mini">Threads and the line each one is on</h3><div id="thr${n}"></div>
+<ul class="legend"><li><span class="sw" style="background:#ffe8a3"></span>next line to run</li><li><span class="sw" style="background:#ffd8d8"></span>asleep, or waiting for the key</li><li><span class="sw" style="background:#e9fac8"></span>woken, still inside wait()</li></ul>
+<h3 class="mini">Trace</h3><div class="tracebox" id="trace${n}"></div></section>
+<div class="side">${c.side}</div></div></div>`;
+}
+$('panels').innerHTML = [1, 2, 3, 4].map(n => panelHTML(n, PAN[n])).join('');
+[1, 2, 3, 4].forEach(n => makeTour(n, buildSteps(SC[n]), s => drawView(n, s)));
+const startTab = +String(location.hash).replace('#', '');
+showTab(startTab >= 1 && startTab <= NTABS ? startTab : 1);
+</script>
+</body>
+</html>
